@@ -57,6 +57,10 @@ ifeq ($(CONFIG_SPINLOCK),y)
   CMN_CSRCS += tricore_testset.c
 endif
 
+ifeq ($(CONFIG_ARCH_USE_MPU),y)
+  CMN_CSRCS += tricore_mpu.c
+endif
+
 ifeq ($(CONFIG_ARCH_HAVE_FPU),y)
   CMN_CSRCS += tricore_fpu.c
 endif
