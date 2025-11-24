@@ -10,12 +10,17 @@ config TRICORE_TC18
 	bool
 	default n
 
+config ARCH_TC1V6
+	bool
+	default n
+
 choice
 	prompt "AURIX SoC Family"
 	default ARCH_CHIP_FAMILY_TC4X
 
 config ARCH_CHIP_FAMILY_TC3X
 	bool "AURIX Family TC3X"
+	select ARCH_TC1V6
 	select ARCH_HAVE_IRQTRIGGER
 	select ARCH_HAVE_PERF_EVENTS
 	select ARCH_HAVE_POWEROFF
