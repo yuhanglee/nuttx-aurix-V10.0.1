@@ -43,6 +43,12 @@
 int mcmcan_board_initialize(void);
 #endif
 
+#ifdef CONFIG_TC4X_ASCLIN_SPI
+#  include <debug.h>
+#  include <nuttx/spi/spi_transfer.h>
+#  include "hardware/tc4x_asclin_spi.h"
+#endif
+
 /****************************************************************************
  * Public Functions
  ****************************************************************************/
@@ -110,5 +116,24 @@ void board_late_initialize(void)
 
 #ifdef CONFIG_CAN_MCAN
   mcmcan_board_initialize();
+#endif
+
+#ifdef CONFIG_TC4X_ASCLIN_SPI
+  {
+    struct spi_dev_s *spi = tc4x_asclin_spibus_initialize(0);
+
+    if (!spi)
+      {
+        _err("SPI init failed\n");
+      }
+#ifdef CONFIG_TC4X_ASCLIN_SPI_CHARDEV
+    int ret = spi_register(spi, 0);
+
+    if (ret < 0)
+      {
+        _err("SPI register failed: %d\n", ret);
+      }
+#endif
+  }
 #endif
 }
