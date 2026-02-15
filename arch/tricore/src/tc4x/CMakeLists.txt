@@ -26,4 +26,8 @@ if(CONFIG_TC4X_I2C)
   list(APPEND SRCS tc4x_i2c.c)
 endif()
 
+if(CONFIG_TC4X_ASCLIN_SPI)
+  list(APPEND SRCS tc4x_asclin_spi.c)
+endif()
+
 target_sources(arch PRIVATE ${SRCS})
