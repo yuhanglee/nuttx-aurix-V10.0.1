@@ -212,4 +212,26 @@ typedef uint32_t gpio_pinset_t;
 
 int aurix_config_gpio(gpio_pinset_t pinset);
 
+/****************************************************************************
+ * Name: aurix_gpio_write
+ *
+ * Description:
+ *   Write a value to a GPIO output pin.
+ *
+ ****************************************************************************/
+
+void aurix_gpio_write(gpio_pinset_t pinset, bool value);
+
+/****************************************************************************
+ * Name: aurix_gpio_read
+ *
+ * Description:
+ *   Read the current state of a GPIO pin.
+ *
+ ****************************************************************************/
+
+bool aurix_gpio_read(gpio_pinset_t pinset);
+
+int aurix_gpio_lower_register(gpio_pinset_t pinset, int minor);
+
 #endif /* __ARCH_TRICORE_SRC_AURIX_TRICORE_GPIO_H */

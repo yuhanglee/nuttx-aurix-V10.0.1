@@ -146,3 +146,28 @@ int aurix_config_gpio(gpio_pinset_t pinset)
 
   return OK;
 }
+
+void aurix_gpio_write(gpio_pinset_t pinset, bool value)
+{
+  uint32_t port = GPIO_GET_PORT(pinset);
+  uint32_t pin  = GPIO_GET_PIN(pinset);
+  uintptr_t omr = tc3x_port_base(port) + PORT_OMR_OFFSET;
+
+  if (value)
+    {
+      putreg32(PORT_OMR_SET(pin), omr);
+    }
+  else
+    {
+      putreg32(PORT_OMR_CLR(pin), omr);
+    }
+}
+
+bool aurix_gpio_read(gpio_pinset_t pinset)
+{
+  uint32_t port = GPIO_GET_PORT(pinset);
+  uint32_t pin  = GPIO_GET_PIN(pinset);
+  uintptr_t in_reg = tc3x_port_base(port) + PORT_IN_OFFSET;
+
+  return !!(getreg32(in_reg) & BIT(pin));
+}

@@ -23,3 +23,7 @@
 ifneq ($(CONFIG_TRICORE_UART0)$(CONFIG_TRICORE_UART1),)
 CMN_CSRCS += tricore_serial.c
 endif
+
+ifeq ($(CONFIG_DEV_GPIO),y)
+CMN_CSRCS += tricore_gpio_lower.c
+endif

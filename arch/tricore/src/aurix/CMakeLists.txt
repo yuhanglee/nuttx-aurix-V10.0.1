@@ -26,4 +26,8 @@ if(CONFIG_TRICORE_UART0 OR CONFIG_TRICORE_UART1)
   list(APPEND SRCS tricore_serial.c)
 endif()
 
+if(CONFIG_DEV_GPIO)
+  list(APPEND SRCS tricore_gpio_lower.c)
+endif()
+
 target_sources(arch PRIVATE ${SRCS})
