@@ -23,4 +23,8 @@ include $(TOPDIR)/Make.defs
 
 CSRCS = tc4d7_appinit.c
 
+ifeq ($(CONFIG_TC4X_I2C),y)
+CSRCS += tc4d7_i2c.c
+endif
+
 include $(TOPDIR)/boards/Board.mk

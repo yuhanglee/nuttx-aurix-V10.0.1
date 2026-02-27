@@ -34,9 +34,27 @@
 #  include "hardware/tc4x_wdt.h"
 #endif
 
+#ifdef CONFIG_TC4X_I2C
+#  include <debug.h>
+#  include "tc4d7_i2c.h"
+#endif
+
 /****************************************************************************
  * Public Functions
  ****************************************************************************/
+
+#ifdef CONFIG_TC4X_I2C
+void board_aurix_setup_i2c_pin(int bus)
+{
+  gpio_pinset_t sclpin = AURIX_GPIO(13, 1, GPIO_PERIPH, GPIO_ALT6) |
+                         GPIO_OPEN_DRAIN;
+  gpio_pinset_t sdapin = AURIX_GPIO(13, 2, GPIO_PERIPH, GPIO_ALT6) |
+                         GPIO_OPEN_DRAIN;
+
+  aurix_config_gpio(sclpin);
+  aurix_config_gpio(sdapin);
+}
+#endif
 
 void board_aurix_setup_serial_pin(int idx)
 {
@@ -71,6 +89,17 @@ void board_late_initialize(void)
     if (ret < 0)
       {
         _err("WDT init failed: %d\n", ret);
+      }
+  }
+#endif
+
+#ifdef CONFIG_TC4X_I2C
+  {
+    int ret = tc4d7_i2c_bringup();
+
+    if (ret < 0)
+      {
+        _err("I2C init failed: %d\n", ret);
       }
   }
 #endif
