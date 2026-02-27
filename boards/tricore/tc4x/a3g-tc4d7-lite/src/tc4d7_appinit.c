@@ -29,6 +29,11 @@
 
 #include "tricore_gpio.h"
 
+#ifdef CONFIG_TC4X_WDT
+#  include <debug.h>
+#  include "hardware/tc4x_wdt.h"
+#endif
+
 /****************************************************************************
  * Public Functions
  ****************************************************************************/
@@ -55,4 +60,18 @@ void board_aurix_setup_serial_pin(int idx)
 int board_app_initialize(uintptr_t arg)
 {
   return OK;
+}
+
+void board_late_initialize(void)
+{
+#ifdef CONFIG_TC4X_WDT
+  {
+    int ret = tc4x_wdt_initialize("/dev/watchdog0", TC4X_WDT_CPU0);
+
+    if (ret < 0)
+      {
+        _err("WDT init failed: %d\n", ret);
+      }
+  }
+#endif
 }
