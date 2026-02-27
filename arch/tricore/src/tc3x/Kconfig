@@ -15,3 +15,9 @@ config TC3X_CHIP_TC375
 		Infineon AURIX TC375.
 
 endchoice
+
+config ARCH_TRICORE_CPU_COUNT
+	int "TRICORE CPU count"
+	default 1
+	---help---
+		Tricore CPU count
