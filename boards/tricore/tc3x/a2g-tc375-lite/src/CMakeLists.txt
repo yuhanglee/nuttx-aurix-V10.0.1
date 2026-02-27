@@ -30,3 +30,7 @@ else()
 endif()
 
 target_sources(board PRIVATE tc375_appinit.c)
+
+if(CONFIG_TC3X_I2C)
+  target_sources(board PRIVATE tc375_i2c.c)
+endif()

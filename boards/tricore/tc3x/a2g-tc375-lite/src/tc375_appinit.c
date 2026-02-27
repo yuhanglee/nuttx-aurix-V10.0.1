@@ -28,6 +28,10 @@
 
 #include "tricore_gpio.h"
 
+#ifdef CONFIG_TC3X_I2C
+#  include "tc375_i2c.h"
+#endif
+
 /****************************************************************************
  * Public Functions
  ****************************************************************************/
@@ -43,7 +47,31 @@ void board_aurix_setup_serial_pin(int idx)
   aurix_config_gpio(AURIX_GPIO(14, 1, GPIO_INPUT, GPIO_PULL_UP));
 }
 
+#ifdef CONFIG_TC3X_I2C
+/* SCL/SDA pads inherited from the TC397 board (P15.4/P15.5, open-drain);
+ * confirm against the TC375 Lite Kit wiring at board-return.
+ */
+
+void board_aurix_setup_i2c_pin(int bus)
+{
+  gpio_pinset_t sclpin = AURIX_GPIO(15, 4, GPIO_PERIPH, GPIO_ALT6) |
+                         GPIO_OPEN_DRAIN;
+  gpio_pinset_t sdapin = AURIX_GPIO(15, 5, GPIO_PERIPH, GPIO_ALT6) |
+                         GPIO_OPEN_DRAIN;
+
+  aurix_config_gpio(sclpin);
+  aurix_config_gpio(sdapin);
+}
+#endif
+
 int board_app_initialize(uintptr_t arg)
 {
   return OK;
+}
+
+void board_late_initialize(void)
+{
+#ifdef CONFIG_TC3X_I2C0
+  tc375_i2c_bringup();
+#endif
 }
