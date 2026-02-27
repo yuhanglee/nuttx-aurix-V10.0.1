@@ -29,9 +29,22 @@
 #include <errno.h>
 #include "tricore_gpio.h"
 
+#ifdef CONFIG_TC4XX_I2C
+#include "tc4xx_i2c.h"
+#endif
+
 /****************************************************************************
  * Public Functions
  ****************************************************************************/
+
+void board_aurix_setup_i2c_pin(int bus)
+{
+  gpio_pinset_t sclpin = AURIX_GPIO(15, 4, GPIO_PERIPH, GPIO_ALT6) | GPIO_OPEN_DRAIN;
+  gpio_pinset_t sdapin = AURIX_GPIO(15, 5, GPIO_PERIPH, GPIO_ALT6) | GPIO_OPEN_DRAIN;
+
+  aurix_config_gpio(sclpin);
+  aurix_config_gpio(sdapin);
+}
 
 void board_aurix_setup_serial_pin(void)
 {
@@ -54,6 +67,14 @@ int board_app_initialize(uintptr_t arg)
     aurix_gpio_write(led1, (ledon = !ledon));
     usleep(500 * 1000);
   }
+
+#ifdef CONFIG_TC3XX_I2C
+  ret = tc3xx_i2c_bringup();
+  if (ret < 0)
+    {
+      _err("I2C init failed: %d\n", ret);
+    }
+#endif
 
   return ret;
 }
