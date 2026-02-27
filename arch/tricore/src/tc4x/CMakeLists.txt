@@ -22,4 +22,8 @@
 
 set(SRCS tc4x_clockconfig.c tc4x_gpio.c tc4x_watchdog.c)
 
+if(CONFIG_TC4X_I2C)
+  list(APPEND SRCS tc4x_i2c.c)
+endif()
+
 target_sources(arch PRIVATE ${SRCS})

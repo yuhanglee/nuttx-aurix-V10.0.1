@@ -30,4 +30,8 @@ if(CONFIG_DEV_GPIO)
   list(APPEND SRCS tricore_gpio_lower.c)
 endif()
 
+if(CONFIG_I2C)
+  list(APPEND SRCS tricore_i2c.c)
+endif()
+
 target_sources(arch PRIVATE ${SRCS})

@@ -24,4 +24,8 @@ CHIP_CSRCS += tc3x_clockconfig.c
 CHIP_CSRCS += tc3x_gpio.c
 CHIP_CSRCS += tc3x_watchdog.c
 
+ifeq ($(CONFIG_TC3X_I2C),y)
+CHIP_CSRCS += tc3x_i2c.c
+endif
+
 VPATH += tc3x
