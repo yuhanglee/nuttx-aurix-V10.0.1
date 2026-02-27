@@ -21,3 +21,23 @@ config ARCH_TRICORE_CPU_COUNT
 	default 1
 	---help---
 		Tricore CPU count
+
+config TC4X_WDT
+	bool "TC4x Watchdog Timer (WTU)"
+	default n
+	depends on WATCHDOG
+	---help---
+		Enable the TC4x Watchdog Timer lowerhalf (/dev/watchdogN).
+		Supports all 7 WDT instances: CPU0-CPU5 and the System WDT.
+
+		Note: WDT overflow raises an SMU alarm. Producing a system
+		reset from that alarm needs SMU configuration (not yet
+		supported); without it, overflow defaults to NMI.
+
+config TC4X_WDT_FSPB
+	int "SPB clock frequency (Hz)"
+	default 100000000
+	depends on TC4X_WDT
+	---help---
+		The SPB (System Peripheral Bus) clock frequency in Hz, used
+		to compute WDT timeout periods. TC4x fSPB target is 100 MHz.
