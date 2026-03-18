@@ -45,4 +45,8 @@ CHIP_CSRCS += tc3x_smu.c
 CFLAGS += -I$(TOPDIR)/drivers/misc
 endif
 
+ifeq ($(CONFIG_TC3XX_GETH),y)
+CHIP_CSRCS += tc3x_geth.c
+endif
+
 VPATH += tc3x

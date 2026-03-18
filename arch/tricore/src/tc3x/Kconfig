@@ -487,3 +487,19 @@ config TC3X_SMU_WDT_REACTION
 		               when TC3X_SMU_IRQ is not set)
 		  7 = CPURST  (CPU reset only)
 endif # TC3X_SMU
+# GETH
+menuconfig TC3XX_GETH
+	bool "Infineon Tricore GETH support"
+	default n
+	depends on NET_DWXGMAC
+	---help---
+		Enable Infineon Tricore GETH support
+
+if TC3XX_GETH
+
+config TRICORE_GETH_BASE
+    hex "Tricore GETH base address"
+    default 0xf001f000
+
+endif # TC3XX_GETH
+
