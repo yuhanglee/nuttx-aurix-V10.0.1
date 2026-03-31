@@ -34,4 +34,8 @@ if(CONFIG_I2C)
   list(APPEND SRCS tricore_i2c.c)
 endif()
 
+if(CONFIG_CAN_MCAN)
+  list(APPEND SRCS tricore_mcmcan.c)
+endif()
+
 target_sources(arch PRIVATE ${SRCS})
