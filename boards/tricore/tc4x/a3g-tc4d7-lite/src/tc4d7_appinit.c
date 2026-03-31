@@ -39,6 +39,10 @@
 #  include "tc4d7_i2c.h"
 #endif
 
+#ifdef CONFIG_CAN_MCAN
+int mcmcan_board_initialize(void);
+#endif
+
 /****************************************************************************
  * Public Functions
  ****************************************************************************/
@@ -102,5 +106,9 @@ void board_late_initialize(void)
         _err("I2C init failed: %d\n", ret);
       }
   }
+#endif
+
+#ifdef CONFIG_CAN_MCAN
+  mcmcan_board_initialize();
 #endif
 }
