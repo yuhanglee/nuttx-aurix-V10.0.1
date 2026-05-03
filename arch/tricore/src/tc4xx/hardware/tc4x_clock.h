@@ -11,9 +11,6 @@
 
 #define TC4X_REG32(off)       (*(volatile uint32_t *)(TC4X_CLOCK_BASE + (off)))
 
-/* --------------------------------------------------------------------------
- * Register offsets
- * -------------------------------------------------------------------------- */
 
 #define TC4X_CLOCK_OSCCON_OFFSET      0x0100u
 #define TC4X_CLOCK_OSCMON1_OFFSET     0x0508u
@@ -37,9 +34,6 @@
 #define TC4X_CLOCK_PERCCUCON0_OFFSET  0x0420u
 #define TC4X_CLOCK_PERCCUCON1_OFFSET  0x0424u
 
-/* --------------------------------------------------------------------------
- * Register accessors
- * -------------------------------------------------------------------------- */
 
 #define TC4X_CLOCK_OSCCON      TC4X_REG32(TC4X_CLOCK_OSCCON_OFFSET)
 #define TC4X_CLOCK_OSCMON1     TC4X_REG32(TC4X_CLOCK_OSCMON1_OFFSET)
@@ -63,9 +57,6 @@
 #define TC4X_CLOCK_PERCCUCON0  TC4X_REG32(TC4X_CLOCK_PERCCUCON0_OFFSET)
 #define TC4X_CLOCK_PERCCUCON1  TC4X_REG32(TC4X_CLOCK_PERCCUCON1_OFFSET)
 
-/* -----------------------------------
- * Bit fields (from Ifx_CLOCK_*_Bits)
- * -----------------------------------*/
 
 /* OSCCON fields */
 #define TC4X_OSCCON_MODE_SHIFT    8
@@ -240,10 +231,8 @@ enum tc4x_rootclk_domain
 #define TC4X_PERCCUCON1_SDMMCPERON          BIT(26)
 #define TC4X_PERCCUCON1_HSCTPERON           BIT(27)
 #define TC4X_PERCCUCON1_LETH100PERON        BIT(28)
+#define TC4X_PERCCUCON1_UP                  BIT(30)
 
-/* --------------------------------------
- * Board-level PLL / clock configuration
- * --------------------------------------*/
 
 #define TC4X_FBACK_HZ           100000000u   /* 100 MHz backup clock */
 #define TC4X_FOSC_HZ            25000000u    /* 25 MHz external crystal */
