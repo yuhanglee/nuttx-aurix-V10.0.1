@@ -26,4 +26,8 @@ if(CONFIG_TC3X_I2C)
   list(APPEND SRCS tc3x_i2c.c)
 endif()
 
+if(CONFIG_TC3X_QSPI)
+  list(APPEND SRCS tc3x_qspi.c)
+endif()
+
 target_sources(arch PRIVATE ${SRCS})
