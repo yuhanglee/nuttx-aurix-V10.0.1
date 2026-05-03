@@ -20,9 +20,6 @@
  *
  ****************************************************************************/
 
-/****************************************************************************
- * Included Files
- ****************************************************************************/
 
 #include <nuttx/config.h>
 
@@ -42,9 +39,6 @@
 #include "tricore_internal.h"
 #include "tricore_asclin.h"
 
-/****************************************************************************
- * Pre-processor Definitions
- ****************************************************************************/
 
 #ifndef CONFIG_TRICORE_ASCLINF_FREQUENCY
 #  if defined(CONFIG_ARCH_CHIP_FAMILY_TC4XX)
@@ -81,13 +75,25 @@
 #  define HAVE_SERIAL_CONSOLE       1
 #  define CONSOLE_DEV               g_uart0port
 #  define TTYS0_DEV                 g_uart0port
+#  ifdef CONFIG_TRICORE_UART1
+#    define TTYS1_DEV               g_uart1port
+#  endif
+#elif defined(CONFIG_UART1_SERIAL_CONSOLE) && defined(CONFIG_TRICORE_UART1)
+#  define HAVE_SERIAL_CONSOLE       1
+#  define CONSOLE_DEV               g_uart1port
+#  define TTYS0_DEV                 g_uart1port
+#  ifdef CONFIG_TRICORE_UART0
+#    define TTYS1_DEV               g_uart0port
+#  endif
 #elif defined(CONFIG_TRICORE_UART0)
 #  define TTYS0_DEV                 g_uart0port
+#  ifdef CONFIG_TRICORE_UART1
+#    define TTYS1_DEV               g_uart1port
+#  endif
+#elif defined(CONFIG_TRICORE_UART1)
+#  define TTYS0_DEV                 g_uart1port
 #endif
 
-/****************************************************************************
- * Private Types
- ****************************************************************************/
 
 struct aurix_uart_config_s
 {
@@ -115,9 +121,6 @@ struct aurix_uart_priv_s
   bool      rxint_enabled;
 };
 
-/****************************************************************************
- * Private Function Prototypes
- ****************************************************************************/
 
 static int  aurix_setup(struct uart_dev_s *dev);
 static void aurix_shutdown(struct uart_dev_s *dev);
@@ -154,9 +157,23 @@ static const struct uart_ops_s g_uart_ops =
 
 #ifdef CONFIG_TRICORE_UART0
 
+
+#ifdef CPU
+#  define AMP_ASCLIN_INDEX  0
+#  define AMP_ASCLIN_BASE   TRICORE_ASCLIN_BASE(0)
+#  define AMP_ASCLIN_TX_IRQ 172
+#  define AMP_ASCLIN_RX_IRQ 173
+#  define AMP_ASCLIN_ER_IRQ 174
+#else
+#  define AMP_ASCLIN_BASE   TRICORE_ASCLIN_BASE(0)
+#  define AMP_ASCLIN_TX_IRQ CONFIG_TRICORE_UART0_TXIRQ
+#  define AMP_ASCLIN_RX_IRQ CONFIG_TRICORE_UART0_RXIRQ
+#  define AMP_ASCLIN_ER_IRQ CONFIG_TRICORE_UART0_ERIRQ
+#endif
+
 static struct aurix_uart_config_s g_uart0_config =
 {
-  .base           = TRICORE_ASCLIN_BASE(0),
+  .base           = AMP_ASCLIN_BASE,
   .fclk           = CONFIG_TRICORE_ASCLINF_FREQUENCY,
   .baud           = CONFIG_UART0_BAUD,
   .clk_src        = CONFIG_TRICORE_ASCLIN_CLK_SRC,
@@ -173,9 +190,9 @@ static struct aurix_uart_config_s g_uart0_config =
 #else
   .parity         = 0,
 #endif
-  .rxirq          = CONFIG_TRICORE_UART0_RXIRQ,
-  .txirq          = CONFIG_TRICORE_UART0_TXIRQ,
-  .erirq          = CONFIG_TRICORE_UART0_ERIRQ,
+  .rxirq          = AMP_ASCLIN_RX_IRQ,
+  .txirq          = AMP_ASCLIN_TX_IRQ,
+  .erirq          = AMP_ASCLIN_ER_IRQ,
 
   .rx_alti        = ASCLIN_IOCR_ALTI_A,
 };
@@ -211,9 +228,65 @@ static uart_dev_t g_uart0port =
 
 #endif /* CONFIG_TRICORE_UART0 */
 
-/****************************************************************************
- * Private Functions
- ****************************************************************************/
+#ifdef CONFIG_TRICORE_UART1
+
+static struct aurix_uart_config_s g_uart1_config =
+{
+  .base           = TRICORE_ASCLIN_BASE(1),
+  .fclk           = CONFIG_TRICORE_ASCLINF_FREQUENCY,
+  .baud           = CONFIG_UART1_BAUD,
+  .clk_src        = CONFIG_TRICORE_ASCLIN_CLK_SRC,
+  .oversampling   = CONFIG_TRICORE_ASCLIN_OVERSAMPLING,
+  .samplepoint    = CONFIG_TRICORE_ASCLIN_SAMPLEPOINT,
+  .prescaler_val  = CONFIG_TRICORE_ASCLIN_PRESCALER,
+  .median_filter  = CONFIG_TRICORE_ASCLIN_MEDIAN_FILTER,
+  .data_bits      = CONFIG_UART1_BITS,
+  .stop_bits      = CONFIG_UART1_2STOP ? 2 : 1,
+#if defined(CONFIG_UART1_PARITY) && CONFIG_UART1_PARITY == 1
+  .parity         = 2,
+#elif defined(CONFIG_UART1_PARITY) && CONFIG_UART1_PARITY == 2
+  .parity         = 1,
+#else
+  .parity         = 0,
+#endif
+  .rxirq          = CONFIG_TRICORE_UART1_RXIRQ,
+  .txirq          = CONFIG_TRICORE_UART1_TXIRQ,
+  .erirq          = CONFIG_TRICORE_UART1_ERIRQ,
+
+  .rx_alti        = ASCLIN_IOCR_ALTI_A,
+};
+
+static struct aurix_uart_priv_s g_uart1_priv =
+{
+  .config         = &g_uart1_config,
+  .txint_enabled  = false,
+  .rxint_enabled  = false,
+};
+
+static char g_uart1rxbuffer[CONFIG_UART1_RXBUFSIZE];
+static char g_uart1txbuffer[CONFIG_UART1_TXBUFSIZE];
+
+static uart_dev_t g_uart1port =
+{
+#if defined(CONFIG_UART1_SERIAL_CONSOLE) && defined(HAVE_SERIAL_CONSOLE)
+  .isconsole = true,
+#endif
+  .recv =
+  {
+    .size   = CONFIG_UART1_RXBUFSIZE,
+    .buffer = g_uart1rxbuffer,
+  },
+  .xmit =
+  {
+    .size   = CONFIG_UART1_TXBUFSIZE,
+    .buffer = g_uart1txbuffer,
+  },
+  .ops  = &g_uart_ops,
+  .priv = &g_uart1_priv,
+};
+
+#endif /* CONFIG_TRICORE_UART1 */
+
 
 static inline uintptr_t aurix_serialreg(
     const struct aurix_uart_config_s *cfg, uint32_t offset)
@@ -380,8 +453,14 @@ static void aurix_asclin_set_frame(
   aurix_serialout(cfg, ASCLIN_RXFIFOCON_OFFSET, rxfifocon);
 }
 
-void weak_function board_aurix_setup_serial_pin(void)
+void weak_function board_aurix_setup_serial_pin(int idx)
 {
+  (void)idx;
+}
+
+static int aurix_asclin_index(const struct aurix_uart_config_s *cfg)
+{
+  return (int)((cfg->base - TRICORE_ASCLIN_BASE(0)) / TRICORE_ASCLIN_STRIDE);
 }
 
 static int aurix_asclin_init(const struct aurix_uart_config_s *cfg)
@@ -416,7 +495,7 @@ static int aurix_asclin_init(const struct aurix_uart_config_s *cfg)
       }
   }
 
-  board_aurix_setup_serial_pin();
+  board_aurix_setup_serial_pin(aurix_asclin_index(cfg));
 
   ret = aurix_asclin_set_clk(cfg, ASCLIN_CSR_CLKSEL_NONE);
   if (ret < 0)
@@ -763,8 +842,20 @@ static bool aurix_txempty(struct uart_dev_s *dev)
 
 static void aurix_lowputc(int ch)
 {
-#ifdef CONFIG_TRICORE_UART0
+#if defined(CONFIG_UART1_SERIAL_CONSOLE) && defined(CONFIG_TRICORE_UART1)
+  const struct aurix_uart_config_s *cfg = &g_uart1_config;
+#elif defined(CONFIG_UART0_SERIAL_CONSOLE) && defined(CONFIG_TRICORE_UART0)
   const struct aurix_uart_config_s *cfg = &g_uart0_config;
+#elif defined(CONFIG_TRICORE_UART0)
+  const struct aurix_uart_config_s *cfg = &g_uart0_config;
+#elif defined(CONFIG_TRICORE_UART1)
+  const struct aurix_uart_config_s *cfg = &g_uart1_config;
+#else
+  (void)ch;
+  return;
+#endif
+
+#if defined(CONFIG_TRICORE_UART0) || defined(CONFIG_TRICORE_UART1)
   uint32_t txfifocon;
 
   do
@@ -777,48 +868,40 @@ static void aurix_lowputc(int ch)
 #endif
 }
 
-/****************************************************************************
- * Public Functions
- ****************************************************************************/
 
 #ifdef USE_SERIALDRIVER
 
-/****************************************************************************
- * Name: aurix_earlyserialinit
- *
- * Description:
- *   Performs the low-level ASCLIN initialization early in the boot so that
- *   the serial console is available during boot up.
- *
- ****************************************************************************/
 
 #ifdef USE_EARLYSERIALINIT
 void aurix_earlyserialinit(void)
 {
+#if defined(CPU) && (CPU) != 0
+  return;
+#else
 #ifdef HAVE_SERIAL_CONSOLE
   CONSOLE_DEV.isconsole = true;
   aurix_setup(&CONSOLE_DEV);
 #endif
+#endif
 }
 #endif
 
-/****************************************************************************
- * Name: aurix_serialinit
- *
- * Description:
- *   Register serial console and serial ports with NuttX serial driver
- *   infrastructure.
- *
- ****************************************************************************/
 
 void aurix_serialinit(void)
 {
+#if defined(CPU) && (CPU) != 0
+  return;
+#else
 #ifdef HAVE_SERIAL_CONSOLE
   uart_register("/dev/console", &CONSOLE_DEV);
 #endif
 
-#ifdef CONFIG_TRICORE_UART0
+#ifdef TTYS0_DEV
   uart_register("/dev/ttyS0", &TTYS0_DEV);
+#endif
+#ifdef TTYS1_DEV
+  uart_register("/dev/ttyS1", &TTYS1_DEV);
+#endif
 #endif
 }
 

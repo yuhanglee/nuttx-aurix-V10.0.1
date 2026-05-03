@@ -20,6 +20,7 @@
  *
  ****************************************************************************/
 
+#include <arch/arch.h>
 #include <nuttx/bits.h>
 #include "tricore_internal.h"
 
@@ -31,6 +32,8 @@ static void wdt_modify(uintptr_t con0, bool endinit)
 {
   uint32_t val = getreg32(con0);
   uint32_t pw = ((val >> 2) & 0x3FFF) ^ 0x003F;
+  uint32_t want = endinit ? BIT(0) : 0;
+  int      i;
 
   /* Password access: LCK=1, ENDINIT=1 */
   if (val & BIT(1))
@@ -39,16 +42,32 @@ static void wdt_modify(uintptr_t con0, bool endinit)
     }
 
   /* Modify access: LCK=1, ENDINIT=desired */
-  putreg32((val & 0xFFFF0000) | (pw << 2) | BIT(1) |
-           (endinit ? BIT(0) : 0), con0);
+  putreg32((val & 0xFFFF0000) | (pw << 2) | BIT(1) | want, con0);
 
-  /* Wait for ENDINIT to take effect */
-  while ((getreg32(con0) & BIT(0)) != (endinit ? 1 : 0));
+
+  for (i = 0; i < 10000; i++)
+    {
+      if ((getreg32(con0) & BIT(0)) == want)
+        {
+          break;
+        }
+    }
 }
 
 void aurix_cpu_endinit_enable(bool enable)
 {
-  wdt_modify(WDTCPU0CON0, enable);
+  uint32_t core_id;
+
+  IFX_MFCR(IFX_CPU_CORE_ID, core_id);
+  core_id &= IFX_CPU_CORE_ID_MASK;
+
+
+  if (core_id == 6)
+    {
+      core_id = 5;
+    }
+
+  wdt_modify(WDTCPU0CON0 + (core_id * 12), enable);
 }
 
 void aurix_safety_endinit_enable(bool enable)
