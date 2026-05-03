@@ -20,9 +20,6 @@
  *
  ****************************************************************************/
 
-/****************************************************************************
- * Included Files
- ****************************************************************************/
 
 #include <nuttx/config.h>
 
@@ -40,9 +37,6 @@
 
 #include "tc4xx_gpio.h"
 
-/****************************************************************************
- * Pre-processor Definitions
- ****************************************************************************/
 
 /* DP83825I PHY configuration */
 #define BOARD_PHY_NAME        "DP83825I"
@@ -51,14 +45,11 @@
 #define BOARD_PHYID2          MII_PHYID2_DP83825I
 
 #define PHY_RESET_TIMEOUT_MS  100
-#define PHY_LINK_TIMEOUT      0x4FFFF
-#define PHY_ANEG_TIMEOUT      0x4FFFF
+#define PHY_LINK_TIMEOUT      5000
+#define PHY_ANEG_TIMEOUT      10000
 
 struct mdio_bus_s *dwxgmac_mdio_bus_initialize(uint8_t port, uintptr_t base);
 
-/****************************************************************************
- * Private Functions
- ****************************************************************************/
 
 static void tc4d7_config_geth_pins(void)
 {
@@ -86,15 +77,51 @@ static void tc4d7_config_geth_pins(void)
     }
 }
 
+static int tc4d7_phy_scan(struct mdio_bus_s *mdio)
+{
+  uint16_t id1;
+  uint16_t id2;
+
+  for (uint8_t a = 0; a < 32; a++)
+    {
+      id1 = id2 = 0;
+      mdio_read(mdio, a, MII_PHYID1, &id1);
+      mdio_read(mdio, a, MII_PHYID2, &id2);
+      if ((id1 != 0x0000 && id1 != 0xFFFF) ||
+          (id2 != 0x0000 && id2 != 0xFFFF))
+        {
+          ninfo("phy_scan: PHY found at addr %u (id1=0x%04x id2=0x%04x)\n",
+                (unsigned)a, id1, id2);
+          return a;
+        }
+    }
+
+  nerr("phy_scan: no PHY responded on MDIO bus\n");
+  return -ENODEV;
+}
+
 static int tc4d7_init_phy(struct mdio_bus_s *mdio)
 {
-  uint8_t phyaddr = BOARD_PHY_ADDR;
+  uint8_t phyaddr;
   uint16_t phyval;
   int ret;
   int to;
-#ifdef CONFIG_NET_AUTONEG
+#ifdef CONFIG_BOARD_PHY_AUTONEG
   volatile uint32_t timeout;
 #endif
+
+  ret = tc4d7_phy_scan(mdio);
+  if (ret < 0)
+    {
+      return ret;
+    }
+
+  phyaddr = (uint8_t)ret;
+  if (phyaddr != BOARD_PHY_ADDR)
+    {
+      ninfo("PHY at addr %u (BOARD_PHY_ADDR=%u) -- using scanned addr\n",
+            (unsigned)phyaddr, BOARD_PHY_ADDR);
+    }
 
   ret = mdio_write(mdio, phyaddr, MII_MCR, MII_MCR_RESET);
   if (ret < 0)
@@ -132,19 +159,12 @@ static int tc4d7_init_phy(struct mdio_bus_s *mdio)
       return ret;
     }
 
-  if (phyval != BOARD_PHYID1)
-    {
-      nerr("ERROR: Wrong PHYID1: 0x%04x expected 0x%04x\n",
-           phyval, BOARD_PHYID1);
-      return -ENXIO;
-    }
 
-  ninfo("DP83825I detected, PHYID1=0x%04x\n", phyval);
+  ninfo("PHY at addr %u, PHYID1=0x%04x (BOARD_PHYID1=0x%04x)\n",
+        (unsigned)phyaddr, phyval, BOARD_PHYID1);
 
-  /*  Configure RMII mode:
-   */
   mdio_write(mdio, phyaddr, MII_DP83825I_RCSR,
-             MII_DP83825I_RCSC_ELAST_2 | MII_DP83825I_RCSC_RMIICS);
+             MII_DP83825I_RCSC_ELAST_2);
 
   mdio_write(mdio, phyaddr, MII_ADVERTISE,
              MII_ADVERTISE_100BASETXFULL |
@@ -153,11 +173,21 @@ static int tc4d7_init_phy(struct mdio_bus_s *mdio)
              MII_ADVERTISE_10BASETXHALF  |
              MII_ADVERTISE_CSMA);
 
-#ifdef CONFIG_NET_AUTONEG
+#ifdef CONFIG_BOARD_PHY_AUTONEG
 
-  ninfo("%s: Waiting for link...\n", BOARD_PHY_NAME);
 
-  for (timeout = 0; timeout < PHY_LINK_TIMEOUT; timeout++)
+  ret = mdio_write(mdio, phyaddr, MII_MCR,
+                   MII_MCR_ANENABLE | MII_MCR_ANRESTART);
+  if (ret < 0)
+    {
+      nerr("ERROR: Failed to (re)start autoneg: %d\n", ret);
+      return ret;
+    }
+
+  ninfo("%s: waiting for autoneg + link...\n", BOARD_PHY_NAME);
+
+
+  for (timeout = 0; timeout < PHY_ANEG_TIMEOUT; timeout++)
     {
       ret = mdio_read(mdio, phyaddr, MII_MSR, &phyval);
       if (ret < 0)
@@ -166,47 +196,33 @@ static int tc4d7_init_phy(struct mdio_bus_s *mdio)
           return ret;
         }
 
-      if (phyval & MII_MSR_LINKSTATUS)
+      if ((phyval & MII_MSR_ANEGCOMPLETE) &&
+          (phyval & MII_MSR_LINKSTATUS))
         break;
 
       nxsig_usleep(100);
     }
 
-  if (timeout >= PHY_LINK_TIMEOUT)
-    {
-      nerr("ERROR: Link timeout (MSR=0x%04x)\n", phyval);
-      return -ETIMEDOUT;
-    }
-
-  ninfo("Link up (MSR=0x%04x)\n", phyval);
-
-  ret = mdio_write(mdio, phyaddr, MII_MCR, MII_MCR_ANENABLE);
-  if (ret < 0)
-    {
-      nerr("ERROR: Failed to enable autoneg: %d\n", ret);
-      return ret;
-    }
-
-  /* Wait for autoneg complete */
-  for (timeout = 0; timeout < PHY_ANEG_TIMEOUT; timeout++)
-    {
-      ret = mdio_read(mdio, phyaddr, MII_MSR, &phyval);
-      if (ret < 0)
-        return ret;
-
-      if (phyval & MII_MSR_ANEGCOMPLETE)
-        break;
-
-      nxsig_usleep(100);
-    }
+  {
+    uint16_t mcr = 0;
+    uint16_t physts = 0;
+    uint16_t lpa = 0;
+    uint16_t rcsr = 0;
+    mdio_read(mdio, phyaddr, MII_MCR,   &mcr);
+    mdio_read(mdio, phyaddr, MII_LPA,   &lpa);
+    mdio_read(mdio, phyaddr, MII_DP83825I_PHYSTS, &physts);
+    mdio_read(mdio, phyaddr, MII_DP83825I_RCSR,   &rcsr);
+    ninfo("PHY status: MCR=0x%04x MSR=0x%04x LPA=0x%04x PHYSTS=0x%04x "
+          "RCSR=0x%04x\n", mcr, phyval, lpa, physts, rcsr);
+  }
 
   if (timeout >= PHY_ANEG_TIMEOUT)
     {
-      nerr("ERROR: Autoneg timeout\n");
-      return -ETIMEDOUT;
+      ninfo("Autoneg / link timeout -- proceeding without link\n");
+      return OK;
     }
 
-  ninfo("Autoneg complete (MSR=0x%04x)\n", phyval);
+  ninfo("Autoneg + link up (MSR=0x%04x)\n", phyval);
 
   ret = mdio_read(mdio, phyaddr, MII_DP83825I_PHYSTS, &phyval);
   if (ret == OK)
@@ -229,17 +245,7 @@ static int tc4d7_init_phy(struct mdio_bus_s *mdio)
   return OK;
 }
 
-/****************************************************************************
- * Public Functions
- ****************************************************************************/
 
-/****************************************************************************
- * Name: tc4d7_ethernet_initialize
- *
- * Description:
- *   Board-level Ethernet initialization for TC4D7-Lite.
- *
- ****************************************************************************/
 
 int tc4d7_ethernet_initialize(void)
 {
@@ -262,7 +268,11 @@ int tc4d7_ethernet_initialize(void)
       return -ENODEV;
     }
 
-  tc4d7_init_phy(mdio);
+  ret = tc4d7_init_phy(mdio);
+  if (ret < 0)
+    {
+      nerr("ERROR: tc4d7_init_phy failed: %d (eth0 will be link-down)\n", ret);
+    }
 
   return OK;
 }

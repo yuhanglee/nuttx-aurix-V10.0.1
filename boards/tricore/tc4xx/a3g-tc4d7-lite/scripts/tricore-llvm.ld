@@ -16,6 +16,7 @@ MEMORY
   dsram  (rw): ORIGIN = 0x70000000, LENGTH = 240K
   psram  (rw): ORIGIN = 0x70100000, LENGTH = 64K
   lmu    (rw): ORIGIN = 0x90400000, LENGTH = 512K
+  lmu_nc (rw): ORIGIN = 0xB0400000, LENGTH = 512K
   dlmu   (rw): ORIGIN = 0x90000000, LENGTH = 512K
   pflash (rx): ORIGIN = 0x80000000, LENGTH = 4M
 #endif
@@ -73,6 +74,11 @@ REGION_ALIAS("BSS_MEM", dsram)
 REGION_ALIAS("CSA_MEM", dsram)
 REGION_ALIAS("HEAP_MEM", dlmu)
 REGION_ALIAS("PSRAM_MEM", psram)
+#if CPU == 0
+REGION_ALIAS("DMA_MEM", lmu_nc)
+#else
+REGION_ALIAS("DMA_MEM", lmu)
+#endif
 
 pflash0_base = ORIGIN(pflash0);
 pflash1_base = ORIGIN(pflash1);
@@ -146,6 +152,14 @@ SECTIONS
     . = ALIGN(4);
     _ebss = ABSOLUTE(.);
   } > BSS_MEM
+
+  .dma_data (NOLOAD) : ALIGN(64)
+  {
+    _sdma_data = ABSOLUTE(.);
+    *(.dma_data .dma_data.*)
+    . = ALIGN(4);
+    _edma_data = ABSOLUTE(.);
+  } > DMA_MEM
 
   .ustack ALIGN(8) (NOLOAD) :
   {

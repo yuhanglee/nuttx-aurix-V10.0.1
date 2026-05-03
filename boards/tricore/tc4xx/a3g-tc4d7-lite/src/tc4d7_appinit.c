@@ -22,6 +22,16 @@
 #  include "hardware/tc4xx_asclin_spi.h"
 #endif
 
+#ifdef CONFIG_TRICORE_FLASH_MTD
+#  include <nuttx/mtd/mtd.h>
+#  include <nuttx/drivers/drivers.h>
+struct mtd_dev_s *tricore_flash_initialize(void);
+#endif
+
+#ifdef CONFIG_CAN
+int mcmcan_board_initialize(void);
+#endif
+
 void board_aurix_setup_i2c_pin(int bus)
 {
   gpio_pinset_t sclpin = AURIX_GPIO(13, 1, GPIO_PERIPH, GPIO_ALT6);
@@ -31,20 +41,46 @@ void board_aurix_setup_i2c_pin(int bus)
   aurix_config_gpio(sdapin);
 }
 
-void board_aurix_setup_serial_pin(void)
-{
-  gpio_pinset_t txpin = AURIX_GPIO(14, 0, GPIO_PERIPH, GPIO_ALT2);
-  gpio_pinset_t rxpin = AURIX_GPIO(14, 1, GPIO_INPUT, GPIO_PULL_UP);
+/* ASCLIN0 = kit USBCOM console on P14.0 TX / P14.1 RX.
+ * ASCLIN1 = mikroBUS pins 13/14 on P15.0 TX / P15.1 RX (ALT2/ALTI_A).
+ * AMP secondaries skip serial init, so this hook only ever runs on CPU 0.
+ */
 
-  aurix_config_gpio(txpin);
-  aurix_config_gpio(rxpin);
+void board_aurix_setup_serial_pin(int idx)
+{
+  switch (idx)
+    {
+      case 0:
+        aurix_config_gpio(AURIX_GPIO(14, 0, GPIO_PERIPH, GPIO_ALT2));
+        aurix_config_gpio(AURIX_GPIO(14, 1, GPIO_INPUT, GPIO_PULL_UP));
+        break;
+
+      case 1:
+        aurix_config_gpio(AURIX_GPIO(15, 0, GPIO_PERIPH, GPIO_ALT2));
+        aurix_config_gpio(AURIX_GPIO(15, 1, GPIO_INPUT, GPIO_PULL_UP));
+        break;
+
+      default:
+        break;
+    }
 }
+
+#ifdef CONFIG_BOARD_GPIO_TEST
+
+static const gpio_pinset_t g_test_gpio_pins[] =
+{
+  AURIX_GPIO(22, 0, GPIO_OUTPUT, GPIO_ALT0) | GPIO_OUTPUT_HIGH,
+  AURIX_GPIO(22, 2, GPIO_INPUT,  GPIO_PULL_UP),
+  AURIX_GPIO(22, 3, GPIO_INPUT,  GPIO_PULL_DOWN),
+};
+#endif
 
 int board_app_initialize(uintptr_t arg)
 {
+  int ret = OK;
+#if 0
   bool ledon = true;
   uint8_t i = 10;
-  int ret;
   gpio_pinset_t led1 = AURIX_GPIO(GPIO_PORT3, GPIO_PIN9, GPIO_OUTPUT, GPIO_ALT0);
 
   aurix_config_gpio(led1);
@@ -52,6 +88,7 @@ int board_app_initialize(uintptr_t arg)
     aurix_gpio_write(led1, (ledon = !ledon));
     usleep(500 * 1000);
   }
+#endif
 
 #ifdef CONFIG_TC4X_WDT
   ret = tc4x_wdt_initialize("/dev/watchdog0", TC4X_WDT_CPU0);
@@ -74,7 +111,11 @@ int board_app_initialize(uintptr_t arg)
 #endif
 
 #ifdef CONFIG_CAN
-  mcmcan_board_initialize();
+  ret = mcmcan_board_initialize();
+  if (ret < 0)
+    {
+      _err("CAN init failed: %d\n", ret);
+    }
 #endif
 
 #ifdef CONFIG_TC4XX_ASCLIN_SPI
@@ -90,6 +131,35 @@ int board_app_initialize(uintptr_t arg)
       _err("SPI register failed: %d\n", ret);
     }
 #endif
+#endif
+
+#ifdef CONFIG_TRICORE_FLASH_MTD
+  {
+    struct mtd_dev_s *mtd = tricore_flash_initialize();
+    if (mtd == NULL)
+      {
+        _err("DFLASH MTD init failed\n");
+      }
+    else
+      {
+        ret = register_mtddriver("/dev/dflash0", mtd, 0666, NULL);
+        if (ret < 0)
+          {
+            _err("DFLASH MTD register failed: %d\n", ret);
+          }
+      }
+  }
+#endif
+
+#ifdef CONFIG_BOARD_GPIO_TEST
+  for (size_t i = 0; i < sizeof(g_test_gpio_pins) / sizeof(g_test_gpio_pins[0]); i++)
+    {
+      int gret = aurix_gpio_lower_register(g_test_gpio_pins[i], (int)i);
+      if (gret < 0)
+        {
+          _err("GPIO /dev/gpio%zu register failed: %d\n", i, gret);
+        }
+    }
 #endif
 
   return ret;
