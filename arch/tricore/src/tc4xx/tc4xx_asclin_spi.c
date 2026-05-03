@@ -191,9 +191,9 @@ static const struct tc4xx_spi_config_s g_spi0_config =
   .bus        = 0,
 
 
-  .mosi_pin  = AURIX_GPIO(15, 6, GPIO_PERIPH, GPIO_ALT2),
+  .mosi_pin  = AURIX_GPIO(15, 6, GPIO_PERIPH, GPIO_ALT2) | GPIO_PERIPH_OWN_PAD,
   .miso_pin  = AURIX_GPIO(15, 7, GPIO_INPUT,  GPIO_PULL_UP),
-  .sclk_pin  = AURIX_GPIO(15, 8, GPIO_PERIPH, GPIO_ALT6),
+  .sclk_pin  = AURIX_GPIO(15, 8, GPIO_PERIPH, GPIO_ALT6) | GPIO_PERIPH_OWN_PAD,
   .cs_pin    = AURIX_GPIO(14, 7, GPIO_OUTPUT, GPIO_ALT0) | GPIO_OUTPUT_HIGH,
   .rx_alti   = ASCLIN_IOCR_ALTI_A,
 
