@@ -29,7 +29,7 @@ else()
     GLOBAL PROPERTY LD_SCRIPT "${NUTTX_DIR}/arch/tricore/src/common/tricore.ld")
 endif()
 
-target_sources(board PRIVATE tc4d7_appinit.c)
+target_sources(board PRIVATE tc4d7_appinit.c tc4d7_amp_secondary.c)
 
 if(CONFIG_TC4X_I2C)
   target_sources(board PRIVATE tc4d7_i2c.c)
