@@ -6,11 +6,17 @@ comment "Infineon Aurix TC3XX Family configurations"
 
 choice
         prompt "Infineon Aurix TC3XX Chip selection"
+        default TC3XX_CHIP_TC397
 
 config TC3XX_CHIP_TC397
         bool "TC397 SoC"
         ---help---
                 TC397 SoC
+
+config TC3XX_CHIP_TC375
+        bool "TC375 SoC"
+        ---help---
+                TC375 SoC
 
 endchoice
 
