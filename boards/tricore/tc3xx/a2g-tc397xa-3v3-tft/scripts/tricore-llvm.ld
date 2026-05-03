@@ -27,7 +27,7 @@ OUTPUT_ARCH("tricore")
 ENTRY(__start)
 EXTERN(__start)
 
-__HEAP_SIZE = (256 * 1024);
+__HEAP_SIZE = (96 * 1024);
 CONFIG_TRICORE_CSA_COUNT = 512;
 CONFIG_TRICORE_INITIAL_STACK_SIZE = 512;
 CONFIG_TRICORE_INITIAL_STACK_OFFSET = 0xEB00;
@@ -40,7 +40,12 @@ MEMORY
   dlmu   (rw): ORIGIN = 0x90000000, LENGTH = 64K
   pflash (rx): ORIGIN = 0x80000000, LENGTH = 3M
 #endif
-  pflash0 (rx): ORIGIN = 0xA0000000, LENGTH = 4M
+  /* pflashN aliases must match the per-CPU `pflash` ORIGIN above so that
+   * `_flash_banks[i]` (used by CPU 0 to seed each secondary's PC) points
+   * at the actual entry-point of CPU i's image.  Use uncached PMI base
+   * (0x80xxxxxx) -- the on-chip flash starts at 0x80000000.
+   */
+  pflash0 (rx): ORIGIN = 0xA0000000, LENGTH = 3M
 
 #if CPU == 1
   dsram  (rw): ORIGIN = 0x60000000, LENGTH = 240K
@@ -48,7 +53,7 @@ MEMORY
   dlmu   (rw): ORIGIN = 0x90010000, LENGTH = 64K
   pflash (rx): ORIGIN = 0x80300000, LENGTH = 3M
 #endif
-  pflash1 (rx): ORIGIN = 0xA0400000, LENGTH = 4M
+  pflash1 (rx): ORIGIN = 0x80300000, LENGTH = 3M
 
 #if CPU == 2
   dsram  (rw): ORIGIN = 0x50000000, LENGTH = 96K
@@ -56,7 +61,7 @@ MEMORY
   dlmu   (rw): ORIGIN = 0x90020000, LENGTH = 64K
   pflash (rx): ORIGIN = 0x80600000, LENGTH = 3M
 #endif
-  pflash2 (rx): ORIGIN = 0xA0800000, LENGTH = 2M
+  pflash2 (rx): ORIGIN = 0x80600000, LENGTH = 3M
 
 #if CPU == 3
   dsram  (rw): ORIGIN = 0x40000000, LENGTH = 96K
@@ -64,7 +69,7 @@ MEMORY
   dlmu   (rw): ORIGIN = 0x90030000, LENGTH = 64K
   pflash (rx): ORIGIN = 0x80900000, LENGTH = 3M
 #endif
-  pflash3 (rx): ORIGIN = 0xA0A00000, LENGTH = 4M
+  pflash3 (rx): ORIGIN = 0x80900000, LENGTH = 3M
 
 #if CPU == 4
   dsram  (rw): ORIGIN = 0x30000000, LENGTH = 96K
@@ -72,7 +77,7 @@ MEMORY
   dlmu   (rw): ORIGIN = 0x90100000, LENGTH = 64K
   pflash (rx): ORIGIN = 0x80C00000, LENGTH = 3M
 #endif
-  pflash4 (rx): ORIGIN = 0x80E00000, LENGTH = 4M
+  pflash4 (rx): ORIGIN = 0x80C00000, LENGTH = 3M
 
 #if CPU == 5
   dsram  (rw): ORIGIN = 0x10000000, LENGTH = 96K
@@ -80,16 +85,36 @@ MEMORY
   dlmu   (rw): ORIGIN = 0x90110000, LENGTH = 64K
   pflash (rx): ORIGIN = 0x80F00000, LENGTH = 1M
 #endif
-  pflash5 (rx): ORIGIN = 0x81200000, LENGTH = 2M
+  pflash5 (rx): ORIGIN = 0x80F00000, LENGTH = 1M
 
-  lmu    (rw): ORIGIN = 0x90040000, LENGTH = 768K
+  /* Per-CPU heap slices carved out of the shared LMU (0x90040000, 768K).
+   * Without this, every CPU's NuttX mm-heap init writes to the same
+   * 0x90040000 region and corrupts each other -- the symptom being
+   * class-2/4 traps in mm_zalloc/zalloc on the secondaries that lose
+   * the race.  128K per CPU x 6 = 768K fits the LMU exactly.
+   */
+#if CPU == 0
+  heap_cpu (rw): ORIGIN = 0x90040000, LENGTH = 128K
+#elif CPU == 1
+  heap_cpu (rw): ORIGIN = 0x90060000, LENGTH = 128K
+#elif CPU == 2
+  heap_cpu (rw): ORIGIN = 0x90080000, LENGTH = 128K
+#elif CPU == 3
+  heap_cpu (rw): ORIGIN = 0x900A0000, LENGTH = 128K
+#elif CPU == 4
+  heap_cpu (rw): ORIGIN = 0x900C0000, LENGTH = 128K
+#elif CPU == 5
+  heap_cpu (rw): ORIGIN = 0x900E0000, LENGTH = 128K
+#else
+  heap_cpu (rw): ORIGIN = 0x90040000, LENGTH = 128K
+#endif
 }
 
 REGION_ALIAS("CODE_MEM", pflash)
 REGION_ALIAS("DATA_MEM", dsram)
 REGION_ALIAS("BSS_MEM", dsram)
 REGION_ALIAS("CSA_MEM", dsram)
-REGION_ALIAS("HEAP_MEM", lmu)
+REGION_ALIAS("HEAP_MEM", heap_cpu)
 REGION_ALIAS("PSRAM_MEM", psram)
 
 pflash0_base = ORIGIN(pflash0);

@@ -20,9 +20,6 @@
  *
  ****************************************************************************/
 
-/****************************************************************************
- * Included Files
- ****************************************************************************/
 
 #include <nuttx/config.h>
 
@@ -40,24 +37,18 @@
 
 #include "tc3xx_gpio.h"
 
-/****************************************************************************
- * Pre-processor Definitions
- ****************************************************************************/
 
-/* RTL8211F PHY configuration */
 #define BOARD_PHY_NAME        "RTL8211F"
-#define BOARD_PHY_ADDR        0           /* PHY address on MDIO bus */
+#define BOARD_PHY_ADDR        1           /* PHY address on MDIO bus */
 #define BOARD_PHYID1          MII_PHYID1_RTL8211F
 
 #define PHY_RESET_TIMEOUT_MS  100
-#define PHY_LINK_TIMEOUT      0x4FFFF
-#define PHY_ANEG_TIMEOUT      0x4FFFF
+
+#define PHY_LINK_TIMEOUT      500
+#define PHY_ANEG_TIMEOUT      500
 
 struct mdio_bus_s *dwxgmac_mdio_bus_initialize(uint8_t port, uintptr_t base);
 
-/****************************************************************************
- * Private Functions
- ****************************************************************************/
 
 int tc3x_geth_init(int intf);
 
@@ -106,15 +97,46 @@ static void tc397_config_geth_pins(void)
     }
 }
 
+static int tc397_phy_scan(struct mdio_bus_s *mdio)
+{
+  uint16_t id1;
+  uint16_t id2;
+
+  for (uint8_t a = 0; a < 32; a++)
+    {
+      id1 = id2 = 0;
+      mdio_read(mdio, a, MII_PHYID1, &id1);
+      mdio_read(mdio, a, MII_PHYID2, &id2);
+      if ((id1 != 0x0000 && id1 != 0xFFFF) ||
+          (id2 != 0x0000 && id2 != 0xFFFF))
+        {
+          printf("phy_scan: PHY found at addr %u (id1=0x%04x id2=0x%04x)\n",
+                 (unsigned)a, id1, id2);
+          return a;
+        }
+    }
+
+  printf("phy_scan: no PHY responded on MDIO bus\n");
+  return -ENODEV;
+}
+
 static int tc397_init_phy(struct mdio_bus_s *mdio)
 {
-  uint8_t phyaddr = BOARD_PHY_ADDR;
+  uint8_t phyaddr;
   uint16_t phyval;
   int ret;
   int to;
 #ifdef CONFIG_BOARD_PHY_AUTONEG
   volatile uint32_t timeout;
 #endif
+
+  ret = tc397_phy_scan(mdio);
+  if (ret < 0)
+    {
+      return ret;
+    }
+
+  phyaddr = (uint8_t)ret;
 
   ret = mdio_write(mdio, phyaddr, MII_MCR, MII_MCR_RESET);
   if (ret < 0)
@@ -153,18 +175,15 @@ static int tc397_init_phy(struct mdio_bus_s *mdio)
       return ret;
     }
 
-  if (phyval != BOARD_PHYID1)
-    {
-      printf("ERROR: Wrong PHYID1: 0x%04x expected 0x%04x\n",
-           phyval, BOARD_PHYID1);
-      return -ENXIO;
-    }
 
-  printf("rtl8211f detected, PHYID1=0x%04x\n", phyval);
+  printf("phy at addr %u, PHYID1=0x%04x (BOARD_PHYID1=0x%04x)\n",
+         (unsigned)phyaddr, phyval, BOARD_PHYID1);
 
   mdio_write(mdio, phyaddr, MII_RTL8211F_MDIO_PAGSR, 0xd08);
   mdio_read(mdio, phyaddr, 0x11, &phyval);
-  mdio_write(mdio, phyaddr, 0x11, (phyval | 0x100)); // enable TX delay
+  mdio_write(mdio, phyaddr, 0x11, (phyval | 0x100));   /* TXDLY_EN */
+  mdio_read(mdio, phyaddr, 0x15, &phyval);
+  mdio_write(mdio, phyaddr, 0x15, (phyval | 0x008));   /* RXDLY_EN */
   mdio_write(mdio, phyaddr, MII_RTL8211F_MDIO_PAGSR, 0);
 
   /* set LEDs */
@@ -189,13 +208,14 @@ static int tc397_init_phy(struct mdio_bus_s *mdio)
       if (phyval & MII_MSR_LINKSTATUS)
         break;
 
-      nxsig_usleep(100);
+      up_mdelay(1);
     }
 
   if (timeout >= PHY_LINK_TIMEOUT)
     {
-      nerr("ERROR: Link timeout (MSR=0x%04x)\n", phyval);
-      return -ETIMEDOUT;
+      ninfo("link not up at boot (MSR=0x%04x); netif will pick up "
+            "link asynchronously\n", phyval);
+      return OK;
     }
 
   ninfo("Link up (MSR=0x%04x)\n", phyval);
@@ -207,7 +227,6 @@ static int tc397_init_phy(struct mdio_bus_s *mdio)
       return ret;
     }
 
-  /* Wait for autoneg complete */
   for (timeout = 0; timeout < PHY_ANEG_TIMEOUT; timeout++)
     {
       ret = mdio_read(mdio, phyaddr, MII_MSR, &phyval);
@@ -217,13 +236,13 @@ static int tc397_init_phy(struct mdio_bus_s *mdio)
       if (phyval & MII_MSR_ANEGCOMPLETE)
         break;
 
-      nxsig_usleep(100);
+      up_mdelay(1);
     }
 
   if (timeout >= PHY_ANEG_TIMEOUT)
     {
-      nerr("ERROR: Autoneg timeout\n");
-      return -ETIMEDOUT;
+      ninfo("autoneg incomplete at boot; will complete asynchronously\n");
+      return OK;
     }
 
   ninfo("Autoneg complete (MSR=0x%04x)\n", phyval);
@@ -250,17 +269,7 @@ static int tc397_init_phy(struct mdio_bus_s *mdio)
   return OK;
 }
 
-/****************************************************************************
- * Public Functions
- ****************************************************************************/
 
-/****************************************************************************
- * Name: tc397_ethernet_initialize
- *
- * Description:
- *   Board-level Ethernet initialization for TC397-Lite.
- *
- ****************************************************************************/
 
 int tc397_ethernet_initialize(void)
 {

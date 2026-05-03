@@ -21,9 +21,14 @@
 ############################################################################
 include $(TOPDIR)/Make.defs
 
-ifeq ($(CONFIG_BOARDCTL),y)
-CSRCS += tc397_appinit.c
-endif
+# Always compile the board init file: it provides the
+# board_aurix_setup_serial_pin() weak override that AMP secondary
+# CPUs (which don't enable CONFIG_BOARDCTL) still need at boot to
+# configure the shared ASCLIN0 pins.
+CSRCS = tc397_appinit.c
+
+# AMP secondary CPU init thread (used when INIT_ENTRYPOINT=amp_secondary_main)
+CSRCS += tc397_amp_secondary.c
 
 ifeq ($(CONFIG_TC3XX_I2C),y)
 CSRCS += tc3xx_i2c_bringup.c
@@ -35,6 +40,10 @@ endif
 
 ifeq ($(CONFIG_CAN),y)
 CSRCS += tc397_can.c
+endif
+
+ifeq ($(CONFIG_TC3XX_QSPI2),y)
+CSRCS += tc397_qspi.c
 endif
 
 include $(TOPDIR)/boards/Board.mk
