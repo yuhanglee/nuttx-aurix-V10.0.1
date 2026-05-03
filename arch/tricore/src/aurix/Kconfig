@@ -138,4 +138,12 @@ config TC4X_GPIO_ACCESS_GROUP
 	---help---
 		Access group used to drive the per-port PORTPROT register.
 
+config TRICORE_FLASH_MTD
+	bool "AURIX HOST DFLASH MTD driver"
+	default n
+	depends on MTD
+	---help---
+		MTD lower-half driver for the AURIX HOST DFLASH(0) on TC3X and
+		TC4X: sector erase, page program and read.
+
 endmenu

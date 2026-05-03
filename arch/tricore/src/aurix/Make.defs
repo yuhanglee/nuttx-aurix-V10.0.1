@@ -35,3 +35,7 @@ endif
 ifeq ($(CONFIG_CAN_MCAN),y)
 CMN_CSRCS += tricore_mcmcan.c
 endif
+
+ifeq ($(CONFIG_TRICORE_FLASH_MTD),y)
+CMN_CSRCS += tricore_flash.c
+endif

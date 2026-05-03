@@ -38,4 +38,8 @@ if(CONFIG_CAN_MCAN)
   list(APPEND SRCS tricore_mcmcan.c)
 endif()
 
+if(CONFIG_TRICORE_FLASH_MTD)
+  list(APPEND SRCS tricore_flash.c)
+endif()
+
 target_sources(arch PRIVATE ${SRCS})
