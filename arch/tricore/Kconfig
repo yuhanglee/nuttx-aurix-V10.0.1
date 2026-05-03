@@ -83,4 +83,20 @@ if ARCH_CHIP_FAMILY_TC4X
 source "arch/tricore/src/tc4x/Kconfig"
 endif
 
+config TRICORE_AMP_NUM_CPUS
+	int "AMP: number of application CPUs CPU 0 should release"
+	default 1
+	---help---
+		In an Asymmetric Multi-Processing build, each per-CPU NuttX
+		image is built with `-DCPU=N` and runs an independent kernel
+		(CONFIG_ARCH_TRICORE_CPU_COUNT=1).  The image built with
+		CPU=0 boots first; in tricore_start() it walks
+		_flash_banks[1..N-1] and releases each secondary CPU from
+		BOOTCON.HALT so the per-CPU images at the higher PFLASH
+		bank addresses start running.
+
+		Set to 1 (default) for plain single-CPU builds.  Set to 4
+		for the standard a3g-tc4d7-lite AMP setup that brings up
+		CPUs 0..3.
+
 endif # ARCH_TRICORE

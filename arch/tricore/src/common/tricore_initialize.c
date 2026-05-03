@@ -70,12 +70,20 @@ void up_initialize(void)
   aurix_serialinit();
 }
 
-#define IFX_CPUn_REG(n)             (0xf8800000 + 0x40000 * (n))
+#if defined(CONFIG_ARCH_CHIP_FAMILY_TC4X)
+#  define IFX_CPUn_REG(n) (0xf8800000 + 0x40000 * (n))
+#elif defined(CONFIG_ARCH_CHIP_FAMILY_TC3X)
+#  define IFX_CPUn_REG(n) (0xf8800000 + 0x20000 * (n))
+#else
+#  error "Unknown AURIX chip family for IFX_CPUn_REG"
+#endif
 
 #define IFX_CPU_HALT                BIT(0)
 #define IFX_CPU_BOOTCON(n)          (IFX_CPUn_REG(n) + 0x1fe60)
 #define IFX_CPU_PC(n)               (IFX_CPUn_REG(n) + 0x1fe08)
 
+#define IFX_CPU_SYSCON(n)           (IFX_CPUn_REG(n) + 0x1fe14)
+#define IFX_CPU_SYSCON_BHALT        BIT(24)
 
 #define IFX_CPU_PROTSPRSE(n)        (IFX_CPUn_REG(n) + 0xe008)
 #define IFX_CPU_ACCENSPRCFG_WRA(n)  (IFX_CPUn_REG(n) + 0xe020)
@@ -93,8 +101,26 @@ void up_initialize(void)
 
 #define IFX_CPU_PROT_RANGE(c)       ((c) << 8)
 
+#if defined(CPU) && (CPU == 0) && defined(CONFIG_ARCH_CHIP_FAMILY_TC3X)
 
+/* CPU5 does not follow the 0x20000 stride the other cores use, so the bases
+ * are tabulated rather than computed.
+ */
+
+static const uintptr_t g_tc3x_cpu_base[6] =
+{
+  0xf8800000u,
+  0xf8820000u,
+  0xf8840000u,
+  0xf8860000u,
+  0xf8880000u,
+  0xf88c0000u,
+};
+#endif
+
+#if defined(CPU) && (CPU == 0)
 extern const unsigned int _flash_banks[];
+#endif
 
 static void tricore_enable_sfr_access(int n)
 {
@@ -121,17 +147,29 @@ static void tricore_enable_sfr_access(int n)
 
 void tricore_start(int current_cpu)
 {
-  /* Start the other cores from CPU 0 */
-
   if (current_cpu == 0)
     {
       int i;
 
+      tricore_enable_sfr_access(0);
       for (i = 1; i < CONFIG_ARCH_TRICORE_CPU_COUNT; i++)
         {
-          uintptr_t hreg = IFX_CPU_BOOTCON(i);
-
           tricore_enable_sfr_access(i);
+        }
+    }
+
+#ifdef CONFIG_ARCH_HAVE_FPU
+  tricore_fpuinit();
+#endif
+
+#if defined(CPU) && (CPU == 0) && defined(CONFIG_ARCH_CHIP_FAMILY_TC4X)
+  if (current_cpu == 0)
+    {
+      int i;
+
+      for (i = 1; i < CONFIG_TRICORE_AMP_NUM_CPUS; i++)
+        {
+          uintptr_t hreg = IFX_CPU_BOOTCON(i);
 
           if (getreg32(hreg))
             {
@@ -140,6 +178,42 @@ void tricore_start(int current_cpu)
             }
         }
     }
+#elif defined(CPU) && (CPU == 0) && defined(CONFIG_ARCH_CHIP_FAMILY_TC3X)
+  if (current_cpu == 0)
+    {
+      int i;
+
+      for (i = 1; i < CONFIG_TRICORE_AMP_NUM_CPUS; i++)
+        {
+          uintptr_t base = g_tc3x_cpu_base[i];
+          uint32_t syscon;
+
+          putreg32(_flash_banks[i], base + 0x1fe08);
+
+          syscon = getreg32(base + 0x1fe14);
+          if (syscon & IFX_CPU_SYSCON_BHALT)
+            {
+              putreg32(syscon & ~IFX_CPU_SYSCON_BHALT, base + 0x1fe14);
+            }
+        }
+    }
+#endif
+
+#if defined(CPU) && (CPU != 0)
+  {
+    extern int amp_secondary_main(int argc, char *argv[]);
+
+    amp_secondary_main(0, NULL);
+  }
+  for (; ; );
+#else
+#ifdef CONFIG_ARCH_LEDS
+  /* Initialize LEDs and signal that NuttX is starting */
+
+  board_autoled_initialize();
+  board_autoled_on(LED_STARTED);
+#endif
 
   nx_start();
+#endif
 }
