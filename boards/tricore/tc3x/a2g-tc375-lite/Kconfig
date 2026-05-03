@@ -5,4 +5,14 @@
 
 if ARCH_BOARD_A2G_TC375_LITE
 
+config BOARD_CAN_TLE9251V_STB_PIN
+	bool "Drive TLE9251V CAN_STB low at boot"
+	default y
+	depends on CAN
+	---help---
+		The AURIX lite Kit V2 wires the on-board TLE9251V CAN
+		transceiver standby control to P20.6.  The transceiver
+		boots in standby; the CPU must drive P20.6 low to enable
+		normal operating mode before any frame leaves the bus.
+
 endif

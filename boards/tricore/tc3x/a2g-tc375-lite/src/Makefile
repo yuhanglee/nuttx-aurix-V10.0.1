@@ -27,4 +27,8 @@ ifeq ($(CONFIG_TC3X_I2C),y)
 CSRCS += tc375_i2c.c
 endif
 
+ifeq ($(CONFIG_CAN_MCAN),y)
+CSRCS += tc375_can.c
+endif
+
 include $(TOPDIR)/boards/Board.mk

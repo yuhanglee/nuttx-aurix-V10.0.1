@@ -36,6 +36,10 @@
 int tc3x_wdt_initialize(const char *devpath, int wdtid);
 #endif
 
+#ifdef CONFIG_CAN_MCAN
+int mcmcan_board_initialize(void);
+#endif
+
 /****************************************************************************
  * Public Functions
  ****************************************************************************/
@@ -77,6 +81,10 @@ void board_late_initialize(void)
 {
 #ifdef CONFIG_TC3X_I2C0
   tc375_i2c_bringup();
+#endif
+
+#ifdef CONFIG_CAN_MCAN
+  mcmcan_board_initialize();
 #endif
 
 #ifdef CONFIG_TC3X_WDT
