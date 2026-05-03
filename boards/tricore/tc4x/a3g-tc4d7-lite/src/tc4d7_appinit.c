@@ -69,6 +69,13 @@ static const gpio_pinset_t g_test_gpio_pins[] =
 };
 #endif
 
+#ifdef CONFIG_BOARD_USER_LED_GPIO
+#  include <debug.h>
+
+static const gpio_pinset_t g_user_led_pin =
+  AURIX_GPIO(3, 9, GPIO_OUTPUT, GPIO_ALT0) | GPIO_OUTPUT_HIGH;
+#endif
+
 /****************************************************************************
  * Public Functions
  ****************************************************************************/
@@ -183,6 +190,7 @@ void board_late_initialize(void)
 #endif
   }
 #endif
+
 #ifdef CONFIG_BOARD_GPIO_TEST
   for (size_t i = 0;
        i < sizeof(g_test_gpio_pins) / sizeof(g_test_gpio_pins[0]);
@@ -196,4 +204,13 @@ void board_late_initialize(void)
     }
 #endif
 
+#ifdef CONFIG_BOARD_USER_LED_GPIO
+  {
+    int gret = aurix_gpio_lower_register(g_user_led_pin, 0);
+    if (gret < 0)
+      {
+        _err("USER_LED /dev/gpio0 register failed: %d\n", gret);
+      }
+  }
+#endif
 }
