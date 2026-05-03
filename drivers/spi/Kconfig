@@ -431,4 +431,83 @@ config QSPI_FLASH_PAGESIZE
 
 endif # QSPI_FLASH
 
+menuconfig XSPI
+	bool "xSPI (JESD251) Driver Support"
+	default n
+	---help---
+		Enable the xSPI subsystem. Provides a vendor neutral upper
+		half abstraction for JEDEC JESD251 controllers supporting
+		single, dual, quad and octal SPI in SDR and DDR modes, with
+		optional HyperBus protocol. Coexists with SPI and QSPI
+		subsystems.
+
+if XSPI
+
+config XSPI_DEFAULT_TIMEOUT_MS
+	int "Default transfer timeout (ms)"
+	default 1000
+	---help---
+		Fallback timeout used when xspi_op_s.timeout_ms is 0.
+
+config XSPI_DW_SSI
+	bool "Synopsys DesignWare DWC_SSI IP core driver"
+	default n
+	---help---
+		Enable the vendor neutral Synopsys DWC_SSI IP core driver.
+		SoC glue layers select this when their xSPI controller is
+		an instance of the DWC_SSI IP. The glue layer supplies per
+		instance state (base address, clock rate) and owns clock,
+		pad muxing and interrupts.
+
+if XSPI_DW_SSI
+
+config XSPI_DW_SSI_FIFO_DEPTH
+	int "TX / RX FIFO depth"
+	default 16
+	---help---
+		FIFO depth of the synthesised IP instance. TC4Dx uses 16.
+
+config XSPI_DW_SSI_DR_COUNT
+	int "Number of data registers (DR)"
+	default 36
+	---help---
+		Number of DR registers in the register map. TC4Dx uses 36.
+
+config XSPI_DW_SSI_MAX_LANES
+	int "Maximum IO lanes supported (1, 2, 4, 8)"
+	default 8
+	range 1 8
+	---help---
+		Maximum SPI IO lane count of the synthesised IP instance.
+		TC4Dx supports 8 (octal) on HSFAST pads.
+
+config XSPI_DW_SSI_HAS_DDR
+	bool "DDR capable"
+	default n
+	---help---
+		IP instance supports dual data rate transfers.
+
+config XSPI_DW_SSI_HAS_HYPERBUS
+	bool "HyperBus capable"
+	default n
+	---help---
+		IP instance supports the HyperBus protocol.
+
+config XSPI_DW_SSI_HAS_DMA
+	bool "Internal AXI DMA capable"
+	default n
+	---help---
+		IP instance has the internal AXI master DMA path.
+
+config XSPI_DW_SSI_HAS_XIP
+	bool "XIP capable"
+	default n
+	---help---
+		IP instance supports eXecute In Place memory mapped
+		access to an attached serial memory.
+
+endif # XSPI_DW_SSI
+
+endif # XSPI
+
 endif # SPI

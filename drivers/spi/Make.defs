@@ -53,6 +53,14 @@ ifeq ($(CONFIG_QSPI_FLASH),y)
   CSRCS += qspi_flash.c
 endif
 
+ifeq ($(CONFIG_XSPI),y)
+
+ifeq ($(CONFIG_XSPI_DW_SSI),y)
+CSRCS += xspi_dw_ssi.c
+endif
+
+endif
+
 # Include SPI device driver build support
 
 DEPPATH += --dep-path spi
