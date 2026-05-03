@@ -19,9 +19,6 @@
  *
  ****************************************************************************/
 
-/****************************************************************************
- * Included Files
- ****************************************************************************/
 
 #include <nuttx/config.h>
 
@@ -54,6 +51,8 @@
 
 static void mcmcan_reset(struct can_dev_s *dev);
 static int  mcmcan_setup(struct can_dev_s *dev);
+static void mcmcan_configure_grint(uintptr_t base, uint8_t node,
+                                    uint32_t line_value);
 static void mcmcan_shutdown(struct can_dev_s *dev);
 static void mcmcan_rxint(struct can_dev_s *dev, bool enable);
 static void mcmcan_txint(struct can_dev_s *dev, bool enable);
@@ -166,8 +165,8 @@ static void mcmcan_rx_callback(struct can_mcan_priv_s *priv,
   if ((frame->flags & CAN_FRAME_RTR) != 0) hdr.ch_rtr = 1;
 
 #ifdef CONFIG_CAN_FD
-  if ((frame->flags & CAN_FRAME_FDF) != 0) hdr.ch_fdcan = 1;
-  if ((frame->flags & CAN_FRAME_BRS) != 0) hdr.ch_brs   = 1;
+  if ((frame->flags & CAN_FRAME_FDF) != 0) hdr.ch_edl = 1;
+  if ((frame->flags & CAN_FRAME_BRS) != 0) hdr.ch_brs = 1;
 #endif
 
   data_len = can_dlc2bytes(frame->dlc);
@@ -260,6 +259,18 @@ static int mcmcan_hw_init_once(struct mcmcan_node_priv_s *np)
 {
   struct can_filter_s filt;
   int err;
+
+#if defined(CONFIG_ARCH_CHIP_FAMILY_TC4X)
+
+  if (np->module_config != NULL)
+    {
+      uint8_t  node_idx = (uint8_t)((np->node_base - np->module_config->base
+                                     - 0x100) / 0x400);
+      uint32_t line     = (uint32_t)(np->irq_line0 - 788) & 0xfu;
+
+      mcmcan_configure_grint(np->module_config->base, node_idx, line);
+    }
+#endif
 
   mcmcan_compute_mram_layout(&np->mcan_config);
 
@@ -418,10 +429,23 @@ static int mcmcan_ioctl(struct can_dev_s *dev, int cmd, unsigned long arg)
 
           DEBUGASSERT(bt != NULL);
           memset(&timing, 0, sizeof(timing));
-          timing.sjw        = bt->bt_sjw;
-          timing.phase_seg1 = bt->bt_tseg1;
-          timing.phase_seg2 = bt->bt_tseg2;
-          timing.prescaler  = 1; /* TODO: derive from bt_baud + clock */
+
+          if (bt->bt_baud != 0)
+            {
+              ret = can_mcan_calc_timing(&np->mcan, &timing, bt->bt_baud,
+                                        np->mcan_config.sample_point);
+              if (ret != OK)
+                {
+                  break;
+                }
+            }
+          else
+            {
+              timing.sjw        = bt->bt_sjw;
+              timing.phase_seg1 = bt->bt_tseg1;
+              timing.phase_seg2 = bt->bt_tseg2;
+              timing.prescaler  = 1;
+            }
 
           was_started = np->mcan.data->started;
           if (was_started)
@@ -580,8 +604,8 @@ static int mcmcan_send(struct can_dev_s *dev, struct can_msg_s *msg)
     }
 
 #ifdef CONFIG_CAN_FD
-  if (msg->cm_hdr.ch_fdcan)  frame.flags |= CAN_FRAME_FDF;
-  if (msg->cm_hdr.ch_brs)    frame.flags |= CAN_FRAME_BRS;
+  if (msg->cm_hdr.ch_edl) frame.flags |= CAN_FRAME_FDF;
+  if (msg->cm_hdr.ch_brs) frame.flags |= CAN_FRAME_BRS;
 #endif
 
   data_len = can_dlc2bytes(frame.dlc);
@@ -607,8 +631,20 @@ static bool mcmcan_txempty(struct can_dev_s *dev)
   return can_mcan_txempty(&np->mcan);
 }
 
-static void mcmcan_configure_grint(uintptr_t base, uint8_t node)
+static void mcmcan_configure_grint(uintptr_t base, uint8_t node,
+                                    uint32_t line_value)
 {
+#if defined(CONFIG_ARCH_CHIP_FAMILY_TC4X)
+
+  uint32_t v = line_value & 0xfu;
+  uint32_t pat = (v << 28) | (v << 24) | (v << 20) | (v << 16) |
+                 (v << 12) | (v << 8)  | (v << 4)  | v;
+
+  putreg32(pat, base + MCMCAN_G0INTR(node));
+  putreg32(pat, base + MCMCAN_G1INTR(node));
+  putreg32(pat, base + MCMCAN_G2INTR(node));
+#else
+
   uint32_t l0 = (uint32_t)(node * 2);
   uint32_t l1 = l0 + 1;
 
@@ -618,8 +654,10 @@ static void mcmcan_configure_grint(uintptr_t base, uint8_t node)
   uint32_t g2 = (l0 << 28) | (l0 << 24) | (l0 << 20) | (l1 << 16) |
                 (l1 << 12) | (l1 << 8)  | (l1 << 4)  | l0;
 
+  UNUSED(line_value);
   putreg32(g1, base + MCMCAN_GRINT1(node));
   putreg32(g2, base + MCMCAN_GRINT2(node));
+#endif
 }
 
 static bool aurix_enable_clock(uintptr_t clc_addr, uint32_t timeout_us)
@@ -649,7 +687,6 @@ static bool aurix_enable_clock(uintptr_t clc_addr, uint32_t timeout_us)
 
 int mcmcan_module_init(const struct mcmcan_config *config)
 {
-  uintptr_t mcr_addr = config->base + MCMCAN_MCR;
   uint32_t mcr;
   uint8_t  i;
   int      err;
@@ -659,6 +696,11 @@ int mcmcan_module_init(const struct mcmcan_config *config)
       canerr("clock gate failed");
       return -ETIMEDOUT;
     }
+
+#if defined(CONFIG_ARCH_CHIP_FAMILY_TC4X)
+
+  putreg32(0xffffffffu, config->base + 0x30);
+#endif
 
   putreg32(MCMCAN_MCR_CLE | MCMCAN_MCR_CLKSEL, config->base + MCMCAN_MCR);
 
@@ -689,12 +731,20 @@ int mcmcan_module_init(const struct mcmcan_config *config)
     {
       if (!config->node_pin[i].present) continue;
 
-      mcr |= (0x3 << (i * 2));
+
+      mcr |= (0x3u << (i * 2));
       putreg32(config->node_pin[i].npcr_val, config->base + MCMCAN_NPCR(i));
-      mcmcan_configure_grint(config->base, i);
+
+#if defined(CONFIG_ARCH_CHIP_FAMILY_TC3X)
+
+      mcmcan_configure_grint(config->base, i, 0);
+#endif
     }
 
+
   putreg32(MCMCAN_MCR_CLE | MCMCAN_MCR_CLKSEL, config->base + MCMCAN_MCR);
+  putreg32(mcr | MCMCAN_MCR_CLE | MCMCAN_MCR_CLKSEL,
+           config->base + MCMCAN_MCR);
   putreg32(mcr, config->base + MCMCAN_MCR);
 
   return OK;
