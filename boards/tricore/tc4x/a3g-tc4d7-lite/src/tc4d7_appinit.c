@@ -44,6 +44,14 @@
 int mcmcan_board_initialize(void);
 #endif
 
+#ifdef CONFIG_TRICORE_FLASH_MTD
+#  include <debug.h>
+#  include <nuttx/fs/fs.h>
+#  include <nuttx/mtd/mtd.h>
+
+struct mtd_dev_s *tricore_flash_initialize(void);
+#endif
+
 #ifdef CONFIG_TC4X_ASCLIN_SPI
 #  include <debug.h>
 #  include <nuttx/spi/spi_transfer.h>
@@ -100,6 +108,26 @@ void board_late_initialize(void)
     if (ret < 0)
       {
         _err("WDT init failed: %d\n", ret);
+      }
+  }
+#endif
+
+#ifdef CONFIG_TRICORE_FLASH_MTD
+  {
+    struct mtd_dev_s *mtd = tricore_flash_initialize();
+
+    if (mtd == NULL)
+      {
+        _err("DFLASH MTD init failed\n");
+      }
+    else
+      {
+        int ret = register_mtddriver("/dev/dflash0", mtd, 0666, NULL);
+
+        if (ret < 0)
+          {
+            _err("DFLASH MTD register failed: %d\n", ret);
+          }
       }
   }
 #endif
