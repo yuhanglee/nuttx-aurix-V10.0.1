@@ -58,22 +58,13 @@ MEMORY
 #endif
   pflash2 (rx): ORIGIN = 0x80200000, LENGTH = 1M
 
-#if CPU == 0
-  heap_cpu (rw): ORIGIN = 0x90030000, LENGTH = 64K
-#elif CPU == 1
-  heap_cpu (rw): ORIGIN = 0x90040000, LENGTH = 64K
-#elif CPU == 2
-  heap_cpu (rw): ORIGIN = 0x90050000, LENGTH = 64K
-#else
-  heap_cpu (rw): ORIGIN = 0x90030000, LENGTH = 64K
-#endif
 }
 
 REGION_ALIAS("CODE_MEM", pflash)
 REGION_ALIAS("DATA_MEM", dsram)
 REGION_ALIAS("BSS_MEM", dsram)
 REGION_ALIAS("CSA_MEM", dsram)
-REGION_ALIAS("HEAP_MEM", heap_cpu)
+REGION_ALIAS("HEAP_MEM", dsram)
 REGION_ALIAS("PSRAM_MEM", psram)
 
 pflash0_base = ORIGIN(pflash0);
