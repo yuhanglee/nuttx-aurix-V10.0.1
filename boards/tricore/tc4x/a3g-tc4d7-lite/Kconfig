@@ -5,4 +5,16 @@
 
 if ARCH_BOARD_A3G_TC4D7_LITE
 
+config BOARD_GPIO_TEST
+	bool "Register Port-22 GPIO pins for gpio_test"
+	default n
+	depends on DEV_GPIO
+	depends on !TC4X_QSPI4 && !TC4X_QSPI5
+	---help---
+		Registers /dev/gpio0 (P22.0 output, init high), /dev/gpio1
+		(P22.2 input pull-up), /dev/gpio2 (P22.3 input pull-down) on
+		boot via aurix_gpio_lower_register().  Wire P22.0 to P22.2
+		(or P22.3) externally to verify loopback with the gpio_test
+		userspace app.
+
 endif

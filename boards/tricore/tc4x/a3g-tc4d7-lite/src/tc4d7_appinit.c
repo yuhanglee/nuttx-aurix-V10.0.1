@@ -58,6 +58,17 @@ struct mtd_dev_s *tricore_flash_initialize(void);
 #  include "hardware/tc4x_asclin_spi.h"
 #endif
 
+#ifdef CONFIG_BOARD_GPIO_TEST
+#  include <debug.h>
+
+static const gpio_pinset_t g_test_gpio_pins[] =
+{
+  AURIX_GPIO(22, 0, GPIO_OUTPUT, GPIO_ALT0) | GPIO_OUTPUT_HIGH,
+  AURIX_GPIO(22, 2, GPIO_INPUT,  GPIO_PULL_UP),
+  AURIX_GPIO(22, 3, GPIO_INPUT,  GPIO_PULL_DOWN),
+};
+#endif
+
 /****************************************************************************
  * Public Functions
  ****************************************************************************/
@@ -172,4 +183,17 @@ void board_late_initialize(void)
 #endif
   }
 #endif
+#ifdef CONFIG_BOARD_GPIO_TEST
+  for (size_t i = 0;
+       i < sizeof(g_test_gpio_pins) / sizeof(g_test_gpio_pins[0]);
+       i++)
+    {
+      int gret = aurix_gpio_lower_register(g_test_gpio_pins[i], (int)i);
+      if (gret < 0)
+        {
+          _err("GPIO /dev/gpio%zu register failed: %d\n", i, gret);
+        }
+    }
+#endif
+
 }
