@@ -2355,6 +2355,15 @@ config ARCH_BOARD_A2G_TC397XA_3V3_TFT
 		This options selects support for NuttX on the Infineon's AURIX board
 		board featuring the TC397 6Quad CPU.
 
+config ARCH_BOARD_AURIX_LITE_KIT_TC375
+	bool "Infineon AURIX lite Kit V2 (TC375)"
+	depends on TC3XX_CHIP_TC375
+	---help---
+		Infineon AURIX lite Kit V2 fitted with the TC375 SoC.
+		On-board TLE9251V CAN transceiver on node 0 (P20.7/P20.8,
+		standby on P20.6) and ASCLIN0 console over the on-board
+		miniWiggler.
+
 config ARCH_BOARD_A3G_TC4D7_LITE
 	bool "Infineon's AURIX TC4D7 board: ARCH_BOARD_A3G_TC4D7_LITE"
 	depends on TC4XX_CHIP_TC4D7
@@ -3759,6 +3768,7 @@ config ARCH_BOARD
 	default "sabre-6quad"               if ARCH_BOARD_SABRE_6QUAD
 	default "a2g-tc397-5v-tft"          if ARCH_BOARD_A2G_TC397_5V_TFT
 	default "a2g-tc397xa-3v3-tft"       if ARCH_BOARD_A2G_TC397XA_3V3_TFT
+	default "aurix-lite-kit-tc375"      if ARCH_BOARD_AURIX_LITE_KIT_TC375
 	default "a3g-tc4d7-lite"            if ARCH_BOARD_A3G_TC4D7_LITE
 	default "triboard-tc4x7-com"        if ARCH_BOARD_TRIBOARD_TC4X7_COM
 	default "qemu-armv7a"               if ARCH_BOARD_QEMU_ARMV7A
@@ -3980,6 +3990,9 @@ source "boards/tricore/tc397/a2g-tc397-5v-tft/Kconfig"
 endif
 if ARCH_BOARD_A2G_TC397XA_3V3_TFT
 source "boards/tricore/tc3xx/a2g-tc397xa-3v3-tft/Kconfig"
+endif
+if ARCH_BOARD_AURIX_LITE_KIT_TC375
+source "boards/tricore/tc3xx/aurix-lite-kit-tc375/Kconfig"
 endif
 if ARCH_BOARD_A3G_TC4D7_LITE
 source "boards/tricore/tc4xx/a3g-tc4d7-lite/Kconfig"

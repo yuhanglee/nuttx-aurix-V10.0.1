@@ -6,6 +6,7 @@
 # Usage:
 #   tools/winidea/flash.sh tc4d7        [path/to/nuttx]
 #   tools/winidea/flash.sh tc397        [path/to/nuttx]
+#   tools/winidea/flash.sh tc375        [path/to/nuttx]
 #   tools/winidea/flash.sh triboard     [path/to/nuttx]
 #   tools/winidea/flash.sh amp tc4d7    [dir-with-nuttx-cpu{0..5}.elf]
 #   tools/winidea/flash.sh amp tc397    [dir-with-nuttx-cpu{0..5}.elf]
@@ -36,6 +37,12 @@ case "$board" in
     instance="com.tasking.winIDEA.instance.id-TC397"
     remote="nuttx-tc3x.out"
     console_port=9000
+    elf="${1:-$here/../../nuttx}"
+    ;;
+  tc375)
+    instance="${TC375_WINIDEA_INSTANCE:-com.tasking.winIDEA.instance.id-TC375}"
+    remote="nuttx-tc375.out"
+    console_port="${TC375_CONSOLE_PORT:-9004}"
     elf="${1:-$here/../../nuttx}"
     ;;
   triboard)
@@ -84,7 +91,7 @@ case "$board" in
     exit 1
     ;;
   *)
-    echo "unknown board: $board (try tc4d7 | tc397 | amp)" >&2
+    echo "unknown board: $board (try tc4d7 | tc397 | tc375 | triboard | amp)" >&2
     exit 2
     ;;
 esac
