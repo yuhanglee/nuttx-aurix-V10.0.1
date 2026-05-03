@@ -774,18 +774,18 @@ config S25FL1_QSPI_FREQUENCY
 	default 108000000
 	---help---
 		Per data sheet:
-		– Normal Read (Serial):
-			– 50 MHz clock rate (-40°C to +85°C/105°C)
-			– 45 MHz clock rate (-40°C to +125°C)
-		– Fast Read (Serial):
-			– 108 MHz clock rate (-40°C to +85°C/105°C)
-			– 97 MHz clock rate (-40°C to +125°C)
-		– Dual Read:
-			– 108 MHz clock rate (-40°C to +85°C/105°C)
-			– 97 MHz clock rate (-40°C to +125°C)
-		– Quad Read:
-			– 108 MHz clock rate (-40°C to +85°C/105°C)
-			– 97 MHz clock rate for S25FL164K (-40°C to +125°C)
+		- Normal Read (Serial):
+			- 50 MHz clock rate (-40degC to +85degC/105degC)
+			- 45 MHz clock rate (-40degC to +125degC)
+		- Fast Read (Serial):
+			- 108 MHz clock rate (-40degC to +85degC/105degC)
+			- 97 MHz clock rate (-40degC to +125degC)
+		- Dual Read:
+			- 108 MHz clock rate (-40degC to +85degC/105degC)
+			- 97 MHz clock rate (-40degC to +125degC)
+		- Quad Read:
+			- 108 MHz clock rate (-40degC to +85degC/105degC)
+			- 97 MHz clock rate for S25FL164K (-40degC to +125degC)
 
 		- Clock frequency for all SPI commands except for Read Data
 		  command (0x03) and Fast Read command (0x0b): 108 MHz
@@ -860,9 +860,9 @@ config W25QXXXJV_QSPI_FREQUENCY
 	default 133000000
 	---help---
 		Per data sheet:
-		– 133MHz Single, Dual/Quad SPI clocks
-		– 266/532MHz equivalent Dual/Quad SPI
-		– 66MB/S continuous data transfer rate
+		- 133MHz Single, Dual/Quad SPI clocks
+		- 266/532MHz equivalent Dual/Quad SPI
+		- 66MB/S continuous data transfer rate
 
 config W25QXXXJV_SECTOR512
 	bool "Simulate 512 byte Erase Blocks"
@@ -1562,4 +1562,13 @@ config MTD_CFI_PAGE_SIZE
 		"write page size" parameter for each write, so this configuration
 		value should be chosen such that it is equal to write page size for
 		the target flash.
+
+config MTD_XSPI_NOR
+	bool "Generic JEDEC SPI NOR over xSPI"
+	default n
+	depends on XSPI
+	---help---
+		Generic JEDEC SPI NOR flash driver using the xSPI subsystem.
+		Current scope is JEDEC RDID probe only. Read, program and
+		erase support will follow with the MTD adapter.
 endif # MTD

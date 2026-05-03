@@ -240,6 +240,10 @@ CSRCS += mtd_cfi.c
 CSRCS += cfi.c
 endif
 
+ifeq ($(CONFIG_MTD_XSPI_NOR),y)
+CSRCS += xspi_nor.c
+endif
+
 # Include MTD driver support
 
 DEPPATH += --dep-path mtd
