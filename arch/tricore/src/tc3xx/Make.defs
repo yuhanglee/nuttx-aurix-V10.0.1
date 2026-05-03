@@ -12,3 +12,7 @@ endif
 ifeq ($(CONFIG_TC3XX_GETH),y)
 CHIP_CSRCS += tc3x_geth.c
 endif
+
+ifeq ($(CONFIG_TC3XX_QSPI),y)
+CHIP_CSRCS += tc3x_qspi.c
+endif

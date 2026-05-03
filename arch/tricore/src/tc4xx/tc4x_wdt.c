@@ -28,6 +28,7 @@
 #include <assert.h>
 #include <debug.h>
 
+#include <arch/arch.h>
 #include <nuttx/bits.h>
 #include <nuttx/arch.h>
 #include <nuttx/irq.h>
@@ -36,9 +37,6 @@
 #include "tricore_internal.h"
 #include "hardware/tc4x_wdt.h"
 
-/****************************************************************************
- * Pre-processor Definitions
- ****************************************************************************/
 
 #define TC4X_WDT_FSPB   CONFIG_TC4X_WDT_FSPB
 
@@ -47,15 +45,12 @@
 
 #define CTRLB_DR        BIT(0)
 
-/* Register addresses */
-#define WDT_CPU0_CTRLA  0xF000003C
-#define WDT_CPU0_CTRLB  0xF0000040
-#define WDT_SYS_CTRLA   0xF00001A8
-#define WDT_SYS_CTRLB   0xF00001AC
+#define WDT_CTRLA_OFF   0x24
+#define WDT_CTRLB_OFF   0x28
+#define WDT_CPU_BASE(n) (TC4X_WDTCPU0_BASE + (n) * 0x30u)
+#define WDT_SYS_CTRLA   (TC4X_WDTSYS_BASE + WDT_CTRLA_OFF)
+#define WDT_SYS_CTRLB   (TC4X_WDTSYS_BASE + WDT_CTRLB_OFF)
 
-/****************************************************************************
- * Private Types
- ****************************************************************************/
 
 #ifdef CONFIG_TC4X_WDT
 struct tc4x_wdt_lowerhalf_s
@@ -129,14 +124,25 @@ static void tc4x_wdt_disable(uintptr_t ctrla_addr, uintptr_t ctrlb_addr)
   putreg32(ctrla, ctrla_addr);
 }
 
-/****************************************************************************
- * Public Functions
- ****************************************************************************/
 
 void tricore_wdt_disable(void)
 {
-  tc4x_wdt_disable(WDT_SYS_CTRLA, WDT_SYS_CTRLB);
-  tc4x_wdt_disable(WDT_CPU0_CTRLA, WDT_CPU0_CTRLB);
+  uint32_t cpu_id;
+  uintptr_t base;
+
+  __asm__ __volatile__("mfcr %0, %1"
+                       : "=d"(cpu_id)
+                       : "i"(IFX_CPU_CORE_ID)
+                       : "memory");
+  cpu_id &= IFX_CPU_CORE_ID_MASK;
+
+  base = WDT_CPU_BASE(cpu_id);
+  tc4x_wdt_disable(base + WDT_CTRLA_OFF, base + WDT_CTRLB_OFF);
+
+  if (cpu_id == 0)
+    {
+      tc4x_wdt_disable(WDT_SYS_CTRLA, WDT_SYS_CTRLB);
+    }
 }
 
 #ifdef CONFIG_TC4X_WDT
@@ -392,9 +398,6 @@ static int tc4x_wdt_settimeout(struct watchdog_lowerhalf_s *lower,
   return OK;
 }
 
-/****************************************************************************
- * Public Functions
- ****************************************************************************/
 
 int tc4x_wdt_initialize(const char *devpath, int wdtid)
 {

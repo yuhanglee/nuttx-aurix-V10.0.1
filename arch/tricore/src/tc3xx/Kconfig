@@ -144,4 +144,68 @@ config TRICORE_GETH_BASE
 
 endif # TC3XX_GETH
 
+# QSPI (Synchronous Serial Interface) -- TC3xx hardware QSPI block
+menuconfig TC3XX_QSPI
+	bool "TC3xx QSPI master driver"
+	default n
+	depends on SPI
+	---help---
+		Enable the polled-mode QSPI master driver for the TC3xx (TC397)
+		family.  Provides a NuttX spi_ops_s lower-half built on top of
+		the dedicated QSPI peripheral with hardware SLSO chip selects.
+
+if TC3XX_QSPI
+
+config TC3XX_QSPI_FSPB_HZ
+	int "fSPB clock feeding the QSPI module (Hz)"
+	default 100000000
+	---help---
+		Source clock frequency that drives the QSPI peripheral.  TC397
+		runs fSPB at 100 MHz by default; adjust to match your clock-tree
+		configuration.
+
+config TC3XX_QSPI2
+	bool "Enable QSPI2"
+	default n
+	---help---
+		Enable QSPI2 as a NuttX SPI bus.  On the TC397 ADAS Kit, QSPI2
+		is wired to the TLF30682QVS01 PMIC via SLSO1 with MTSR=P15.6,
+		MRST=P15.7, SCLK=P15.8, SLSO1=P14.2 (all ALT3).
+
+if TC3XX_QSPI2
+
+config TC3XX_QSPI2_DEFAULT_CS
+	int "Default hardware CS (SLSO index, 0..15)"
+	default 1
+	range 0 15
+	---help---
+		Default SLSO line driven by the QSPI2 module.  TLF30682 on the
+		TC397 ADAS Kit uses SLSO1.
+
+endif # TC3XX_QSPI2
+
+endif # TC3XX_QSPI
+
+# WDT
+config TC3XX_WDT
+	bool "TC3xx Watchdog Timer driver"
+	default n
+	depends on WATCHDOG
+	---help---
+		Enable the TC3xx CPU watchdog timer driver.  Registers
+		/dev/watchdog0 backed by SCU.WDTCPU0_CON0/CON1/SR.
+
+		WDT overflow generates an alarm to the SMU.  Until the
+		TC3xx SMU integration is in place, an overflow will not
+		automatically issue a chip reset; feed/start/stop/status
+		paths still work for development use.
+
+config TC3XX_WDT_FSPB
+	int "SPB clock frequency (Hz) feeding the TC3xx WDT"
+	default 100000000
+	depends on TC3XX_WDT
+	---help---
+		Source clock for the WDT divider chain.  TC397 runs fSPB at
+		100 MHz by default; adjust to match your clock-tree.
+
 endmenu
