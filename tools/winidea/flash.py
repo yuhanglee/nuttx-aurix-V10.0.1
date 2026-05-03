@@ -5,7 +5,7 @@
 Standalone flasher for Infineon AURIX targets via remote winIDEA + isystem.connect.
 
 Usable by anything that can produce an ELF (Zephyr west, NuttX make, bare CMake,
-…). Mirrors the logic in scripts/west_commands/runners/winidea.py but takes
+...). Mirrors the logic in scripts/west_commands/runners/winidea.py but takes
 its inputs as plain CLI flags rather than a Zephyr RunnerConfig.
 
 Pipeline:
@@ -40,7 +40,7 @@ from pathlib import Path
 OPT_SYMBOL_FILE = '/IDE/System.Debug.Applications[0].SymbolFiles.File'
 OPT_PROGRAM_FILE = '/IDE/System.Debug.SoCs[0].DLFs_Program.File'
 
-DEFAULT_CONSOLE_HOST = '192.168.1.3'   # kural (lab serial-over-TCP host)
+DEFAULT_CONSOLE_HOST = '192.168.1.2'
 
 log = logging.getLogger('winidea.flash')
 
