@@ -33,9 +33,6 @@
 #include "tricore_internal.h"
 #include "hardware/tc4xx_port.h"
 
-/****************************************************************************
- * Pre-processor Definitions
- ****************************************************************************/
 
 #ifndef CONFIG_TC4XX_GPIO_ACCESS_GROUP
 #  define CONFIG_TC4XX_GPIO_ACCESS_GROUP 0
@@ -94,9 +91,6 @@ static uint32_t tc4x_build_drvcfg(gpio_pinset_t pinset)
   return drvcfg;
 }
 
-/****************************************************************************
- * Public Functions
- ****************************************************************************/
 
 int aurix_config_gpio(gpio_pinset_t pinset)
 {
@@ -130,7 +124,10 @@ int aurix_config_gpio(gpio_pinset_t pinset)
 
   if (GPIO_IS_PERIPH_OWN_PAD(pinset))
     {
+      uintptr_t protse = base + PORT_PROTSE_OFFSET;
+      tc4x_prot_set_config(protse);
       putreg32(BIT(pin), base + PORT_PCSRSEL_OFFSET);
+      tc4x_prot_set_run(protse);
     }
 
   prot = base + PORT_ACCGRP_PROTE(CONFIG_TC4XX_GPIO_ACCESS_GROUP);
