@@ -21,9 +21,14 @@
 ############################################################################
 include $(TOPDIR)/Make.defs
 
-ifeq ($(CONFIG_BOARDCTL),y)
+# Always compile the board init file: it provides the
+# board_aurix_setup_serial_pin() weak override that the AMP secondary
+# CPUs (which don't enable CONFIG_BOARDCTL) still need at boot to
+# configure their per-ASCLIN pins.
 CSRCS = tc4d7_appinit.c
-endif
+
+# AMP secondary CPU init thread (used when INIT_ENTRYPOINT=amp_secondary_main)
+CSRCS += tc4d7_amp_secondary.c
 
 ifeq ($(CONFIG_TC4XX_I2C),y)
 CSRCS += tc4xx_i2c_bringup.c
