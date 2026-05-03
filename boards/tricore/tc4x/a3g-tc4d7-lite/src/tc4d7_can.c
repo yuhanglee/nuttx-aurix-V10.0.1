@@ -20,9 +20,6 @@
  *
  ****************************************************************************/
 
-/****************************************************************************
- * Included Files
- ****************************************************************************/
 
 #include <nuttx/config.h>
 
@@ -39,27 +36,31 @@
 #include "tricore_gpio.h"
 #include "tricore_mcmcan.h"
 
-/****************************************************************************
- * Pre-processor Definitions
- ****************************************************************************/
+
 //TODO all in Kconfig
 #define CONFIG_MCMCAN_BASE_ADDR             0xF4710000
-#define CONFIG_MCMCAN_NODE0_BASE_ADDR       0xF4710200
+#define CONFIG_MCMCAN_NODE0_BASE_ADDR       0xF4710600  /* NODE 1 */
 #define CONFIG_MCMCAN_NODE0_MRAM_ADDR       0xF4700000
 #define CONFIG_MCMCAN_NODE0_MRAM_SIZE       0x9000
 
-#define CONFIG_MCMCAN_NODE0_IRQ_LINE0       788
+#define CONFIG_MCMCAN_NODE0_IRQ_LINE0       789
 // TC4X has one ISR line for TX & RX
 #define CONFIG_MCMCAN_NODE0_IRQ_LINE1       0
 
-#define CONFIG_MCMCAN_NODE0_BITRATE         875
-#define CONFIG_MCMCAN_NODE0_SAMPLE_POINT    875
+#ifndef CONFIG_MCMCAN_NODE0_BITRATE
+#  define CONFIG_MCMCAN_NODE0_BITRATE       CONFIG_CAN_MCAN_BITRATE
+#endif
+#ifndef CONFIG_MCMCAN_NODE0_SAMPLE_POINT
+#  define CONFIG_MCMCAN_NODE0_SAMPLE_POINT  875
+#endif
 #define CONFIG_MCMCAN_NODE0_STD_FILTERS     32
 #define CONFIG_MCMCAN_NODE0_EXT_FILTERS     32
 #define CONFIG_MCMCAN_NODE0_RX_FIFO0        32
 #define CONFIG_MCMCAN_NODE0_RX_FIFO1        32
 #define CONFIG_MCMCAN_NODE0_TX_EVENTS       16
 #define CONFIG_MCMCAN_NODE0_TX_SLOTS        16
+
+
 #define CONFIG_MCMCAN_NODE0_NPCR            0x2
 
 static struct can_dev_s g_node0_candev;
@@ -74,8 +75,8 @@ static const struct mcmcan_config g_mcmcan_module =
   .base       = CONFIG_MCMCAN_BASE_ADDR,
   .node_pin   =
     {
-      [0] = { .present = true,  .npcr_val = CONFIG_MCMCAN_NODE0_NPCR },
-      [1] = { .present = false, .npcr_val = 0 },
+      [0] = { .present = false, .npcr_val = 0 },
+      [1] = { .present = true,  .npcr_val = CONFIG_MCMCAN_NODE0_NPCR },
       [2] = { .present = false, .npcr_val = 0 },
       [3] = { .present = false, .npcr_val = 0 },
     },
@@ -95,6 +96,7 @@ static struct mcmcan_node_priv_s g_node0_priv =
       .callbacks    = &g_node0_cbs,
       .bitrate      = CONFIG_MCMCAN_NODE0_BITRATE,
       .sample_point = CONFIG_MCMCAN_NODE0_SAMPLE_POINT,
+      .module_clock_hz = 80000000u,    /* fMCANI per CCU (tc4x_clockconfig.c) */
 #ifdef CONFIG_CAN_FD_MODE
       .bitrate_data      = CONFIG_MCMCAN_NODE0_BITRATE_DATA,
       .sample_point_data = CONFIG_MCMCAN_NODE0_SAMPLE_POINT_DATA,
@@ -116,9 +118,6 @@ static struct mcmcan_node_priv_s g_node0_priv =
     },
 };
 
-/****************************************************************************
- * Private Functions
- ****************************************************************************/
 
 static void tc4d7_config_can_pins(void)
 {
@@ -137,11 +136,14 @@ static void tc4d7_config_can_pins(void)
     {
       aurix_config_gpio(pins[i]);
     }
+
+
+  gpio_pinset_t stb = AURIX_GPIO(GPIO_PORT3, GPIO_PIN5,
+                                 GPIO_OUTPUT, GPIO_ALT0);
+  aurix_config_gpio(stb);
+  aurix_gpio_write(stb, false);
 }
 
-/****************************************************************************
- * Public Functions
- ****************************************************************************/
 
 int mcmcan_board_initialize(void)
 {

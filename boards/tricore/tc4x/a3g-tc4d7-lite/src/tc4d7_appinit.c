@@ -40,6 +40,7 @@
 #endif
 
 #ifdef CONFIG_CAN_MCAN
+#  include <debug.h>
 int mcmcan_board_initialize(void);
 #endif
 
@@ -115,7 +116,14 @@ void board_late_initialize(void)
 #endif
 
 #ifdef CONFIG_CAN_MCAN
-  mcmcan_board_initialize();
+  {
+    int ret = mcmcan_board_initialize();
+
+    if (ret < 0)
+      {
+        _err("CAN init failed: %d\n", ret);
+      }
+  }
 #endif
 
 #ifdef CONFIG_TC4X_ASCLIN_SPI
