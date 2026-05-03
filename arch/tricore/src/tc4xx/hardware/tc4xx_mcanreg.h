@@ -19,9 +19,6 @@
  *
  ****************************************************************************/
 
-/****************************************************************************
- * Included Files
- ****************************************************************************/
 
 #ifndef __ARCH_TRICORE_SRC_TC4XX_MCMCAN_H
 #define __ARCH_TRICORE_SRC_TC4XX_MCMCAN_H
@@ -34,8 +31,11 @@
 
 #define MCMCAN_CLC         0x00
 #define MCMCAN_MCR         0x70
-#define MCMCAN_GRINT1(n)   (0x12C + n * 0x400)
-#define MCMCAN_GRINT2(n)   (0x130 + n * 0x400)
 #define MCMCAN_NPCR(n)     (0x14C + n * 0x400)
+
+
+#define MCMCAN_G0INTR(n)   (0x12C + n * 0x400)
+#define MCMCAN_G1INTR(n)   (0x130 + n * 0x400)
+#define MCMCAN_G2INTR(n)   (0x134 + n * 0x400)
 
 #endif /* __ARCH_TRICORE_SRC_TC4XX_MCMCAN_H */
