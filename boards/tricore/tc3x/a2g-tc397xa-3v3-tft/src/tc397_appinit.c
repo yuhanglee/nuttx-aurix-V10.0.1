@@ -20,22 +20,34 @@
  *
  ****************************************************************************/
 
-/****************************************************************************
- * Included Files
- ****************************************************************************/
 
 #include <nuttx/config.h>
 #include <debug.h>
 #include <errno.h>
 #include "tricore_gpio.h"
 
-#ifdef CONFIG_TC4XX_I2C
-#include "tc4xx_i2c.h"
+#ifdef CONFIG_TC3XX_I2C
+#include "tc3xx_i2c.h"
 #endif
 
-/****************************************************************************
- * Public Functions
- ****************************************************************************/
+#ifdef CONFIG_TRICORE_FLASH_MTD
+#  include <nuttx/mtd/mtd.h>
+#  include <nuttx/drivers/drivers.h>
+struct mtd_dev_s *tricore_flash_initialize(void);
+#endif
+
+#ifdef CONFIG_CAN
+int mcmcan_board_initialize(void);
+#endif
+
+#ifdef CONFIG_TC3XX_QSPI2
+int tc397_qspi_initialize(void);
+#endif
+
+#ifdef CONFIG_TC3XX_WDT
+int tc3x_wdt_initialize(const char *devpath, int wdtid);
+#endif
+
 
 void board_aurix_setup_i2c_pin(int bus)
 {
@@ -46,20 +58,33 @@ void board_aurix_setup_i2c_pin(int bus)
   aurix_config_gpio(sdapin);
 }
 
-void board_aurix_setup_serial_pin(void)
+void board_aurix_setup_serial_pin(int idx)
 {
-  gpio_pinset_t txpin = AURIX_GPIO(14, 0, GPIO_PERIPH, GPIO_ALT2);
-  gpio_pinset_t rxpin = AURIX_GPIO(14, 1, GPIO_INPUT, GPIO_PULL_UP);
+  if (idx != 0)
+    {
+      return;
+    }
 
-  aurix_config_gpio(txpin);
-  aurix_config_gpio(rxpin);
+  aurix_config_gpio(AURIX_GPIO(14, 0, GPIO_PERIPH, GPIO_ALT2));
+  aurix_config_gpio(AURIX_GPIO(14, 1, GPIO_INPUT, GPIO_PULL_UP));
 }
+
+#ifdef CONFIG_BOARD_GPIO_TEST
+
+static const gpio_pinset_t g_test_gpio_pins[] =
+{
+  AURIX_GPIO(22, 0, GPIO_OUTPUT, GPIO_ALT0) | GPIO_OUTPUT_HIGH,
+  AURIX_GPIO(22, 2, GPIO_INPUT,  GPIO_PULL_UP),
+  AURIX_GPIO(22, 3, GPIO_INPUT,  GPIO_PULL_DOWN),
+};
+#endif
 
 int board_app_initialize(uintptr_t arg)
 {
+  int ret = OK;
+#if 0
   bool ledon = true;
   uint8_t i = 10;
-  int ret = OK;
   gpio_pinset_t led1 = AURIX_GPIO(GPIO_PORT33, GPIO_PIN1, GPIO_OUTPUT, GPIO_ALT0);
 
   aurix_config_gpio(led1);
@@ -67,6 +92,7 @@ int board_app_initialize(uintptr_t arg)
     aurix_gpio_write(led1, (ledon = !ledon));
     usleep(500 * 1000);
   }
+#endif
 
 #ifdef CONFIG_TC3XX_I2C
   ret = tc3xx_i2c_bringup();
@@ -85,7 +111,56 @@ int board_app_initialize(uintptr_t arg)
 #endif
 
 #ifdef CONFIG_CAN
-  mcmcan_board_initialize();
+  ret = mcmcan_board_initialize();
+  if (ret < 0)
+    {
+      _err("CAN init failed: %d\n", ret);
+    }
+#endif
+
+#ifdef CONFIG_TC3XX_QSPI2
+  ret = tc397_qspi_initialize();
+  if (ret < 0)
+    {
+      _err("QSPI2/TLF30682 init failed: %d\n", ret);
+    }
+#endif
+
+#ifdef CONFIG_TC3XX_WDT
+  ret = tc3x_wdt_initialize("/dev/watchdog0", 0);
+  if (ret < 0)
+    {
+      _err("WDT init failed: %d\n", ret);
+    }
+#endif
+
+#ifdef CONFIG_TRICORE_FLASH_MTD
+  {
+    struct mtd_dev_s *mtd = tricore_flash_initialize();
+    if (mtd == NULL)
+      {
+        _err("DFLASH MTD init failed\n");
+      }
+    else
+      {
+        ret = register_mtddriver("/dev/dflash0", mtd, 0666, NULL);
+        if (ret < 0)
+          {
+            _err("DFLASH MTD register failed: %d\n", ret);
+          }
+      }
+  }
+#endif
+
+#ifdef CONFIG_BOARD_GPIO_TEST
+  for (size_t i = 0; i < sizeof(g_test_gpio_pins) / sizeof(g_test_gpio_pins[0]); i++)
+    {
+      int gret = aurix_gpio_lower_register(g_test_gpio_pins[i], (int)i);
+      if (gret < 0)
+        {
+          _err("GPIO /dev/gpio%zu register failed: %d\n", i, gret);
+        }
+    }
 #endif
 
   return ret;

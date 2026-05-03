@@ -20,9 +20,6 @@
  *
  ****************************************************************************/
 
-/****************************************************************************
- * Included Files
- ****************************************************************************/
 
 #include <nuttx/config.h>
 
@@ -39,9 +36,6 @@
 #include "tc3xx_gpio.h"
 #include "tricore_mcmcan.h"
 
-/****************************************************************************
- * Pre-processor Definitions
- ****************************************************************************/
 //TODO all in Kconfig
 #define CONFIG_MCMCAN_BASE_ADDR             0xF0200000
 #define CONFIG_MCMCAN_NODE0_BASE_ADDR       0xF0208200
@@ -51,8 +45,12 @@
 #define CONFIG_MCMCAN_NODE0_IRQ_LINE0       364
 #define CONFIG_MCMCAN_NODE0_IRQ_LINE1       365
 
-#define CONFIG_MCMCAN_NODE0_BITRATE         875
-#define CONFIG_MCMCAN_NODE0_SAMPLE_POINT    875
+#ifndef CONFIG_MCMCAN_NODE0_BITRATE
+#  define CONFIG_MCMCAN_NODE0_BITRATE       CONFIG_CAN_MCAN_BITRATE
+#endif
+#ifndef CONFIG_MCMCAN_NODE0_SAMPLE_POINT
+#  define CONFIG_MCMCAN_NODE0_SAMPLE_POINT  875
+#endif
 #define CONFIG_MCMCAN_NODE0_STD_FILTERS     32
 #define CONFIG_MCMCAN_NODE0_EXT_FILTERS     32
 #define CONFIG_MCMCAN_NODE0_RX_FIFO0        32
@@ -94,6 +92,7 @@ static struct mcmcan_node_priv_s g_node0_priv =
       .callbacks    = &g_node0_cbs,
       .bitrate      = CONFIG_MCMCAN_NODE0_BITRATE,
       .sample_point = CONFIG_MCMCAN_NODE0_SAMPLE_POINT,
+      .module_clock_hz = 80000000u,    /* fMCAN default per CCU on TC397 */
 #ifdef CONFIG_CAN_FD_MODE
       .bitrate_data      = CONFIG_MCMCAN_NODE0_BITRATE_DATA,
       .sample_point_data = CONFIG_MCMCAN_NODE0_SAMPLE_POINT_DATA,
@@ -115,9 +114,6 @@ static struct mcmcan_node_priv_s g_node0_priv =
     },
 };
 
-/****************************************************************************
- * Private Functions
- ****************************************************************************/
 
 static void tc397_config_can_pins(void)
 {
@@ -138,9 +134,6 @@ static void tc397_config_can_pins(void)
     }
 }
 
-/****************************************************************************
- * Public Functions
- ****************************************************************************/
 
 int mcmcan_board_initialize(void)
 {
