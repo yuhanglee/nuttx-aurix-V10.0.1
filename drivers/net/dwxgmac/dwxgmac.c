@@ -20,9 +20,6 @@
  *
  ****************************************************************************/
 
-/****************************************************************************
- * Included Files
- ****************************************************************************/
 
 #include <nuttx/config.h>
 
@@ -53,24 +50,28 @@
 #endif
 
 
-/****************************************************************************
- * Pre-processor Definitions
- ****************************************************************************/
 
 #define ETHWORK             HPWORK
 
-/****************************************************************************
- * Static data — descriptors, buffers, config
- ****************************************************************************/
+
+#ifdef CONFIG_NET_DWXGMAC_DMA_SECTION
+#  define DWXGMAC_DMA_SECTION \
+   __attribute__((section(CONFIG_NET_DWXGMAC_DMA_SECTION)))
+#else
+#  define DWXGMAC_DMA_SECTION
+#endif
 
 static struct eth_dwmac_dma_desc
-  g_rx0_descs[CONFIG_DWXGMAC_NUM_RX_DMA_DESCRIPTORS] aligned_data(64);
+  g_rx0_descs[CONFIG_DWXGMAC_NUM_RX_DMA_DESCRIPTORS]
+  aligned_data(64) DWXGMAC_DMA_SECTION;
 static struct eth_dwmac_dma_desc
-  g_tx0_descs[CONFIG_DWXGMAC_NUM_TX_DMA_DESCRIPTORS] aligned_data(64);
+  g_tx0_descs[CONFIG_DWXGMAC_NUM_TX_DMA_DESCRIPTORS]
+  aligned_data(64) DWXGMAC_DMA_SECTION;
 
 static uint8_t
-  g_rxbuf_pool[CONFIG_DWXGMAC_NUM_RX_DMA_DESCRIPTORS][CONFIG_NET_ETH_PKTSIZE]
-  aligned_data(64);
+  g_rxbuf_pool[CONFIG_DWXGMAC_NUM_RX_DMA_DESCRIPTORS]
+              [ALIGN_UP(CONFIG_NET_ETH_PKTSIZE, 8)]
+  aligned_data(64) DWXGMAC_DMA_SECTION;
 
 static struct eth_dwmac_dma_ch_config g_dma_rx_cfg[1] =
 {
@@ -95,7 +96,8 @@ static struct eth_dwmac_rx_queue g_mtl_rx_cfg[1] =
     .priority = 0xFF,
     .threshold = 64,
     .sf = true,
-    .dma_channel = 0
+    .dma_channel = 0,
+    .route_multi_broad = true,
   },
 };
 
@@ -126,6 +128,7 @@ static struct eth_xgmac_config g_xgmac_cfg[CONFIG_DWXGMAC_NETHERNET] =
   {
     .dwmac = g_dwmac_cfg0,
     .ubl = true,
+    .blen = 0x4,  /* BLEN16 (1 << 3 in SYSBUS_MODE, written as blen << 1) */
   }
 };
 
@@ -139,9 +142,8 @@ static struct eth_xgmac_data g_xgmac_data[CONFIG_DWXGMAC_NETHERNET] =
 
 static struct xgmac_driver_s g_xgmac[CONFIG_DWXGMAC_NETHERNET];
 
-/****************************************************************************
- * Private Functions
- ****************************************************************************/
+static void xgmac_dma_rx_process(FAR struct xgmac_driver_s *priv, uint8_t ch);
+
 
 static void dma_tx_data_init(FAR struct xgmac_driver_s *priv, uint8_t ch)
 {
@@ -218,6 +220,9 @@ static void dma_init(FAR struct xgmac_driver_s *priv)
   const struct eth_dwmac_config *cfg = &priv->config->dwmac;
   uint8_t ch;
 
+  if (eth_dwmac_dma_reset(priv) < 0)
+    nerr("dma_init: DMA SWR did not clear (continuing anyway)\n");
+
   eth_dwmac_dma_set_sysbus(priv);
 
   for (ch = 0; ch < cfg->dma_tx_channel; ch++)
@@ -260,6 +265,8 @@ static void set_link_state(FAR struct xgmac_driver_s *priv, bool up)
   eth_dwmac_mac_rx_set_state(priv, up);
   eth_dwmac_mac_tx_set_state(priv, up);
 
+  ninfo("set_link_state: up=%d\n", up);
+
   leave_critical_section(flags);
 }
 
@@ -292,6 +299,8 @@ static int xgmac_send(FAR struct xgmac_driver_s *priv,
   td->tail = (td->tail + 1) % dcfg->descs_count;
 
   eth_dwmac_dma_tx_set_tail(priv, 0);
+
+  ninfo("xgmac_tx: len=%u\n", len);
 
   nxmutex_unlock(&td->lock);
   return OK;
@@ -406,6 +415,13 @@ static void xgmac_dma_rx_process(FAR struct xgmac_driver_s *priv, uint8_t ch)
 
           if (pktlen > 0 && pktlen <= CONFIG_NET_ETH_PKTSIZE)
             {
+              FAR uint8_t *_p = d->data[d->head];
+              ninfo("xgmac_rx: head=%d len=%u dst=%02x%02x%02x%02x%02x%02x "
+                    "src=%02x%02x%02x%02x%02x%02x type=%02x%02x\n",
+                    d->head, pktlen,
+                    _p[0], _p[1], _p[2], _p[3], _p[4], _p[5],
+                    _p[6], _p[7], _p[8], _p[9], _p[10], _p[11],
+                    _p[12], _p[13]);
               dev->d_buf = d->data[d->head];
               dev->d_len = pktlen;
               NETDEV_RXPACKETS(dev);
@@ -418,8 +434,7 @@ refill:
       d->head = (d->head + 1) % dcfg->descs_count;
     }
 
-  /* Update tail pointer so DMA can use recycled descriptors */
-  d->tail = d->head;
+  d->tail = dcfg->descs_count;
   eth_dwmac_dma_rx_set_tail(priv, ch);
 }
 

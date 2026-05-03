@@ -20,9 +20,6 @@
  *
  ****************************************************************************/
 
-/****************************************************************************
- * Included Files
- ****************************************************************************/
 
 #include <nuttx/config.h>
 
@@ -67,6 +64,8 @@ static int init_phy_mode_input_cfg(int port)
   xgmac_modreg(BIT(1), GENMASK(1, 0), TC3XX_ETH_GPCTL);
   /* all pins in alt0 */
   xgmac_modreg(0, GENMASK(10, 2), TC3XX_ETH_GPCTL);
+
+  return OK;
 }
 
 static int init_geth(int port)
