@@ -27,6 +27,7 @@ CMN_ASRCS += tricore_trap.S
 
 CMN_CSRCS += tricore_allocateheap.c
 CMN_CSRCS += tricore_checkstack.c
+CMN_CSRCS += tricore_compiler.c
 CMN_CSRCS += tricore_createstack.c
 CMN_CSRCS += tricore_csa.c
 CMN_CSRCS += tricore_doirq.c

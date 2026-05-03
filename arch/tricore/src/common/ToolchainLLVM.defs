@@ -19,7 +19,7 @@
 #
 
 # Toolchain path - adjust if needed
-LLVM_TOOLCHAIN_PATH ?= /opt/tooling/tricore-llvm/toolchains/tricore/v10.1.0
+LLVM_TOOLCHAIN_PATH ?= /opt/tooling/tricore-llvm/toolchains/tricore/v10.2.0/
 
 # Optimization levels
 

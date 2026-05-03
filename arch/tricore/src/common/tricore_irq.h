@@ -23,16 +23,10 @@
 #ifndef __ARCH_TRICORE_SRC_COMMON_TRICORE_IRQ_H
 #define __ARCH_TRICORE_SRC_COMMON_TRICORE_IRQ_H
 
-/****************************************************************************
- * Included Files
- ****************************************************************************/
 
 #include <nuttx/config.h>
 #include <stdint.h>
 
-/****************************************************************************
- * Pre-processor Definitions
- ****************************************************************************/
 
 /* Number of service request nodes */
 
@@ -41,7 +35,21 @@
 /* Default configuration */
 
 #define TRICORE_DEFAULT_IR_PRIO     255
-#define TRICORE_DEFAULT_IR_TOS      0
+
+#if defined(CONFIG_ARCH_CHIP_FAMILY_TC3XX) && defined(CPU)
+static inline uint32_t tricore_default_ir_tos(void)
+{
+  uint32_t cid;
+
+  __asm__ __volatile__ ("mfcr %0, 0xFE1C" : "=d"(cid) :: "memory");
+  return cid & 0x7;
+}
+#  define TRICORE_DEFAULT_IR_TOS    tricore_default_ir_tos()
+#elif defined(CPU)
+#  define TRICORE_DEFAULT_IR_TOS    (CPU)
+#else
+#  define TRICORE_DEFAULT_IR_TOS    0
+#endif
 
 #if defined(CONFIG_ARCH_CHIP_FAMILY_TC4XX)
 #  define IFX_IR_INT_BASE           0xf4430000

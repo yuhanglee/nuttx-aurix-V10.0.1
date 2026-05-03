@@ -23,9 +23,6 @@
 #ifndef __ARCH_TRICORE_SRC_COMMON_TRICORE_INTERNAL_H
 #define __ARCH_TRICORE_SRC_COMMON_TRICORE_INTERNAL_H
 
-/****************************************************************************
- * Included Files
- ****************************************************************************/
 
 #include <nuttx/config.h>
 
@@ -39,14 +36,7 @@
 
 #endif
 
-/****************************************************************************
- * Pre-processor Definitions
- ****************************************************************************/
 
-/* Determine which (if any) console driver to use.  If a console is enabled
- * and no other console device is specified, then a serial console is
- * assumed.
- */
 
 #ifndef CONFIG_DEV_CONSOLE
 #  undef  USE_SERIALDRIVER
@@ -70,19 +60,11 @@
 #  endif
 #endif
 
-/* If some other device is used as the console, then the serial driver may
- * still be needed.  Let's assume that if the upper half serial driver is
- * built, then the lower half will also be needed.  There is no need for
- * the early serial initialization in this case.
- */
 
 #if !defined(USE_SERIALDRIVER) && defined(CONFIG_STANDARD_SERIAL)
 #  define USE_SERIALDRIVER 1
 #endif
 
-/* For use with EABI and floating point, the stack must be aligned to 8-byte
- * addresses.
- */
 
 #define STACK_ALIGNMENT     8
 
@@ -100,9 +82,6 @@
 
 #define INTSTACK_SIZE (CONFIG_ARCH_INTERRUPTSTACK & ~STACK_ALIGN_MASK)
 
-/* This is the value used to mark the stack for subsequent stack monitoring
- * logic.
- */
 
 #define STACK_COLOR    0xdeadbeef
 #define INTSTACK_COLOR 0xdeadbeef
@@ -141,24 +120,14 @@ extern void tricore_switchcontext(uintptr_t **saveregs,
                                   uintptr_t *restoreregs);
 #endif
 
-/****************************************************************************
- * Public Types
- ****************************************************************************/
 
 #ifndef __ASSEMBLY__
 typedef void (*up_vector_t)(void);
 #endif
 
-/****************************************************************************
- * Public Data
- ****************************************************************************/
 
 #if 0 //ndef __ASSEMBLY__
 
-/* This is the beginning of heap as provided from up_head.S. This is the
- * first address in DRAM after the loaded program+bss+idle stack.  The
- * end of the heap is CONFIG_RAM_END
- */
 
 extern uintptr_t        __USTACK0_END[];
 extern uintptr_t        __USTACK0[];
@@ -199,22 +168,13 @@ extern uintptr_t __USTACK[];
 extern uintptr_t        __istack[];
 #endif 
 
-/****************************************************************************
- * Public Data
- ****************************************************************************/
 
-/****************************************************************************
- * Inline Functions
- ****************************************************************************/
 
 /* Macros to handle saving and restoring interrupt state. */
 
 #define tricore_savestate(regs)    (regs = up_current_regs())
 #define tricore_restorestate(regs) (up_set_current_regs(regs))
 
-/****************************************************************************
- * Public Function Prototypes
- ****************************************************************************/
 
 /* Signal handling **********************************************************/
 
@@ -257,8 +217,17 @@ size_t tricore_stack_check(uintptr_t alloc, size_t size);
 void tricore_stack_color(void *stackbase, size_t nbytes);
 #endif
 
-void tricore_endinit_clear(void);
-void tricore_endinit_set(void);
+void tricore_endinit_disable(void);
+void tricore_endinit_enable(void);
+void tricore_safety_endinit_enable(void);
 void tricore_wdt_disable(void);
+void up_clockconfig(void);
+
+#ifdef CONFIG_TRICORE_FLASH_MTD
+struct mtd_dev_s;
+struct mtd_dev_s *tricore_flash_initialize(void);
+void tricore_flash_get_last_dmu_state(uint32_t *err, uint32_t *status,
+                                      uint32_t *phase);
+#endif
 
 #endif /* __ARCH_TRICORE_SRC_COMMON_TRICORE_INTERNAL_H */

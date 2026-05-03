@@ -20,9 +20,6 @@
  *
  ****************************************************************************/
 
-/****************************************************************************
- * Included Files
- ****************************************************************************/
 
 #include <nuttx/config.h>
 
@@ -38,9 +35,6 @@
 #include "tricore_irq.h"
 #include "tricore_internal.h"
 
-/****************************************************************************
- * Private Functions
- ****************************************************************************/
 
 static inline uint32_t tricore_srcr_read(int irq)
 {
@@ -52,9 +46,6 @@ static inline void tricore_srcr_write(int irq, uint32_t val)
   putreg32(val, IFX_IR_GET_SRC(irq));
 }
 
-/****************************************************************************
- * Public Functions
- ****************************************************************************/
 
 void up_irq_enable(void)
 {
@@ -87,16 +78,9 @@ void up_enable_irq(int irq)
   regval &= ~SRCR_SRPN_MASK;
   regval |= ((uint32_t)irq << SRCR_SRPN_SHIFT) & SRCR_SRPN_MASK;
 
-#if defined(CONFIG_ARCH_CHIP_FAMILY_TC4XX)
-  if (((regval & SRCR_TOS_MASK) >> SRCR_TOS_SHIFT) == 0xf)
-#elif defined(CONFIG_ARCH_CHIP_FAMILY_TC3XX)
-  if (((regval & SRCR_TOS_MASK) >> SRCR_TOS_SHIFT) == 0x7)
-#endif
-    {
-      regval &= ~SRCR_TOS_MASK;
-      regval |= (TRICORE_DEFAULT_IR_TOS << SRCR_TOS_SHIFT) &
-                 SRCR_TOS_MASK;
-    }
+
+  regval &= ~SRCR_TOS_MASK;
+  regval |= (TRICORE_DEFAULT_IR_TOS << SRCR_TOS_SHIFT) & SRCR_TOS_MASK;
 
   regval |= SRCR_SRE;
   tricore_srcr_write(irq, regval);

@@ -78,7 +78,7 @@ __tricore_virt_disable:
 
 #else /* TC1.6 (AURIX TC3x) */
 
-/* TC1.6 (AURIX TC3x) — WDT-based endinit */
+/* TC1.6 (AURIX TC3x) -- WDT-based endinit */
 
 #define SCU_BASE	0xF0036000
 #define WDTCPU0CON0	(SCU_BASE + 0x024C)
@@ -88,6 +88,9 @@ __tricore_virt_disable:
 tricore_endinit_disable:
         mfcr    %d4, IFX_CPU_CORE_ID
         extr.u  %d4, %d4, 0, 3
+	jne	%d4, 6, 1f
+	mov	%d4, 5
+1:
         sh      %d5, %d4, 1
         add     %d4, %d5, %d4
 	movh.a	%a15, hi:WDTCPU0CON0
@@ -111,6 +114,9 @@ tricore_endinit_disable:
 tricore_endinit_enable:
         mfcr    %d4, IFX_CPU_CORE_ID
         extr.u  %d4, %d4, 0, 3
+	jne	%d4, 6, 1f
+	mov	%d4, 5
+1:
         sh      %d5, %d4, 1
         add     %d4, %d5, %d4
 	movh.a	%a15, hi:WDTCPU0CON0
@@ -132,6 +138,10 @@ tricore_endinit_enable:
 
 	.type	tricore_safety_endinit_enable, %function
 tricore_safety_endinit_enable:
+	mfcr	%d4, IFX_CPU_CORE_ID
+	extr.u	%d4, %d4, 0, 3
+	jnz	%d4, _safety_endinit_skip
+
 	movh.a	%a15, hi:WDTSCON0
 	lea	%a15, [%a15], lo:WDTSCON0
 
@@ -145,6 +155,7 @@ tricore_safety_endinit_enable:
 	st.w	[%a15], %d15
 	dsync
 
+_safety_endinit_skip:
 	ji	%a11
 
 #endif /* CONFIG_TRICORE_TC18 */

@@ -79,6 +79,11 @@ __start_stage2:
 
 #if defined(CONFIG_TRICORE_TC18)
 
+	/* virt_disable ends in rfh; only CPU 0 has the hypervisor context */
+	mfcr	%d4, IFX_CPU_CORE_ID
+	extr.u	%d4, %d4, 0, 3
+	jnz	%d4, skip_virt_disable
+
 	/* Disable Virtualization */
 	call	__tricore_virt_disable
 
@@ -93,6 +98,8 @@ __start_stage2:
 	encode_csa_link %d15, %d14, %d13
 	mtcr	IFX_CPU_FCX, %d15
 	isync
+
+skip_virt_disable:
 
 #endif /* CONFIG_TRICORE_TC18 */
 
@@ -187,4 +194,9 @@ skip_bss:
 
 	mfcr	%d4, IFX_CPU_CORE_ID
 	extr.u	%d4, %d4, 0, 3
+	jnz	%d4, skip_clockconfig
+	call	up_clockconfig
+	mfcr	%d4, IFX_CPU_CORE_ID
+	extr.u	%d4, %d4, 0, 3
+skip_clockconfig:
 	j	tricore_start

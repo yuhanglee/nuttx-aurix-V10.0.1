@@ -20,9 +20,6 @@
  *
  ****************************************************************************/
 
-/****************************************************************************
- * Included Files
- ****************************************************************************/
 
 #include <nuttx/config.h>
 
@@ -39,53 +36,11 @@
 
 #include <tricore_internal.h>
 
-/****************************************************************************
- * Public Functions
- ****************************************************************************/
 
-/****************************************************************************
- * Name: up_create_stack
- *
- * Description:
- *   Allocate a stack for a new thread and setup up stack-related information
- *   in the TCB.
- *
- *   The following TCB fields must be initialized by this function:
- *
- *   - adj_stack_size: Stack size after adjustment for hardware, processor,
- *     etc.  This value is retained only for debug purposes.
- *   - stack_alloc_ptr: Pointer to allocated stack
- *   - stack_base_ptr: Adjusted stack base pointer after the TLS Data and
- *     Arguments has been removed from the stack allocation.
- *
- * Input Parameters:
- *   - tcb: The TCB of new task
- *   - stack_size:  The requested stack size.  At least this much
- *     must be allocated.
- *   - ttype:  The thread type.  This may be one of following (defined in
- *     include/nuttx/sched.h):
- *
- *       TCB_FLAG_TTYPE_TASK     Normal user task
- *       TCB_FLAG_TTYPE_PTHREAD  User pthread
- *       TCB_FLAG_TTYPE_KERNEL   Kernel thread
- *
- *     This thread type is normally available in the flags field of the TCB,
- *     however, there are certain contexts where the TCB may not be fully
- *     initialized when up_create_stack is called.
- *
- *     If CONFIG_BUILD_KERNEL is defined, then this thread type may affect
- *     how the stack is allocated.  For example, kernel thread stacks should
- *     be allocated from protected kernel memory.  Stacks for user tasks and
- *     threads must come from memory that is accessible to user code.
- *
- ****************************************************************************/
 
 int up_create_stack(struct tcb_s *tcb, size_t stack_size, uint8_t ttype)
 {
 #ifdef CONFIG_TLS_ALIGNED
-  /* The allocated stack size must not exceed the maximum possible for the
-   * TLS feature.
-   */
 
   DEBUGASSERT(stack_size <= TLS_MAXSTACK);
   if (stack_size >= TLS_MAXSTACK)
@@ -94,10 +49,6 @@ int up_create_stack(struct tcb_s *tcb, size_t stack_size, uint8_t ttype)
     }
 #endif
 
-  /* Is there already a stack allocated of a different size?  Because of
-   * alignment issues, stack_size might erroneously appear to be of a
-   * different size.  Fortunately, this is not a critical operation.
-   */
 
   if (tcb->stack_alloc_ptr && tcb->adj_stack_size != stack_size)
     {
@@ -110,10 +61,6 @@ int up_create_stack(struct tcb_s *tcb, size_t stack_size, uint8_t ttype)
 
   if (!tcb->stack_alloc_ptr)
     {
-      /* Allocate the stack.  If DEBUG is enabled (but not stack debug),
-       * then create a zeroed stack to make stack dumps easier to trace.
-       * If TLS is enabled, then we must allocate aligned stacks.
-       */
 
 #ifdef CONFIG_TLS_ALIGNED
 #ifdef CONFIG_MM_KERNEL_HEAP
@@ -153,7 +100,7 @@ int up_create_stack(struct tcb_s *tcb, size_t stack_size, uint8_t ttype)
 
       if (!tcb->stack_alloc_ptr)
         {
-          serr("ERROR: Failed to allocate stack, size %zu\n", stack_size);
+          printf("ERROR: Failed to allocate stack, size %zu\n", stack_size);
         }
 #endif
     }
@@ -165,17 +112,9 @@ int up_create_stack(struct tcb_s *tcb, size_t stack_size, uint8_t ttype)
       uintptr_t top_of_stack;
       size_t size_of_stack;
 
-      /* RISC-V uses a push-down stack: the stack grows toward lower
-       * addresses in memory. The stack pointer register points to the
-       * lowest, valid working address (the "top" of the stack). Items on
-       * the stack are referenced as positive word offsets from SP.
-       */
 
       top_of_stack = (uintptr_t)tcb->stack_alloc_ptr + stack_size;
 
-      /* The RISC-V stack must be aligned at 128-bit (16-byte) boundaries.
-       * If necessary top_of_stack must be rounded down to the next boundary.
-       */
 
       top_of_stack = STACK_ALIGN_DOWN(top_of_stack);
       size_of_stack = top_of_stack - (uintptr_t)tcb->stack_alloc_ptr;
@@ -186,10 +125,6 @@ int up_create_stack(struct tcb_s *tcb, size_t stack_size, uint8_t ttype)
       tcb->adj_stack_size = size_of_stack;
 
 #ifdef CONFIG_STACK_COLORATION
-      /* If stack debug is enabled, then fill the stack with a
-       * recognizable value that we can use later to test for high
-       * water marks.
-       */
 
       tricore_stack_color(tcb->stack_base_ptr, tcb->adj_stack_size);
 
@@ -202,13 +137,6 @@ int up_create_stack(struct tcb_s *tcb, size_t stack_size, uint8_t ttype)
   return ERROR;
 }
 
-/****************************************************************************
- * Name: tricore_stack_color
- *
- * Description:
- *   Write a well know value into the stack
- *
- ****************************************************************************/
 
 #ifdef CONFIG_STACK_COLORATION
 void tricore_stack_color(void *stackbase, size_t nbytes)

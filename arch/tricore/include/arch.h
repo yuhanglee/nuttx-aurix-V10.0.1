@@ -20,16 +20,10 @@
  *
  ****************************************************************************/
 
-/* This file should never be included directly but, rather,
- * only indirectly through nuttx/arch.h
- */
 
 #ifndef __ARCH_TRICORE_INCLUDE_ARCH_H
 #define __ARCH_TRICORE_INCLUDE_ARCH_H
 
-/****************************************************************************
- * Included Files
- ****************************************************************************/
 
 #include <nuttx/config.h>
 
@@ -38,9 +32,6 @@
 #  include <stddef.h>
 #endif
 
-/****************************************************************************
- * Pre-processor Definitions
- ****************************************************************************/
 
 #define IFX_CPU_VCON0					0xB000
 #define IFX_CPU_PCXI					0xFE00
@@ -133,24 +124,13 @@
 #define tricore_addr2csa(addr) ((uintptr_t)(((((uintptr_t)(addr)) & 0xF0000000) >> 12) \
                                             | (((uintptr_t)(addr) & 0x003FFFC0) >> 6)))
 
-/****************************************************************************
- * Public Types
- ****************************************************************************/
 
 #ifndef __ASSEMBLY__
 struct xcptcontext
 {
-  /* These are saved copies of the context used during
-   * signal processing.
-   */
 
   uintptr_t *saved_regs;
 
-  /* Register save area with XCPTCONTEXT_SIZE, only valid when:
-   * 1.The task isn't running or
-   * 2.The task is interrupted
-   * otherwise task is running, and regs contain the stale value.
-   */
 
   uintptr_t *regs;
 };
@@ -161,10 +141,11 @@ struct xcptcontext
 #define	IFX_CFG_DSPR0_START			(0x70000000)
 
 #if defined(CONFIG_ARCH_CHIP_FAMILY_TC4XX)
-#  define IFX_IR_LASR_ADDR          (0xF4430C00)
+#  define IFX_IR_LASR_ADDR          (0xF4430C20)
 #  define IFX_IR_LASR_TOS_STRIDE    (0x34)
 #  define IFX_IR_LASR_PIPN_WIDTH    (11)
 #elif defined(CONFIG_ARCH_CHIP_FAMILY_TC3XX)
+   /* TC3x INT_CHx_LASR: 0xF0037204 + CH_index * 0x10. */
 #  define IFX_IR_LASR_ADDR          (0xF0037204)
 #  define IFX_IR_LASR_TOS_STRIDE    (0x10)
 #  define IFX_IR_LASR_PIPN_WIDTH    (10)
@@ -180,9 +161,6 @@ struct xcptcontext
 #define IFX_IRQ_DISABLE()  { __asm__ __volatile__ ("disable" : : : "memory"); }
 #endif /* __ASSEMBLY__ */
 
-/****************************************************************************
- * Public Function Prototypes
- ****************************************************************************/
 
 #ifdef __cplusplus
 #define EXTERN extern "C"

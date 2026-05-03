@@ -49,6 +49,22 @@ if ARCH_CHIP_FAMILY_TC4XX
 source "arch/tricore/src/tc4xx/Kconfig"
 endif
 
+config TRICORE_AMP_NUM_CPUS
+	int "AMP: number of application CPUs CPU 0 should release"
+	default 1
+	---help---
+		In an Asymmetric Multi-Processing build, each per-CPU NuttX
+		image is built with `-DCPU=N` and runs an independent kernel
+		(CONFIG_ARCH_TRICORE_CPU_COUNT=1).  The image built with
+		CPU=0 boots first; in tricore_start() it walks
+		_flash_banks[1..N-1] and releases each secondary CPU from
+		BOOTCON.HALT so the per-CPU images at the higher PFLASH
+		bank addresses start running.
+
+		Set to 1 (default) for plain single-CPU builds.  Set to 4
+		for the standard a3g-tc4d7-lite AMP setup that brings up
+		CPUs 0..3.
+
 choice
 	prompt "Tricore Toolchain Selection"
 	default TRICORE_TOOLCHAIN_LLVM
@@ -66,7 +82,7 @@ config TRICORE_TOOLCHAIN_LLVM
 		This is the commercial toolchain provided by HighTec.
 
 		The toolchain must be installed at:
-		/opt/tooling/tricore-llvm/toolchains/tricore/v10.1.0
+		/opt/tooling/tricore-llvm/toolchains/tricore/v10.2.0
 
 		Or set LLVM_TOOLCHAIN_PATH in your environment to the installation path.
 
@@ -79,12 +95,63 @@ endchoice
 
 config TRICORE_LLVM_TOOLCHAIN_PATH
 	string "HighTec LLVM Toolchain Path"
-	default "/opt/tooling/tricore-llvm/toolchains/tricore/v10.1.0"
+	default "/opt/tooling/tricore-llvm/toolchains/tricore/v10.2.0/"
 	depends on TRICORE_TOOLCHAIN_LLVM
 	---help---
 		Path to the HighTec LLVM toolchain installation directory.
 		The toolchain binaries should be in $(path)/bin/
 
-		Default: /opt/tooling/tricore-llvm/toolchains/tricore/v10.1.0
+		Default: /opt/tooling/tricore-llvm/toolchains/tricore/v10.2.0/
+
+menu "TriCore on-chip NVM (HOST DFLASH)"
+
+config TRICORE_FLASH_MTD
+	bool "AURIX HOST DFLASH MTD driver"
+	default n
+	depends on MTD
+	---help---
+		Enable the MTD lower-half driver for the Infineon AURIX HOST
+		DFLASH(0) on TC3x and TC4x.  Erase / program operations are
+		issued through the DMU host command-sequence interpreter at
+		0xF8080000.  Logical sector size is 2 KB, page (write) size
+		is 8 bytes.  Read access is memory-mapped.
+
+		On real hardware the driver runs from PFLASH; this is fine
+		for DFLASH because the DFLASH and PFLASH banks are
+		independent on AURIX (DFLASH operations do not stall PFLASH
+		reads).
+
+		Use tricore_flash_initialize() from board bring-up code to
+		obtain a struct mtd_dev_s pointer for ftl_initialize() or
+		mtd_partition().
+
+if TRICORE_FLASH_MTD
+
+config TRICORE_DFLASH_BASE
+	hex "HOST DFLASH(0) base address (non-cached)"
+	default 0xAF000000 if ARCH_CHIP_FAMILY_TC3XX
+	default 0xAE000000 if ARCH_CHIP_FAMILY_TC4XX
+	default 0xAF000000
+	---help---
+		Base address of HOST DFLASH(0) in the non-cached address
+		segment.  The DMU command-sequence interpreter requires the
+		PA / SA arguments to use the non-cached alias.
+
+		Standard AURIX TC3x: 0xAF000000.
+		Standard AURIX TC4x: 0xAE000000.
+
+config TRICORE_DFLASH_SIZE
+	int "HOST DFLASH(0) size (bytes)"
+	default 1048576
+	---help---
+		Total size of HOST DFLASH(0) in bytes.  TC3x / TC4x DFLASH(0)
+		ships in 1 MiB / 512 KiB / 128 KiB variants depending on the
+		SKU; defaults to 1 MiB which matches every kit currently
+		supported (TC397 ADAS Kit, TC4D7 Lite Kit).  Override per
+		board when targeting a smaller SKU.
+
+endif # TRICORE_FLASH_MTD
+
+endmenu
 
 endif # ARCH_TRICORE

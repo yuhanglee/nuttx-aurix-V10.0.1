@@ -20,9 +20,6 @@
  *
  ****************************************************************************/
 
-/****************************************************************************
- * Included Files
- ****************************************************************************/
 
 #include <nuttx/arch.h>
 #include <nuttx/board.h>
@@ -30,24 +27,10 @@
 
 #include "tricore_internal.h"
 
-/****************************************************************************
- * Public Data
- ****************************************************************************/
 
 volatile uintptr_t *g_current_regs[CONFIG_SMP_NCPUS];
 
-/****************************************************************************
- * Private Functions
- ****************************************************************************/
 
-/****************************************************************************
- * Name: up_color_intstack
- *
- * Description:
- *   Set the interrupt stack to a value so that later we can determine how
- *   much stack space was used by interrupt handling logic
- *
- ****************************************************************************/
 
 #if defined(CONFIG_STACK_COLORATION) && CONFIG_ARCH_INTERRUPTSTACK > 15
 static inline void up_color_intstack(void)
@@ -66,26 +49,7 @@ static inline void up_color_intstack(void)
 #  define up_color_intstack()
 #endif
 
-/****************************************************************************
- * Public Functions
- ****************************************************************************/
 
-/****************************************************************************
- * Name: up_initialize
- *
- * Description:
- *   up_initialize will be called once during OS initialization after the
- *   basic OS services have been initialized.  The architecture specific
- *   details of initializing the OS will be handled here.  Such things as
- *   setting up interrupt service routines, starting the clock, and
- *   registering device drivers are some of the things that are different
- *   for each processor and hardware platform.
- *
- *   up_initialize is called after the OS initialized but before the user
- *   initialization logic has been started and before the libraries have
- *   been initialized.  OS services and driver services are available.
- *
- ****************************************************************************/
 
 void up_initialize(void)
 {
@@ -93,20 +57,37 @@ void up_initialize(void)
 
   up_color_intstack();
 
-#ifdef USE_EARLYSERIALINIT
-  aurix_earlyserialinit();
-#endif
 
-#ifdef USE_SERIALDRIVER
+  aurix_earlyserialinit();
   aurix_serialinit();
-#endif
 }
 
-#define IFX_CPUn_REG(n) (0xF8800000 + 0x40000 * n)
+#if defined(CONFIG_ARCH_CHIP_FAMILY_TC4XX)
+#  define IFX_CPUn_REG(n) (0xF8800000 + 0x40000 * (n))
+#elif defined(CONFIG_ARCH_CHIP_FAMILY_TC3XX)
+#  define IFX_CPUn_REG(n) (0xF8800000 + 0x20000 * (n))
+#else
+#  error "Unknown AURIX chip family for IFX_CPUn_REG"
+#endif
 
 #define IFX_CPU_HALT BIT(0)
 #define IFX_CPU_BOOTCON(n) (IFX_CPUn_REG(n) + 0x1FE60)
 #define IFX_CPU_PC(n) (IFX_CPUn_REG(n) + 0x1FE08)
+
+#define IFX_CPU_SYSCON(n) (IFX_CPUn_REG(n) + 0x1FE14)
+#define IFX_CPU_SYSCON_BHALT BIT(24)
+
+#if defined(CONFIG_ARCH_CHIP_FAMILY_TC3XX)
+static const uintptr_t g_tc3xx_cpu_base[6] =
+{
+  0xF8800000U,
+  0xF8820000U,
+  0xF8840000U,
+  0xF8860000U,
+  0xF8880000U,
+  0xF88C0000U,
+};
+#endif
 
 #define IFX_CPU_PROTSPRSE(n) (IFX_CPUn_REG(n) + 0xE008)
 #define IFX_CPU_ACCENSPRCFG_WRA(n) (IFX_CPUn_REG(n) + 0xE020)
@@ -162,13 +143,10 @@ void tricore_start(int current_cpu)
 	uintptr_t hreg;
 	uintptr_t pcreg;
 
-	/* Start other core from cpu 0 */
-	if (current_cpu == 0) {
-		up_clockconfig();
 
-		tricore_enable_sfr_access(0);
-		for (int i = 1; i < CONFIG_ARCH_TRICORE_CPU_COUNT; i++) {
-			tricore_enable_sfr_access(i);
+#if defined(CPU) && (CPU == 0) && defined(CONFIG_ARCH_CHIP_FAMILY_TC4XX)
+	if (current_cpu == 0) {
+		for (int i = 1; i < CONFIG_TRICORE_AMP_NUM_CPUS; i++) {
 			hreg = IFX_CPU_BOOTCON(i);
 			if (getreg32(hreg)) {
 				pcreg = IFX_CPU_PC(i);
@@ -177,6 +155,36 @@ void tricore_start(int current_cpu)
 			}
 		}
 	}
+#elif defined(CPU) && (CPU == 0) && defined(CONFIG_ARCH_CHIP_FAMILY_TC3XX)
+	(void)hreg;
+	if (current_cpu == 0) {
+		for (int i = 1; i < CONFIG_TRICORE_AMP_NUM_CPUS; i++) {
+			uintptr_t base = g_tc3xx_cpu_base[i];
+			uint32_t syscon;
 
+			pcreg = base + 0x1FE08;
+			putreg32(_flash_banks[i], pcreg);
+
+			syscon = getreg32(base + 0x1FE14);
+			if (syscon & IFX_CPU_SYSCON_BHALT) {
+				putreg32(syscon & ~IFX_CPU_SYSCON_BHALT,
+					 base + 0x1FE14);
+			}
+		}
+	}
+#else
+	(void)current_cpu;
+	(void)hreg;
+	(void)pcreg;
+#endif
+
+#if defined(CPU) && (CPU != 0)
+	{
+		extern int amp_secondary_main(int argc, char *argv[]);
+		amp_secondary_main(0, NULL);
+		for (;;) ;
+	}
+#else
 	nx_start();
+#endif
 }
