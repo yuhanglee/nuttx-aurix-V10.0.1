@@ -9,6 +9,7 @@
 #include <nuttx/board.h>
 #include <nuttx/irq.h>
 #include "tricore_gpio.h"
+#include "tc4xx_gpio.h"
 
 #ifdef CONFIG_TC4X_WDT
 #include "hardware/tc4x_wdt.h"
@@ -73,6 +74,12 @@ static const gpio_pinset_t g_test_gpio_pins[] =
   AURIX_GPIO(22, 2, GPIO_INPUT,  GPIO_PULL_UP),
   AURIX_GPIO(22, 3, GPIO_INPUT,  GPIO_PULL_DOWN),
 };
+#endif
+
+#ifdef CONFIG_BOARD_USER_LED_GPIO
+
+static const gpio_pinset_t g_user_led_pin =
+  AURIX_GPIO(3, 9, GPIO_OUTPUT, GPIO_ALT0) | GPIO_OUTPUT_HIGH;
 #endif
 
 int board_app_initialize(uintptr_t arg)
@@ -160,6 +167,16 @@ int board_app_initialize(uintptr_t arg)
           _err("GPIO /dev/gpio%zu register failed: %d\n", i, gret);
         }
     }
+#endif
+
+#ifdef CONFIG_BOARD_USER_LED_GPIO
+  {
+    int gret = aurix_gpio_lower_register(g_user_led_pin, 0);
+    if (gret < 0)
+      {
+        _err("USER_LED /dev/gpio0 register failed: %d\n", gret);
+      }
+  }
 #endif
 
   return ret;

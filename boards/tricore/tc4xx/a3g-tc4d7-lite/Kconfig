@@ -20,4 +20,16 @@ config BOARD_GPIO_TEST
 		(or P22.3) externally to verify loopback with the gpio_test
 		userspace app.
 
+config BOARD_USER_LED_GPIO
+	bool "Register on-board user LED1 (P03.9) as /dev/gpio0"
+	default n
+	depends on DEV_GPIO
+	depends on !BOARD_GPIO_TEST
+	---help---
+		Registers TC4D7-Lite Kit user LED1 (P03.9) as /dev/gpio0
+		via aurix_gpio_lower_register().  The pin is configured as
+		push-pull output with init level HIGH so the LED is off at
+		boot (the kit drives LED1 active-low).  Run the led_blink
+		smoke test from tricore-apps to toggle it at 1 Hz.
+
 endif
