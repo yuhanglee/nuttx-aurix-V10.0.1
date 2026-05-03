@@ -23,9 +23,6 @@
 #ifndef ETHERNET_TC4X_GETH_H
 #define ETHERNET_TC4X_GETH_H
 
-/****************************************************************************
- * GETH registers
- ****************************************************************************/
 
 #define TC4XX_ETH_BASE              CONFIG_TRICORE_GETH_BASE
 #define TC4XX_ETH_CLC               (TC4XX_ETH_BASE + 0x000)
@@ -40,9 +37,6 @@
 #define TC4XX_ETH_ACCEN_CH_WRA(i)   (TC4XX_ETH_BASE + 0x0A0 + 0x20 * (i))
 #define TC4XX_ETH_ACCEN_CH_WRB(i)   (TC4XX_ETH_BASE + 0x0A4 + 0x20 * (i))
 
-/****************************************************************************
- * Bridge registers
- ****************************************************************************/
 
 #define TC4XX_BRIDGE_BASE            (TC4XX_ETH_BASE + 0x1E000)
 #define TC4XX_BRIDGE_FWDCTRL         (TC4XX_BRIDGE_BASE + 0x000)
@@ -51,10 +45,8 @@
 #define TC4XX_BRIDGE_RXC_MAP_P0      (TC4XX_BRIDGE_BASE + 0x014)
 #define TC4XX_BRIDGE_PORT1_CTRL      (TC4XX_BRIDGE_BASE + 0x018)
 #define TC4XX_BRIDGE_INTR_STATUS     (TC4XX_BRIDGE_BASE + 0x104)
+#define TC4XX_BRIDGE_DMA_PORT_SEL    (TC4XX_BRIDGE_BASE + 0x110)
 
-/****************************************************************************
- * HSPHY registers
- ****************************************************************************/
 
 #define TC4XX_HSPHY_BASE             0xF2000000u
 #define TC4XX_HSPHY_CLC              (TC4XX_HSPHY_BASE + 0x000)
@@ -67,9 +59,6 @@
 #define TC4XX_HSPHY_ETH(i)           (TC4XX_HSPHY_BASE + 0x600 + (4 * (i)))
 #define TC4XX_HSPHY_DLLCFG           (TC4XX_HSPHY_BASE + 0x628)
 
-/****************************************************************************
- * PMS VMON registers
- ****************************************************************************/
 
 #define PMS_VMONP_VDDPHPHY0CON   0xF024909Cu
 #define PMS_VMONP_VDDPHPHY0RST   0xF02490A0u

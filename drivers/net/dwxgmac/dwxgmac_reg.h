@@ -1435,7 +1435,12 @@
 #define DMA_SFTY_IND_CTRL_MSEL                           GENMASK(19, 16)
 #define DMA_SFTY_IND_CTRL_DAPS                           GENMASK(23, 22)
 #define DMA_SFTY_IND_DATA                                0xF08C
-#define DMA_CHi_CONTROL(i)                               (0x100 + i * 0x80)
+/* DMA per-channel control sits in the DMA sub-block which starts at
+ * MAC base + 0xF000.  Channel 0 control is therefore at 0xF100, not
+ * 0x100 (offset 0x100 from MAC base lands on a stat counter region).
+ * Confirmed against iLLD GETH0_DMA_CH0_CONTROL @ 0xF901F100.
+ */
+#define DMA_CHi_CONTROL(i)                               (0xF100 + i * 0x80)
 #define DMA_CHi_CONTROL_PBLX8                            BIT(16)
 #define DMA_CHi_CONTROL_DSL                              GENMASK(20, 18)
 #define DMA_CHi_CONTROL_SPH                              BIT(24)

@@ -20,9 +20,6 @@
  *
  ****************************************************************************/
 
-/****************************************************************************
- * Included Files
- ****************************************************************************/
 
 #include <nuttx/config.h>
 
@@ -53,24 +50,28 @@
 #endif
 
 
-/****************************************************************************
- * Pre-processor Definitions
- ****************************************************************************/
 
 #define ETHWORK             HPWORK
 
-/****************************************************************************
- * Static data — descriptors, buffers, config
- ****************************************************************************/
+
+#ifdef CONFIG_NET_DWXGMAC_DMA_SECTION
+#  define DWXGMAC_DMA_SECTION \
+   __attribute__((section(CONFIG_NET_DWXGMAC_DMA_SECTION)))
+#else
+#  define DWXGMAC_DMA_SECTION
+#endif
 
 static struct eth_dwmac_dma_desc
-  g_rx0_descs[CONFIG_DWXGMAC_NUM_RX_DMA_DESCRIPTORS] aligned_data(64);
+  g_rx0_descs[CONFIG_DWXGMAC_NUM_RX_DMA_DESCRIPTORS]
+  aligned_data(64) DWXGMAC_DMA_SECTION;
 static struct eth_dwmac_dma_desc
-  g_tx0_descs[CONFIG_DWXGMAC_NUM_TX_DMA_DESCRIPTORS] aligned_data(64);
+  g_tx0_descs[CONFIG_DWXGMAC_NUM_TX_DMA_DESCRIPTORS]
+  aligned_data(64) DWXGMAC_DMA_SECTION;
 
 static uint8_t
-  g_rxbuf_pool[CONFIG_DWXGMAC_NUM_RX_DMA_DESCRIPTORS][CONFIG_NET_ETH_PKTSIZE]
-  aligned_data(64);
+  g_rxbuf_pool[CONFIG_DWXGMAC_NUM_RX_DMA_DESCRIPTORS]
+              [ALIGN_UP(CONFIG_NET_ETH_PKTSIZE, 8)]
+  aligned_data(64) DWXGMAC_DMA_SECTION;
 
 static struct eth_dwmac_dma_ch_config g_dma_rx_cfg[1] =
 {
@@ -95,7 +96,8 @@ static struct eth_dwmac_rx_queue g_mtl_rx_cfg[1] =
     .priority = 0xFF,
     .threshold = 64,
     .sf = true,
-    .dma_channel = 0
+    .dma_channel = 0,
+    .route_multi_broad = true,
   },
 };
 
@@ -126,6 +128,7 @@ static struct eth_xgmac_config g_xgmac_cfg[CONFIG_DWXGMAC_NETHERNET] =
   {
     .dwmac = g_dwmac_cfg0,
     .ubl = true,
+    .blen = 0x4,  /* BLEN16 (1 << 3 in SYSBUS_MODE, written as blen << 1) */
   }
 };
 
@@ -139,9 +142,8 @@ static struct eth_xgmac_data g_xgmac_data[CONFIG_DWXGMAC_NETHERNET] =
 
 static struct xgmac_driver_s g_xgmac[CONFIG_DWXGMAC_NETHERNET];
 
-/****************************************************************************
- * Private Functions
- ****************************************************************************/
+static void xgmac_dma_rx_process(FAR struct xgmac_driver_s *priv, uint8_t ch);
+
 
 static void dma_tx_data_init(FAR struct xgmac_driver_s *priv, uint8_t ch)
 {
@@ -218,6 +220,9 @@ static void dma_init(FAR struct xgmac_driver_s *priv)
   const struct eth_dwmac_config *cfg = &priv->config->dwmac;
   uint8_t ch;
 
+  if (eth_dwmac_dma_reset(priv) < 0)
+    nerr("dma_init: DMA SWR did not clear (continuing anyway)\n");
+
   eth_dwmac_dma_set_sysbus(priv);
 
   for (ch = 0; ch < cfg->dma_tx_channel; ch++)
@@ -260,6 +265,8 @@ static void set_link_state(FAR struct xgmac_driver_s *priv, bool up)
   eth_dwmac_mac_rx_set_state(priv, up);
   eth_dwmac_mac_tx_set_state(priv, up);
 
+  ninfo("set_link_state: up=%d\n", up);
+
   leave_critical_section(flags);
 }
 
@@ -292,6 +299,61 @@ static int xgmac_send(FAR struct xgmac_driver_s *priv,
   td->tail = (td->tail + 1) % dcfg->descs_count;
 
   eth_dwmac_dma_tx_set_tail(priv, 0);
+
+  {
+    FAR uint8_t *_p = buf;
+    ninfo("xgmac_tx: len=%u dst=%02x%02x%02x%02x%02x%02x\n", len,
+          _p[0], _p[1], _p[2], _p[3], _p[4], _p[5]);
+    ninfo(" MAC: MMC_RXP=%lu RXBC=%lu RXCRC=%lu RX64=%lu PKT_FILT=%08lx "
+          "RXQ_CTRL0=%08lx RXQ_CTRL1=%08lx TXC=%08lx RXC=%08lx\n",
+          (unsigned long)xgmac_read(priv->base + 0x900),
+          (unsigned long)xgmac_read(priv->base + 0x918),
+          (unsigned long)xgmac_read(priv->base + 0x928),
+          (unsigned long)xgmac_read(priv->base + 0x940),
+          (unsigned long)xgmac_read(priv->base + 0x008),
+          (unsigned long)xgmac_read(priv->base + 0xa0),
+          (unsigned long)xgmac_read(priv->base + 0xa4),
+          (unsigned long)xgmac_read(priv->base + 0x000),
+          (unsigned long)xgmac_read(priv->base + 0x004));
+    ninfo(" MTL: RXQ0_DBG=%08lx RXQ0_OP=%08lx RXQ_DMA_MAP0=%08lx "
+          "RXQ0_MISSED=%08lx\n",
+          (unsigned long)xgmac_read(priv->base + 0x1148),
+          (unsigned long)xgmac_read(priv->base + 0x1140),
+          (unsigned long)xgmac_read(priv->base + 0x1030),
+          (unsigned long)xgmac_read(priv->base + 0x1144));
+    ninfo(" DMA: RX_CTL=%08lx RX_STAT=%08lx INT_EN=%08lx "
+          "RXDESC_LIST=%08lx RXDESC_TAIL=%08lx RDRL=%08lx CURRX=%08lx\n",
+          (unsigned long)xgmac_read(priv->base + 0xF108),
+          (unsigned long)xgmac_read(priv->base + 0xF160),
+          (unsigned long)xgmac_read(priv->base + 0xF138),
+          (unsigned long)xgmac_read(priv->base + 0xF11C),
+          (unsigned long)xgmac_read(priv->base + 0xF12C),
+          (unsigned long)xgmac_read(priv->base + 0xF134),
+          (unsigned long)xgmac_read(priv->base + 0xF14C));
+    ninfo(" BR: FWDCTL=%08lx FLUSH=%08lx P0CTL=%08lx RXCMAP=%08lx "
+          "INTSTAT=%08lx DMAPORT=%08lx\n",
+          (unsigned long)xgmac_read(0xF901E000),
+          (unsigned long)xgmac_read(0xF901E004),
+          (unsigned long)xgmac_read(0xF901E00C),
+          (unsigned long)xgmac_read(0xF901E014),
+          (unsigned long)xgmac_read(0xF901E104),
+          (unsigned long)xgmac_read(0xF901E110));
+    {
+      volatile uint32_t *rd = (volatile uint32_t *)0xb04013c0;
+      ninfo(" RDES[0]=%08lx %08lx %08lx %08lx  RDES[1]=%08lx %08lx %08lx %08lx\n",
+            (unsigned long)rd[0], (unsigned long)rd[1],
+            (unsigned long)rd[2], (unsigned long)rd[3],
+            (unsigned long)rd[4], (unsigned long)rd[5],
+            (unsigned long)rd[6], (unsigned long)rd[7]);
+    }
+    ninfo(" INT: MAC_IS=%08lx DMA_IS=%08lx MTL_IS=%08lx Q0_IS=%08lx "
+          "MTL_OPMODE=%08lx\n",
+          (unsigned long)xgmac_read(priv->base + 0xb0),
+          (unsigned long)xgmac_read(priv->base + 0xF008),
+          (unsigned long)xgmac_read(priv->base + 0x1020),
+          (unsigned long)xgmac_read(priv->base + 0x1174),
+          (unsigned long)xgmac_read(priv->base + 0x1000));
+  }
 
   nxmutex_unlock(&td->lock);
   return OK;
@@ -406,6 +468,13 @@ static void xgmac_dma_rx_process(FAR struct xgmac_driver_s *priv, uint8_t ch)
 
           if (pktlen > 0 && pktlen <= CONFIG_NET_ETH_PKTSIZE)
             {
+              FAR uint8_t *_p = d->data[d->head];
+              ninfo("xgmac_rx: head=%d len=%u dst=%02x%02x%02x%02x%02x%02x "
+                    "src=%02x%02x%02x%02x%02x%02x type=%02x%02x\n",
+                    d->head, pktlen,
+                    _p[0], _p[1], _p[2], _p[3], _p[4], _p[5],
+                    _p[6], _p[7], _p[8], _p[9], _p[10], _p[11],
+                    _p[12], _p[13]);
               dev->d_buf = d->data[d->head];
               dev->d_len = pktlen;
               NETDEV_RXPACKETS(dev);
@@ -418,8 +487,7 @@ refill:
       d->head = (d->head + 1) % dcfg->descs_count;
     }
 
-  /* Update tail pointer so DMA can use recycled descriptors */
-  d->tail = d->head;
+  d->tail = dcfg->descs_count;
   eth_dwmac_dma_rx_set_tail(priv, ch);
 }
 

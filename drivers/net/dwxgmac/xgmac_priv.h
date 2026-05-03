@@ -16,9 +16,6 @@
 #include "dwxgmac_reg.h"
 #include <nuttx/bits.h>
 
-/****************************************************************************
- * Helper macros
- ****************************************************************************/
 
 #define LSB_GET(value)            ((value) & -(value))
 #define FIELD_PREP(mask, value)   (((value) * LSB_GET(mask)) & (mask))
@@ -32,9 +29,6 @@
 #  define aligned_data(n) __attribute__((aligned(n)))
 #endif
 
-/****************************************************************************
- * XGMAC-specific config / data
- ****************************************************************************/
 
 struct eth_xgmac_rdes_rd
 {
@@ -93,9 +87,6 @@ struct eth_xgmac_rdes_wb
   } rdes3;
 };
 
-/****************************************************************************
- * TX descriptor — Read format
- ****************************************************************************/
 
 struct eth_xgmac_tdes_rd
 {
@@ -125,9 +116,6 @@ struct eth_xgmac_tdes_rd
   } tdes3;
 };
 
-/****************************************************************************
- * TX descriptor — Write-back format
- ****************************************************************************/
 
 struct eth_xgmac_tdes_wb
 {
@@ -145,9 +133,6 @@ struct eth_xgmac_tdes_wb
   } tdes3;
 };
 
-/****************************************************************************
- * RX descriptor inline accessors
- ****************************************************************************/
 
 static inline bool eth_dwmac_rdes_own(void *d)
 {
@@ -192,7 +177,6 @@ static inline void eth_dwmac_rdes_rd_set(void *d, uintptr_t buf)
   rdes->rdes0.buf1ap = (uint32_t)buf;
   rdes->rdes1.buf1ap_high = 0;
   rdes->rdes2.buf2ap = 0;
-  /* Set IOC + OWN */
   *(volatile uint32_t *)&rdes->rdes3 = BIT(30) | BIT(31);
 }
 
@@ -255,10 +239,15 @@ static inline void eth_dwmac_dma_rx_init(const struct xgmac_driver_s *priv,
   uint8_t hw_ch = cfg->dwmac.dma_rx[dma_ch].nr;
   const struct eth_dwmac_dma_ch_config *dcfg = &cfg->dwmac.dma_rx[dma_ch];
 
+  xgmac_write(0, priv->base + DMA_CHi_CONTROL(hw_ch));
+
+  xgmac_write(0, priv->base + DMA_CHi_RXDESC_LIST_HADDRESS(hw_ch));
   xgmac_write((uint32_t)(uintptr_t)dcfg->descs,
               priv->base + DMA_CHi_RXDESC_LIST_LADDRESS(hw_ch));
-  xgmac_write(FIELD_PREP(DMA_CHi_RX_CONTROL_RBSZ,
-              CONFIG_NET_ETH_PKTSIZE / 8),
+  xgmac_write(DMA_CHi_RX_CONTROL_RPF |
+              FIELD_PREP(DMA_CHi_RX_CONTROL_RBSZ,
+                         CONFIG_NET_ETH_PKTSIZE / 8) |
+              FIELD_PREP(DMA_CHi_RX_CONTROL_RXPBL, 32),
               priv->base + DMA_CHi_RX_CONTROL(hw_ch));
   xgmac_write(FIELD_PREP(DMA_CHi_RX_CONTROL2_RDRL,
               dcfg->descs_count - 1),
@@ -294,10 +283,14 @@ static inline void eth_dwmac_dma_rx_irq_enable(const struct xgmac_driver_s *priv
   uint8_t hw_ch = cfg->dwmac.dma_rx[dma_ch].nr;
 
   xgmac_modreg(DMA_CHi_INTERRUPT_ENABLE_RIE |
+               DMA_CHi_INTERRUPT_ENABLE_RBUE |
+               DMA_CHi_INTERRUPT_ENABLE_RSE |
                DMA_CHi_INTERRUPT_ENABLE_NIE |
                DMA_CHi_INTERRUPT_ENABLE_FBEE |
                DMA_CHi_INTERRUPT_ENABLE_AIE,
                DMA_CHi_INTERRUPT_ENABLE_RIE |
+               DMA_CHi_INTERRUPT_ENABLE_RBUE |
+               DMA_CHi_INTERRUPT_ENABLE_RSE |
                DMA_CHi_INTERRUPT_ENABLE_NIE |
                DMA_CHi_INTERRUPT_ENABLE_FBEE |
                DMA_CHi_INTERRUPT_ENABLE_AIE,
@@ -347,11 +340,15 @@ static inline void eth_dwmac_dma_tx_init(const struct xgmac_driver_s *priv,
   uint8_t hw_ch = cfg->dwmac.dma_tx[dma_ch].nr;
   const struct eth_dwmac_dma_ch_config *dcfg = &cfg->dwmac.dma_tx[dma_ch];
 
+  xgmac_write(0, priv->base + DMA_CHi_TXDESC_LIST_HADDRESS(hw_ch));
   xgmac_write((uint32_t)(uintptr_t)dcfg->descs,
               priv->base + DMA_CHi_TXDESC_LIST_LADDRESS(hw_ch));
   xgmac_write(FIELD_PREP(DMA_CHi_TX_CONTROL2_TDRL,
               dcfg->descs_count - 1),
               priv->base + DMA_CHi_TX_CONTROL2(hw_ch));
+  xgmac_modreg(FIELD_PREP(DMA_CHi_TX_CONTROL_TXPBL, 32),
+               DMA_CHi_TX_CONTROL_TXPBL,
+               priv->base + DMA_CHi_TX_CONTROL(hw_ch));
   xgmac_write((uint32_t)(uintptr_t)dcfg->descs,
               priv->base + DMA_CHi_TXDESC_TAIL_LPOINTER(hw_ch));
 }
@@ -426,6 +423,24 @@ static inline void eth_dwmac_dma_tx_queue_flush(const struct xgmac_driver_s *pri
                priv->base + MTL_TXQX_OPERATION_MODE(cfg->dwmac.dma_tx[dma_ch].nr));
 }
 
+static inline int eth_dwmac_dma_reset(const struct xgmac_driver_s *priv)
+{
+  uint32_t v;
+  int i;
+
+  v = xgmac_read(priv->base + DMA_MODE);
+  xgmac_write(v | DMA_MODE_SWR, priv->base + DMA_MODE);
+
+  for (i = 0; i < 1000; i++)
+    {
+      if ((xgmac_read(priv->base + DMA_MODE) & DMA_MODE_SWR) == 0)
+        return 0;
+      up_udelay(50);
+    }
+
+  return -EIO;
+}
+
 static inline void eth_dwmac_dma_set_sysbus(const struct xgmac_driver_s *priv)
 {
   const struct eth_xgmac_config *cfg = priv->config;
@@ -438,12 +453,19 @@ static inline void eth_dwmac_dma_set_sysbus(const struct xgmac_driver_s *priv)
 
 static inline void eth_dwmac_mac_config(const struct xgmac_driver_s *priv)
 {
-  xgmac_write(MAC_RX_CONFIGURATION_IPC |
-              MAC_RX_CONFIGURATION_CST |
-              MAC_RX_CONFIGURATION_ACS,
+  xgmac_write(MAC_RX_CONFIGURATION_CST |
+              MAC_RX_CONFIGURATION_ACS |
+              MAC_RX_CONFIGURATION_DCRCC |
+              MAC_RX_CONFIGURATION_GPSLCE |
+              FIELD_PREP(MAC_RX_CONFIGURATION_GPSL, 1518) |
+#ifdef CONFIG_NET_DWXGMAC_MAC_LOOPBACK
+              MAC_RX_CONFIGURATION_LM |
+#endif
+              0,
               priv->base + MAC_RX_CONFIGURATION);
 
-  xgmac_write(MAC_PACKET_FILTER_PM, priv->base + MAC_PACKET_FILTER);
+  xgmac_write(MAC_PACKET_FILTER_RA | MAC_PACKET_FILTER_PM,
+              priv->base + MAC_PACKET_FILTER);
   xgmac_write(0, priv->base + MAC_EXTENDED_CONFIGURATION);
 }
 
@@ -531,6 +553,7 @@ static inline void eth_dwmac_mtl_set_rxq_ctrl(const struct xgmac_driver_s *priv)
   const struct eth_xgmac_config *cfg = priv->config;
   uint8_t queue;
   uint32_t rxq_ctrl0 = 0;
+  uint32_t rxq_ctrl1 = 0;
   uint32_t rxq_dma_map[2] = {0, 0};
 
   for (queue = 0; queue < cfg->dwmac.mtl_rx_queues; queue++)
@@ -539,12 +562,19 @@ static inline void eth_dwmac_mtl_set_rxq_ctrl(const struct xgmac_driver_s *priv)
 
       rxq_ctrl0 |= (0x2u << (2 * qcfg->nr));
 
+      if (qcfg->route_multi_broad)
+        {
+          rxq_ctrl1 |= MAC_RXQ_CTRL1_MCBCQEN |
+                       FIELD_PREP(MAC_RXQ_CTRL1_MCBCQ, qcfg->nr);
+        }
+
       rxq_dma_map[qcfg->nr / 4] |= (qcfg->dma_channel << ((qcfg->nr % 4) * 8));
     }
 
   xgmac_write(rxq_dma_map[0], priv->base + MTL_RXQ_DMA_MAP0);
   xgmac_write(rxq_dma_map[1], priv->base + MTL_RXQ_DMA_MAP1);
   xgmac_write(rxq_ctrl0, priv->base + MAC_RXQ_CTRL0);
+  xgmac_write(rxq_ctrl1, priv->base + MAC_RXQ_CTRL1);
 }
 
 #endif /* XGMAC_PRIV_H */

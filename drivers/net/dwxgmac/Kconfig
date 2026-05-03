@@ -42,4 +42,21 @@ config DWXGMAC_QOS
 	---help---
 		Enable QOS version of designware xgmac Ethernet driver.
 
+config NET_DWXGMAC_MAC_LOOPBACK
+	bool "Enable MAC-internal loopback (debug only)"
+	default n
+	---help---
+		Sets MAC_RX_CONFIGURATION.LM so the MAC loops every transmitted
+		frame back into its own receive path, bypassing the MII/RMII
+		PHY pads.  Use this only to isolate MAC vs. PHY/board issues.
+
+config NET_DWXGMAC_DMA_SECTION
+	string "Linker section for DMA descriptors and RX buffers"
+	---help---
+		If non-empty, place the DMA descriptors and RX buffer pool
+		into the named linker section.  Required on systems where the
+		Ethernet DMA peripheral cannot access the default .bss memory
+		(for example AURIX TriCore, where .bss lives in CPU-local DSPR
+		but the GETH DMA only reaches LMU/system RAM).
+
 endif #NET_DWXGMAC
