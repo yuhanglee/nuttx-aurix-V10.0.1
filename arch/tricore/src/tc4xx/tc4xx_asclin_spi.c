@@ -20,9 +20,6 @@
  *
  ****************************************************************************/
 
-/****************************************************************************
- * Included Files
- ****************************************************************************/
 
 #include <nuttx/config.h>
 
@@ -44,16 +41,7 @@
 #include "tc4xx_gpio.h"
 #include "hardware/tc4xx_asclin_spi.h"
 
-/****************************************************************************
- * Pre-processor Definitions
- ****************************************************************************/
 
-/* Additional ASCLIN register bits not in the UART header but needed for SPI.
- * FLAGS.OMT = Operation Mode Transition (bit 11) - set on mode switch
- * FLAGS.TC  = Transfer Complete (bit 17) - already defined
- * FLAGSCLEAR.OMTC = bit 11
- * FLAGSSET.SWTRGS = Software Trigger Set (bit 12)
- */
 
 #ifndef ASCLIN_FLAGS_OMT
 #  define ASCLIN_FLAGS_OMT            BIT(11)
@@ -79,10 +67,6 @@
 #  define ASCLIN_FLAGSCLEAR_TRRQC     BIT(15)
 #endif
 
-/* FIFO inlet/outlet width for 16-bit (2-byte) transfers.
- * INW/OUTW encodings: 0=0 bytes, 1=1 byte, 2=2 bytes, 3=4 bytes
- * The base header only defines INW_1/OUTW_1.
- */
 
 #ifndef ASCLIN_TXFIFOCON_INW_2
 #  define ASCLIN_TXFIFOCON_INW_2    (2u << ASCLIN_TXFIFOCON_INW_SHIFT)
@@ -111,9 +95,6 @@
 
 #define SPI_POLL_TIMEOUT            1000000u
 
-/****************************************************************************
- * Private Types
- ****************************************************************************/
 
 /* Per-bus hardware configuration */
 
@@ -145,9 +126,6 @@ struct tc4xx_spi_priv_s
   bool                          initialized;
 };
 
-/****************************************************************************
- * Private Function Prototypes
- ****************************************************************************/
 
 static int      tc4xx_spi_lock(FAR struct spi_dev_s *dev, bool lock);
 static void     tc4xx_spi_select(FAR struct spi_dev_s *dev,
@@ -171,9 +149,6 @@ static void     tc4xx_spi_recvblock(FAR struct spi_dev_s *dev,
                                     FAR void *buffer, size_t nwords);
 #endif
 
-/****************************************************************************
- * Private Data
- ****************************************************************************/
 
 static const struct spi_ops_s g_asclin_spi_ops =
 {
@@ -205,45 +180,28 @@ static const struct spi_ops_s g_asclin_spi_ops =
   .registercallback = NULL,
 };
 
-/* -----------------------------------------------------------------------
- * ASCLIN SPI bus instance(s)
- * -----------------------------------------------------------------------
- * Default pin mapping uses ASCLIN2 on mikroBUS-adjacent pins.
- * The user must verify pin assignments against the actual board schematic
- * and pinmux tables.  Loopback mode is enabled by default for safe
- * initial bring-up (no external wiring required).
- *
- * For real hardware:
- *   - Check pinmux.pdf for ASCLINx_ATX, ASCLINx_ASCLK, ASCLINx_ASLSO
- *     output alternate functions on chosen port pins.
- *   - Check pinmux.pdf for ASCLINx_ARXy input function on chosen MISO pin.
- *   - Set loopback = false.
- * -----------------------------------------------------------------------
- */
 
-#ifdef CONFIG_TC4XX_ASCLIN2_SPI
+#ifdef CONFIG_TC4XX_ASCLIN3_SPI
 
 static const struct tc4xx_spi_config_s g_spi0_config =
 {
-  .base      = TRICORE_ASCLIN_BASE(2),
+  .base      = TRICORE_ASCLIN_BASE(3),
   .fclk      = TC4X_ASCLINF_FREQUENCY,
   .clk_src   = TC4X_ASCLIN_CLK_SRC,
   .bus        = 0,
 
-  /* Pin mapping: user must adjust to match board wiring.
-   * Defaults use P15.0 (ATX/MOSI), P15.1 (ARX/MISO), P15.2 (ASCLK),
-   * P14.7 (GPIO CS).  Verify against pinmux.pdf Table for Port 15.
-   */
 
-  .mosi_pin  = AURIX_GPIO(15, 0, GPIO_PERIPH, GPIO_ALT2),
-  .miso_pin  = AURIX_GPIO(15, 1, GPIO_INPUT, GPIO_PULL_UP),
-  .sclk_pin  = AURIX_GPIO(15, 2, GPIO_PERIPH, GPIO_ALT2),
-  //.cs_pin    = AURIX_GPIO(14, 7, GPIO_OUTPUT, GPIO_PAD_CONFIG_OUT_GPIO),
+  .mosi_pin  = AURIX_GPIO(15, 6, GPIO_PERIPH, GPIO_ALT2),
+  .miso_pin  = AURIX_GPIO(15, 7, GPIO_INPUT,  GPIO_PULL_UP),
+  .sclk_pin  = AURIX_GPIO(15, 8, GPIO_PERIPH, GPIO_ALT6),
+  .cs_pin    = AURIX_GPIO(14, 7, GPIO_OUTPUT, GPIO_ALT0) | GPIO_OUTPUT_HIGH,
   .rx_alti   = ASCLIN_IOCR_ALTI_A,
 
-  /* Enable loopback for initial bring-up.  Set to false for real HW. */
-
+#ifdef CONFIG_TC4XX_ASCLIN3_SPI_LOOPBACK
   .loopback  = true,
+#else
+  .loopback  = false,
+#endif
 };
 
 static struct tc4xx_spi_priv_s g_spi0_priv =
@@ -258,11 +216,8 @@ static struct tc4xx_spi_priv_s g_spi0_priv =
   .initialized = false,
 };
 
-#endif /* CONFIG_TC4XX_ASCLIN2_SPI */
+#endif /* CONFIG_TC4XX_ASCLIN3_SPI */
 
-/****************************************************************************
- * Private Functions - Register Access
- ****************************************************************************/
 
 static inline uint32_t spi_getreg(const struct tc4xx_spi_config_s *cfg,
                                   uint32_t offset)
@@ -283,13 +238,6 @@ static inline void spi_modreg(const struct tc4xx_spi_config_s *cfg,
   modreg32(setbits, setbits | clrbits, cfg->base + offset);
 }
 
-/****************************************************************************
- * Name: spi_wait_clk
- *
- * Description:
- *   Wait for CSR.CON to reach expected state after clock selection change.
- *
- ****************************************************************************/
 
 static int spi_wait_clk(const struct tc4xx_spi_config_s *cfg, bool on)
 {
@@ -308,13 +256,6 @@ static int spi_wait_clk(const struct tc4xx_spi_config_s *cfg, bool on)
   return -ETIMEDOUT;
 }
 
-/****************************************************************************
- * Name: spi_set_clk
- *
- * Description:
- *   Set ASCLIN clock source and wait for it to take effect.
- *
- ****************************************************************************/
 
 static int spi_set_clk(const struct tc4xx_spi_config_s *cfg,
                        uint8_t clksel)
@@ -323,26 +264,6 @@ static int spi_set_clk(const struct tc4xx_spi_config_s *cfg,
   return spi_wait_clk(cfg, clksel != ASCLIN_CSR_CLKSEL_NONE);
 }
 
-/****************************************************************************
- * Name: spi_compute_baudrate
- *
- * Description:
- *   Compute BRG numerator/denominator and BITCON prescaler/oversampling
- *   to achieve the requested SPI clock frequency.
- *
- *   For SPI mode with symmetric clock:
- *     oversampling should be even
- *     samplepoint = oversampling / 2
- *
- *   fPD  = fclk / (prescaler + 1)
- *   fOVS = fPD * NUM / DEN
- *   fSCLK = fOVS / (oversampling + 1)
- *
- *   Target: NUM/DEN = freq * (oversampling + 1) * (prescaler + 1) / fclk
- *
- * Returns actual frequency achieved.
- *
- ****************************************************************************/
 
 static uint32_t spi_compute_baudrate(const struct tc4xx_spi_config_s *cfg,
                                      uint32_t freq)
@@ -359,17 +280,10 @@ static uint32_t spi_compute_baudrate(const struct tc4xx_spi_config_s *cfg,
   uint32_t bitcon;
   uint32_t brg;
 
-  /* Use oversampling = 16 for symmetric SCLK (even), samplepoint = 8
-   * This gives SCLK with 50% duty cycle.
-   */
 
   oversampling = 15u;  /* register value: actual oversampling = value + 1 */
   samplepoint  = 7u;   /* register value: first half = value + 1 = 8 ticks */
 
-  /* Find prescaler that keeps fPD in a useful range.
-   * fPD = fclk / (prescaler + 1)
-   * We want fPD such that NUM/DEN ratio stays within 12-bit range.
-   */
 
   prescaler = 0;
 
@@ -383,10 +297,6 @@ static uint32_t spi_compute_baudrate(const struct tc4xx_spi_config_s *cfg,
     {
       fpd = cfg->fclk / (prescaler + 1);
 
-      /* We need NUM/DEN = target_fovs / fpd
-       * Both NUM and DEN must fit in 12 bits (0..4095)
-       * DEN=0 is not allowed (means bypass, not what we want)
-       */
 
       if (fpd == 0)
         {
@@ -475,24 +385,6 @@ found:
   return actual;
 }
 
-/****************************************************************************
- * Name: spi_hw_init
- *
- * Description:
- *   Full ASCLIN SPI initialization sequence.
- *
- *   1. Enable module clock (CLC)
- *   2. Configure GPIO pins
- *   3. Turn off operating clock (CSR.CLKSEL = 0) for register writes
- *   4. Set FRAMECON.MODE = SPI
- *   5. Configure bit timing (BITCON) and baud rate (BRG)
- *   6. Configure data length (DATCON)
- *   7. Configure IOCR (CPOL, SPOL, loopback, RX input select)
- *   8. Configure TX/RX FIFOs
- *   9. Clear all flags
- *  10. Turn on operating clock
- *
- ****************************************************************************/
 
 static int spi_hw_init(struct tc4xx_spi_priv_s *priv)
 {
@@ -542,11 +434,6 @@ static int spi_hw_init(struct tc4xx_spi_priv_s *priv)
       return ret;
     }
 
-  /* Step 4: FRAMECON - SPI mode, MSB first, no parity
-   * LEAD = 1 (1 bit time leading delay before first SCLK edge)
-   * STOP = 1 (1 bit time trailing delay after last SCLK edge) - "trail"
-   * IDLE = 1 (1 bit time idle between frames)
-   */
 
   reg = ASCLIN_FRAMECON_MODE_SPI
       | ASCLIN_FRAMECON_MSB
@@ -589,13 +476,6 @@ static int spi_hw_init(struct tc4xx_spi_priv_s *priv)
 
   spi_putreg(cfg, ASCLIN_IOCR_OFFSET, reg);
 
-  /* Step 8: Configure FIFOs
-   * TX: flush, enable outlet, combined mode
-   * RX: flush, enable inlet
-   * Inlet/outlet width must match the transfer word size:
-   *   nbits <= 8:  INW_1 / OUTW_1 (1 byte per FIFO access)
-   *   nbits > 8:   INW_2 / OUTW_2 (2 bytes per FIFO access)
-   */
 
   reg = ASCLIN_TXFIFOCON_FLUSH
       | ASCLIN_TXFIFOCON_ENO
@@ -633,22 +513,6 @@ static int spi_hw_init(struct tc4xx_spi_priv_s *priv)
   return OK;
 }
 
-/****************************************************************************
- * Name: spi_exchange_word
- *
- * Description:
- *   Exchange a single SPI word (polled).  Writes TX data, waits for
- *   transfer complete, reads RX data.
- *
- *   ASCLIN SPI transfer sequence:
- *   1. Flush TX/RX FIFOs
- *   2. Clear TC flag
- *   3. Write data to TXDATA
- *   4. Poll for FLAGS.TC = 1 (transfer complete)
- *   5. Read RXDATA
- *   6. Clear TC flag
- *
- ****************************************************************************/
 
 static uint32_t spi_exchange_word(struct tc4xx_spi_priv_s *priv,
                                   uint32_t txword)
@@ -703,14 +567,6 @@ static uint32_t spi_exchange_word(struct tc4xx_spi_priv_s *priv,
   return rxword;
 }
 
-/****************************************************************************
- * Name: spi_reconfigure
- *
- * Description:
- *   Reconfigure the ASCLIN for changed mode/bits.  Requires clock off,
- *   modify registers, clock on sequence.
- *
- ****************************************************************************/
 
 static void spi_reconfigure(struct tc4xx_spi_priv_s *priv)
 {
@@ -735,17 +591,6 @@ static void spi_reconfigure(struct tc4xx_spi_priv_s *priv)
 
   spi_putreg(cfg, ASCLIN_IOCR_OFFSET, iocr);
 
-  /* Update FRAMECON for clock phase (CPHA).
-   *
-   * ASCLIN SPI is defined as: shift on first edge, sample on second edge.
-   * This maps to CPOL=0,CPHA=0 (MODE0) or CPOL=1,CPHA=0 (MODE2) natively.
-   *
-   * For CPHA=1 (MODE1/MODE3), we adjust the LEAD delay to achieve the
-   * phase shift effect.  LEAD=0 with the SPI mode gives CPHA=1 behavior.
-   *
-   * NOTE: ASCLIN SPI always shifts first, then latches.  For true CPHA=1,
-   * the lead delay effectively shifts the data alignment.
-   */
 
   framecon = spi_getreg(cfg, ASCLIN_FRAMECON_OFFSET);
   framecon &= ~ASCLIN_FRAMECON_LEAD_MASK;
@@ -774,9 +619,6 @@ static void spi_reconfigure(struct tc4xx_spi_priv_s *priv)
 
   priv->actual_freq = spi_compute_baudrate(cfg, priv->frequency);
 
-  /* Reconfigure FIFO widths to match current nbits, then flush.
-   * Must fully rewrite TXFIFOCON/RXFIFOCON since FLUSH is W-only.
-   */
 
   {
     uint32_t txfifo;
@@ -807,9 +649,6 @@ static void spi_reconfigure(struct tc4xx_spi_priv_s *priv)
   spi_set_clk(cfg, cfg->clk_src);
 }
 
-/****************************************************************************
- * Private Functions - SPI ops implementation
- ****************************************************************************/
 
 static int tc4xx_spi_lock(FAR struct spi_dev_s *dev, bool lock)
 {
@@ -825,13 +664,6 @@ static int tc4xx_spi_lock(FAR struct spi_dev_s *dev, bool lock)
     }
 }
 
-/****************************************************************************
- * Name: tc4xx_spi_select
- *
- * Description:
- *   Assert or de-assert CS via GPIO.  Active low by default.
- *
- ****************************************************************************/
 
 static void tc4xx_spi_select(FAR struct spi_dev_s *dev, uint32_t devid,
                              bool selected)
@@ -845,13 +677,6 @@ static void tc4xx_spi_select(FAR struct spi_dev_s *dev, uint32_t devid,
   aurix_gpio_write(priv->config->cs_pin, !selected);
 }
 
-/****************************************************************************
- * Name: tc4xx_spi_setfrequency
- *
- * Description:
- *   Set the SPI clock frequency.
- *
- ****************************************************************************/
 
 static uint32_t tc4xx_spi_setfrequency(FAR struct spi_dev_s *dev,
                                        uint32_t frequency)
@@ -872,20 +697,6 @@ static uint32_t tc4xx_spi_setfrequency(FAR struct spi_dev_s *dev,
   return priv->actual_freq;
 }
 
-/****************************************************************************
- * Name: tc4xx_spi_setmode
- *
- * Description:
- *   Set the SPI mode (CPOL/CPHA).
- *
- *   ASCLIN SPI natively does shift-first, sample-second.  Combined with
- *   IOCR.CPOL this gives:
- *     MODE0: CPOL=0, shift on rising, sample on falling
- *     MODE2: CPOL=1, shift on falling, sample on rising
- *
- *   For MODE1/MODE3 (CPHA=1), we adjust the LEAD delay.
- *
- ****************************************************************************/
 
 static void tc4xx_spi_setmode(FAR struct spi_dev_s *dev,
                               enum spi_mode_e mode)
@@ -903,13 +714,6 @@ static void tc4xx_spi_setmode(FAR struct spi_dev_s *dev,
   spiinfo("mode=%d\n", mode);
 }
 
-/****************************************************************************
- * Name: tc4xx_spi_setbits
- *
- * Description:
- *   Set the number of bits per word (2..16).
- *
- ****************************************************************************/
 
 static void tc4xx_spi_setbits(FAR struct spi_dev_s *dev, int nbits)
 {
@@ -932,26 +736,12 @@ static void tc4xx_spi_setbits(FAR struct spi_dev_s *dev, int nbits)
   spiinfo("nbits=%d\n", nbits);
 }
 
-/****************************************************************************
- * Name: tc4xx_spi_status
- *
- * Description:
- *   Return SPI status.
- *
- ****************************************************************************/
 
 static uint8_t tc4xx_spi_status(FAR struct spi_dev_s *dev, uint32_t devid)
 {
   return SPI_STATUS_PRESENT;
 }
 
-/****************************************************************************
- * Name: tc4xx_spi_send
- *
- * Description:
- *   Exchange one word on SPI.  Returns the received word.
- *
- ****************************************************************************/
 
 static uint32_t tc4xx_spi_send(FAR struct spi_dev_s *dev, uint32_t wd)
 {
@@ -959,14 +749,6 @@ static uint32_t tc4xx_spi_send(FAR struct spi_dev_s *dev, uint32_t wd)
   return spi_exchange_word(priv, wd);
 }
 
-/****************************************************************************
- * Name: tc4xx_spi_exchange
- *
- * Description:
- *   Exchange a block of data.  Full duplex: simultaneously sends txbuffer
- *   and receives into rxbuffer.  Either buffer may be NULL.
- *
- ****************************************************************************/
 
 #ifdef CONFIG_SPI_EXCHANGE
 static void tc4xx_spi_exchange(FAR struct spi_dev_s *dev,
@@ -1039,13 +821,7 @@ static void tc4xx_spi_recvblock(FAR struct spi_dev_s *dev,
 }
 #endif
 
-/****************************************************************************
- * Public Functions
- ****************************************************************************/
 
-/****************************************************************************
- * Name: tc4xx_asclin_spibus_initialize
- ****************************************************************************/
 
 FAR struct spi_dev_s *tc4xx_asclin_spibus_initialize(int bus)
 {
@@ -1054,7 +830,7 @@ FAR struct spi_dev_s *tc4xx_asclin_spibus_initialize(int bus)
 
   switch (bus)
     {
-#ifdef CONFIG_TC4XX_ASCLIN2_SPI
+#ifdef CONFIG_TC4XX_ASCLIN3_SPI
       case 0:
         priv = &g_spi0_priv;
         break;
