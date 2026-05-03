@@ -19,9 +19,6 @@
  *
  ****************************************************************************/
 
-/****************************************************************************
- * Included Files
- ****************************************************************************/
 
 #include <nuttx/config.h>
 
@@ -210,7 +207,6 @@ static int tricore_i2c_do_transfer(struct tricore_i2c_priv_s *priv,
 {
   int ret;
   uint32_t total_bytes = 0;
-  int offset;
 
   for (int i = 0; i < nmsgs; i++)
     {
@@ -246,50 +242,56 @@ static int tricore_i2c_do_transfer(struct tricore_i2c_priv_s *priv,
 
   i2c_putreg(priv, TRICORE_I2C_ICR_OFFSET, I2C_INT_DTR_ALL);
 
-  offset = 0;
 
-  while (total_bytes > 0)
-    {
-      uint32_t val;
-      uint32_t count = 1;
+  {
+    int msg_idx    = 0;
+    int msg_offset = 0;
 
-      ret = tricore_i2c_wait_fifo_req(priv);
-      if (ret < 0)
-        {
-          goto err;
-        }
+    while (total_bytes > 0)
+      {
+        uint32_t val;
+        uint32_t count = 1;
 
-      val = i2c_getreg(priv, TRICORE_I2C_RIS_OFFSET);
+        ret = tricore_i2c_wait_fifo_req(priv);
+        if (ret < 0)
+          {
+            goto err;
+          }
 
-      if (val & (I2C_INT_LBREQ | I2C_INT_BREQ))
-        {
-          count = (total_bytes >= 4) ? 4 : total_bytes;
-        }
+        val = i2c_getreg(priv, TRICORE_I2C_RIS_OFFSET);
 
-      for (int i = 0; i < count && total_bytes > 0; i++)
-        {
-          if (is_read)
-            {
-              msgs[i].buffer[offset] = i2c_getreg(priv,
-                                          TRICORE_I2C_RXD_OFFSET) & 0xff;
-            }
-          else
-            {
-              i2c_putreg(priv, TRICORE_I2C_TXD_OFFSET,
-                         msgs[i].buffer[offset]);
-            }
+        if (val & (I2C_INT_LBREQ | I2C_INT_BREQ))
+          {
+            count = (total_bytes >= 4) ? 4 : total_bytes;
+          }
 
-          offset++;
-          total_bytes--;
-          if (offset >= msgs[i].length)
-            {
-              i++;
-              offset = 0;
-            }
-        }
+        while (count > 0 && total_bytes > 0)
+          {
+            if (is_read)
+              {
+                msgs[msg_idx].buffer[msg_offset] =
+                    i2c_getreg(priv, TRICORE_I2C_RXD_OFFSET) & 0xff;
+              }
+            else
+              {
+                i2c_putreg(priv, TRICORE_I2C_TXD_OFFSET,
+                           msgs[msg_idx].buffer[msg_offset]);
+              }
 
-      i2c_putreg(priv, TRICORE_I2C_ICR_OFFSET, I2C_INT_DTR_ALL);
-    }
+            msg_offset++;
+            total_bytes--;
+            count--;
+
+            if (msg_offset >= (int)msgs[msg_idx].length)
+              {
+                msg_idx++;
+                msg_offset = 0;
+              }
+          }
+
+        i2c_putreg(priv, TRICORE_I2C_ICR_OFFSET, I2C_INT_DTR_ALL);
+      }
+  }
 
   ret = tricore_i2c_wait_pirq(priv);
   if (ret < 0)
