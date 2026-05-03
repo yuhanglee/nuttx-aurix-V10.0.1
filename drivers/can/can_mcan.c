@@ -19,9 +19,6 @@
  *
  ****************************************************************************/
 
-/****************************************************************************
- * Included Files
- ****************************************************************************/
 
 #include <nuttx/config.h>
 
@@ -52,21 +49,155 @@
 #define CAN_CALC_TDCO(timing, tx_delay, max_tdco) \
     MIN((uint8_t)((timing)->phase_seg1 * (timing)->prescaler), (uint8_t)(max_tdco))
 
-static int can_mcan_calc_timing(struct can_mcan_priv_s *priv,
-                                struct can_timing_s *timing,
-                                uint32_t bitrate, uint16_t sample_pnt)
-{
-  /* TODO: implement bit timing calculation for nominal phase */
-  UNUSED(priv);
-  UNUSED(bitrate);
-  UNUSED(sample_pnt);
 
-  timing->sjw        = 1;
-  timing->phase_seg1 = 13;
-  timing->phase_seg2 = 2;
-  timing->prescaler  = 1;
+struct mcan_bt_limits_s
+{
+  uint16_t bits_min;     /* min total Tq per bit (incl. sync) */
+  uint16_t bits_max;
+  uint16_t prescaler_max;
+  uint16_t tseg1_max;    /* max NTSEG1 in Tq */
+  uint16_t tseg2_max;    /* max NTSEG2 in Tq */
+  uint16_t sjw_max;
+};
+
+static int can_mcan_search_bt(uint32_t fck, uint32_t bitrate,
+                              uint16_t sample_pnt,
+                              const struct mcan_bt_limits_s *lim,
+                              struct can_timing_s *timing)
+{
+  uint32_t best_err = UINT32_MAX;
+  uint32_t best_prescaler = 0;
+  uint32_t best_bits = 0;
+  uint32_t prescaler;
+
+  if (fck == 0u || bitrate == 0u || sample_pnt == 0u || sample_pnt >= 1000u)
+    {
+      return -EINVAL;
+    }
+
+
+  uint64_t best_score = UINT64_MAX;
+
+  for (prescaler = 1u; prescaler <= lim->prescaler_max; prescaler++)
+    {
+      uint32_t bits;
+      uint32_t actual;
+      uint32_t err_bitrate;
+      uint32_t sp_actual;
+      uint32_t sp_err;
+      uint64_t score;
+
+      /* round(fck / (bitrate * prescaler)) */
+      bits = ((fck * 2u) / (bitrate * prescaler) + 1u) / 2u;
+
+      if (bits < lim->bits_min)
+        {
+          /* Tq/bit too small; larger prescaler only makes it smaller. */
+          break;
+        }
+      if (bits > lim->bits_max)
+        {
+          continue;
+        }
+
+      actual = fck / (prescaler * bits);
+      err_bitrate = (actual > bitrate)
+                    ? (actual - bitrate)
+                    : (bitrate - actual);
+
+
+      uint32_t ts1_phys = (sample_pnt * bits) / 1000u;
+      if (ts1_phys < 2u)
+        {
+          ts1_phys = 2u;
+        }
+      if (ts1_phys > bits - 1u)
+        {
+          ts1_phys = bits - 1u;
+        }
+      sp_actual = (ts1_phys * 1000u) / bits;
+      sp_err    = (sp_actual > sample_pnt)
+                  ? (sp_actual - sample_pnt)
+                  : (sample_pnt - sp_actual);
+
+      score  = (uint64_t)err_bitrate * 1000000ull;
+      score += (bits >= 8u && bits <= 25u) ? 0ull : 1000000ull;
+      score += sp_err;
+
+      if (score < best_score)
+        {
+          best_score     = score;
+          best_prescaler = prescaler;
+          best_bits      = bits;
+          best_err       = err_bitrate;
+        }
+    }
+
+  if (best_prescaler == 0u)
+    {
+      return -EINVAL;
+    }
+
+  /* Distribute bits between TSEG1 and TSEG2 by target sample point. */
+
+  uint32_t ts1 = (sample_pnt * best_bits) / 1000u;
+  if (ts1 < 2u)
+    {
+      ts1 = 2u;
+    }
+  if (ts1 > best_bits - 1u)
+    {
+      ts1 = best_bits - 1u;
+    }
+
+  uint32_t ts2 = best_bits - ts1;          /* incl. SYNC swap below */
+  ts1 -= 1u;                               /* subtract SYNC seg */
+
+  if (ts1 < 1u || ts1 > lim->tseg1_max ||
+      ts2 < 1u || ts2 > lim->tseg2_max)
+    {
+      return -EINVAL;
+    }
+
+  timing->prescaler  = (uint16_t)best_prescaler;
+  timing->phase_seg1 = (uint16_t)ts1;
+  timing->phase_seg2 = (uint16_t)ts2;
+  timing->prop_seg   = 0;
+  timing->sjw        = (ts2 < lim->sjw_max) ? (uint16_t)ts2 : lim->sjw_max;
+  if (timing->sjw < 1u)
+    {
+      timing->sjw = 1u;
+    }
 
   return 0;
+}
+
+int can_mcan_calc_timing(struct can_mcan_priv_s *priv,
+                         struct can_timing_s *timing,
+                         uint32_t bitrate, uint16_t sample_pnt)
+{
+  static const struct mcan_bt_limits_s nominal =
+  {
+    .bits_min      = 4u,
+    .bits_max      = 385u,    /* 1 + NTSEG1(256) + NTSEG2(128) */
+    .prescaler_max = 512u,
+    .tseg1_max     = 256u,
+    .tseg2_max     = 128u,
+    .sjw_max       = 128u,
+  };
+
+  if (priv->config->module_clock_hz == 0u)
+    {
+      timing->sjw        = 1;
+      timing->phase_seg1 = 13;
+      timing->phase_seg2 = 2;
+      timing->prescaler  = 1;
+      timing->prop_seg   = 0;
+      return 0;
+    }
+
+  return can_mcan_search_bt(priv->config->module_clock_hz, bitrate,
+                            sample_pnt, &nominal, timing);
 }
 
 #ifdef CONFIG_CAN_FD_MODE
@@ -74,17 +205,28 @@ static int can_mcan_calc_timing_data(struct can_mcan_priv_s *priv,
                                      struct can_timing_s *timing,
                                      uint32_t bitrate, uint16_t sample_pnt)
 {
-  /* TODO: implement bit timing calculation for FD data phase */
-  UNUSED(priv);
-  UNUSED(bitrate);
-  UNUSED(sample_pnt);
+  static const struct mcan_bt_limits_s data =
+  {
+    .bits_min      = 3u,
+    .bits_max      = 49u,     /* 1 + DTSEG1(32) + DTSEG2(16) */
+    .prescaler_max = 32u,
+    .tseg1_max     = 32u,
+    .tseg2_max     = 16u,
+    .sjw_max       = 16u,
+  };
 
-  timing->sjw        = 1;
-  timing->phase_seg1 = 4;
-  timing->phase_seg2 = 1;
-  timing->prescaler  = 1;
+  if (priv->config->module_clock_hz == 0u)
+    {
+      timing->sjw        = 1;
+      timing->phase_seg1 = 4;
+      timing->phase_seg2 = 1;
+      timing->prescaler  = 1;
+      timing->prop_seg   = 0;
+      return 0;
+    }
 
-  return 0;
+  return can_mcan_search_bt(priv->config->module_clock_hz, bitrate,
+                            sample_pnt, &data, timing);
 }
 #endif /* CONFIG_CAN_FD_MODE */
 
@@ -260,13 +402,14 @@ static int can_mcan_leave_init_mode(struct can_mcan_priv_s *priv,
 
   nxmutex_lock(&data->lock);
 
+
   err = can_mcan_read_reg(priv, CAN_MCAN_CCCR, &cccr);
   if (err != 0)
     {
       goto unlock;
     }
 
-  cccr &= ~CAN_MCAN_CCCR_INIT;
+  cccr &= ~CAN_MCAN_CCCR_CCE;
 
   err = can_mcan_write_reg(priv, CAN_MCAN_CCCR, cccr);
   if (err != 0)
@@ -275,14 +418,7 @@ static int can_mcan_leave_init_mode(struct can_mcan_priv_s *priv,
     }
 
   start_time = clock_systime_ticks();
-
-  err = can_mcan_read_reg(priv, CAN_MCAN_CCCR, &cccr);
-  if (err != 0)
-    {
-      goto unlock;
-    }
-
-  while ((cccr & CAN_MCAN_CCCR_INIT) != 0u)
+  do
     {
       if (clock_systime_ticks() - start_time > MSEC2TICK(timeout_ms))
         {
@@ -296,6 +432,32 @@ static int can_mcan_leave_init_mode(struct can_mcan_priv_s *priv,
           goto unlock;
         }
     }
+  while ((cccr & CAN_MCAN_CCCR_CCE) != 0u);
+
+  cccr &= ~CAN_MCAN_CCCR_INIT;
+
+  err = can_mcan_write_reg(priv, CAN_MCAN_CCCR, cccr);
+  if (err != 0)
+    {
+      goto unlock;
+    }
+
+  start_time = clock_systime_ticks();
+  do
+    {
+      if (clock_systime_ticks() - start_time > MSEC2TICK(timeout_ms))
+        {
+          err = -EAGAIN;
+          goto unlock;
+        }
+
+      err = can_mcan_read_reg(priv, CAN_MCAN_CCCR, &cccr);
+      if (err != 0)
+        {
+          goto unlock;
+        }
+    }
+  while ((cccr & CAN_MCAN_CCCR_INIT) != 0u);
 
 unlock:
   nxmutex_unlock(&data->lock);
@@ -777,8 +939,7 @@ int can_mcan_configure_mram(struct can_mcan_priv_s *priv,
   addr = mram - mrba + config->mram_offsets[CAN_MCAN_MRAM_CFG_TX_BUFFER];
   reg  = (addr & CAN_MCAN_TXBC_TBSA) |
          FIELD_PREP(CAN_MCAN_TXBC_TFQS,
-                    config->mram_elements[CAN_MCAN_MRAM_CFG_TX_BUFFER]) |
-         CAN_MCAN_TXBC_TFQM;
+                    config->mram_elements[CAN_MCAN_MRAM_CFG_TX_BUFFER]);
   err = can_mcan_write_reg(priv, CAN_MCAN_TXBC, reg);
   if (err != 0)
     {
@@ -1640,15 +1801,14 @@ int can_mcan_init(struct can_mcan_priv_s *priv)
           FIELD_GET(CAN_MCAN_CREL_DAY,     reg));
 #endif
 
+
   err = can_mcan_read_reg(priv, CAN_MCAN_CCCR, &reg);
   if (err != 0)
     {
       return err;
     }
 
-  reg &= ~(CAN_MCAN_CCCR_FDOE | CAN_MCAN_CCCR_BRSE |
-           CAN_MCAN_CCCR_TEST | CAN_MCAN_CCCR_MON  |
-           CAN_MCAN_CCCR_ASM);
+  reg |= CAN_MCAN_CCCR_TEST;
 
   err = can_mcan_write_reg(priv, CAN_MCAN_CCCR, reg);
   if (err != 0)
@@ -1670,14 +1830,30 @@ int can_mcan_init(struct can_mcan_priv_s *priv)
       return err;
     }
 
+  err = can_mcan_read_reg(priv, CAN_MCAN_CCCR, &reg);
+  if (err != 0)
+    {
+      return err;
+    }
+
+  reg &= ~(CAN_MCAN_CCCR_FDOE | CAN_MCAN_CCCR_BRSE |
+           CAN_MCAN_CCCR_TEST | CAN_MCAN_CCCR_MON  |
+           CAN_MCAN_CCCR_ASM);
+
+  err = can_mcan_write_reg(priv, CAN_MCAN_CCCR, reg);
+  if (err != 0)
+    {
+      return err;
+    }
+
   err = can_mcan_read_reg(priv, CAN_MCAN_GFC, &reg);
   if (err != 0)
     {
       return err;
     }
 
-  reg |= FIELD_PREP(CAN_MCAN_GFC_ANFE, 0x2) |
-         FIELD_PREP(CAN_MCAN_GFC_ANFS, 0x2);
+  reg |= FIELD_PREP(CAN_MCAN_GFC_ANFE, 0x0) |
+         FIELD_PREP(CAN_MCAN_GFC_ANFS, 0x0);
 
 #ifndef CONFIG_CAN_ACCEPT_RTR
   reg |= CAN_MCAN_GFC_RRFS | CAN_MCAN_GFC_RRFE;

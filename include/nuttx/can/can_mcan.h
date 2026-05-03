@@ -206,6 +206,8 @@ struct can_mcan_config
   uint16_t sample_point_data;
 #endif
 
+  uint32_t module_clock_hz;
+
   bool     phy_present;
 
   uint16_t mram_elements[CAN_MCAN_MRAM_CFG_NUM_CELLS];
@@ -230,9 +232,6 @@ struct can_mcan_data
   void                       *state_change_cb_user_data;
 } __attribute__((aligned(4)));
 
-/* Handle - SoC driver embeds this in its priv struct.
- * Recover with container_of(priv, soc_priv_t, mcan).
- */
 
 struct can_mcan_priv_s
 {
@@ -342,6 +341,9 @@ int  can_mcan_start(struct can_mcan_priv_s *priv);
 int  can_mcan_stop(struct can_mcan_priv_s *priv);
 int  can_mcan_set_mode(struct can_mcan_priv_s *priv, can_mode_t mode);
 
+int  can_mcan_calc_timing(struct can_mcan_priv_s *priv,
+                          struct can_timing_s *timing,
+                          uint32_t bitrate, uint16_t sample_pnt);
 int  can_mcan_set_timing(struct can_mcan_priv_s *priv,
                          const struct can_timing_s *timing);
 #ifdef CONFIG_CAN_FD_MODE
