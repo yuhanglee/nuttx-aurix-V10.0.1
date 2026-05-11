@@ -23,6 +23,9 @@ include $(TOPDIR)/Make.defs
 
 CSRCS = tc397_appinit.c
 
+# AMP secondary CPU init thread (used when INIT_ENTRYPOINT=amp_secondary_main)
+CSRCS += tc397_amp_secondary.c
+
 ifeq ($(CONFIG_TC3X_I2C),y)
 CSRCS += tc397_i2c.c
 endif
