@@ -1,0 +1,23 @@
+#
+# For a description of the syntax of this configuration file,
+# see the file kconfig-language.txt in the NuttX tools repository.
+#
+
+if ARCH_BOARD_A2G_TC397_5V_TRB
+
+config BOARD_PHY_AUTONEG
+	bool "Ethernet PHY autonegotiation"
+        default y
+
+config BOARD_GPIO_TEST
+	bool "Register Port-22 GPIO pins for gpio_test"
+	default n
+	depends on DEV_GPIO
+	---help---
+		Registers /dev/gpio0 (P22.0 output, init high), /dev/gpio1
+		(P22.2 input pull-up), /dev/gpio2 (P22.3 input pull-down) on
+		boot via aurix_gpio_lower_register().  Wire P22.0 to P22.2
+		(or P22.3) externally to verify loopback with the gpio_test
+		userspace app.
+
+endif
