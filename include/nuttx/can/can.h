@@ -921,6 +921,9 @@ struct canioc_connmodes_s
                                           * by this node. */
   uint8_t               bm_silent   : 1; /* Disable transmission of messages.
                                           * The node still receives messages. */
+  uint8_t               bm_canfd    : 1; /* Enable CAN-FD operating mode
+                                          * (controller FDOE/BRSE).  No effect
+                                          * unless CONFIG_CAN_FD_MODE is set. */
 };
 
 #ifdef CONFIG_CAN_EXTID
