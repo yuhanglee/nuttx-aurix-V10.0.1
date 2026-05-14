@@ -43,6 +43,7 @@ struct aurix_gpio_lower_s
 {
   struct gpio_dev_s gpio;
   gpio_pinset_t pinset;
+  gpio_pinset_t orig_pinset;
 };
 
 /****************************************************************************
@@ -72,6 +73,24 @@ static const struct gpio_operations_s g_aurix_gpio_ops =
 /****************************************************************************
  * Private Functions
  ****************************************************************************/
+
+static enum gpio_pintype_e pinset_to_pintype(gpio_pinset_t pinset)
+{
+  switch (GPIO_GET_MODE(pinset))
+    {
+      case GPIO_INPUT:
+        if (GPIO_GET_FUNCALT(pinset) == 2) return GPIO_INPUT_PIN_PULLUP;
+        if (GPIO_GET_FUNCALT(pinset) == 1) return GPIO_INPUT_PIN_PULLDOWN;
+        return GPIO_INPUT_PIN;
+
+      case GPIO_OUTPUT:
+        if (GPIO_IS_OPENDRAIN(pinset)) return GPIO_OUTPUT_PIN_OPENDRAIN;
+        return GPIO_OUTPUT_PIN;
+
+      default:
+        return GPIO_OUTPUT_PIN;
+    }
+}
 
 static int aurix_gpio_lower_read(FAR struct gpio_dev_s *dev,
                                   FAR bool *value)
@@ -103,11 +122,18 @@ static int aurix_gpio_lower_setpintype(FAR struct gpio_dev_s *dev,
   FAR struct aurix_gpio_lower_s *priv =
     (FAR struct aurix_gpio_lower_s *)dev;
   gpio_pinset_t newset;
+  int ret;
 
   DEBUGASSERT(priv != NULL);
 
-  newset = priv->pinset & ~(GPIO_MODE_MASK | GPIO_FUNCALT_MASK |
-                             GPIO_OPEN_DRAIN | GPIO_OUTPUT_HIGH);
+  /* Start from the original registered pinset so we keep PD, PL, init-level,
+   * and any other fields the board specified. Only override what the new
+   * pintype explicitly changes. This prevents state from leaking across
+   * successive setpintype calls.
+   */
+
+  newset = priv->orig_pinset & ~(GPIO_MODE_MASK | GPIO_FUNCALT_MASK |
+                                 GPIO_OPEN_DRAIN);
 
   switch (pintype)
     {
@@ -135,8 +161,16 @@ static int aurix_gpio_lower_setpintype(FAR struct gpio_dev_s *dev,
         return -EINVAL;
     }
 
+  ret = aurix_config_gpio(newset);
+  if (ret < 0)
+    {
+      return ret;
+    }
+
   priv->pinset = newset;
-  return aurix_config_gpio(newset);
+  priv->gpio.gp_pintype = pintype;
+
+  return OK;
 }
 
 /****************************************************************************
@@ -154,43 +188,10 @@ int aurix_gpio_lower_register(gpio_pinset_t pinset, int minor)
       return -ENOMEM;
     }
 
-  priv->pinset = pinset;
-
-  switch (GPIO_GET_MODE(pinset))
-    {
-      case GPIO_INPUT:
-        if (GPIO_GET_FUNCALT(pinset) == 2)
-          {
-            priv->gpio.gp_pintype = GPIO_INPUT_PIN_PULLUP;
-          }
-        else if (GPIO_GET_FUNCALT(pinset) == 1)
-          {
-            priv->gpio.gp_pintype = GPIO_INPUT_PIN_PULLDOWN;
-          }
-        else
-          {
-            priv->gpio.gp_pintype = GPIO_INPUT_PIN;
-          }
-        break;
-
-      case GPIO_OUTPUT:
-        if (GPIO_IS_OPENDRAIN(pinset))
-          {
-            priv->gpio.gp_pintype = GPIO_OUTPUT_PIN_OPENDRAIN;
-          }
-        else
-          {
-            priv->gpio.gp_pintype = GPIO_OUTPUT_PIN;
-          }
-        break;
-
-      default:
-
-        priv->gpio.gp_pintype = GPIO_OUTPUT_PIN;
-        break;
-    }
-
+  priv->pinset      = pinset;
+  priv->orig_pinset = pinset;
   priv->gpio.gp_ops = &g_aurix_gpio_ops;
+  priv->gpio.gp_pintype = pinset_to_pintype(pinset);
 
   ret = aurix_config_gpio(pinset);
   if (ret < 0)
