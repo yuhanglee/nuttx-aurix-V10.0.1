@@ -49,6 +49,13 @@ config CAN_FD
 	---help---
 		Enables support for the CAN_FD mode.
 
+config CAN_FD_MODE
+	bool "CAN FD operation mode (controller-level)"
+	depends on CAN_FD
+	default y
+	---help---
+		Enable CAN FD operation in the controller hardware.
+
 config CAN_TXFIFOSIZE
 	int "CAN driver I/O tx buffer size"
 	default 8
@@ -235,6 +242,16 @@ config CAN_MCAN_BITRATE
 	default 500000
 	---help---
 		MCP2515 bitrate in bits per second.
+
+config CAN_MCAN_BITRATE_DATA
+	int "MCAN data-phase bit rate (CAN FD)"
+	depends on CAN_FD_MODE
+	default 2000000
+	range 500000 8000000
+	---help---
+		Data-phase bit rate, in bits per second, used when transmitting
+		CAN FD frames with the bit-rate-switch (BRS) flag.  Has no effect
+		unless CAN_FD_MODE is enabled.
 
 endif # CAN_MCAN
 
