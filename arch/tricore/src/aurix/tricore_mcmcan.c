@@ -136,6 +136,33 @@ static void mcmcan_tx_callback(struct can_mcan_priv_s *priv, int error,
   can_txdone(np->candev);
 }
 
+/* Drain pending MCAN TX before a stop+modify+start cycle.
+ *
+ * can_mcan_stop() puts the controller in init mode which aborts any TX
+ * still queued in the controller's TX buffer.  For mode/bittiming changes
+ * we want to preserve in-flight frames, so poll TXBRP via can_mcan_txempty()
+ * until the controller is idle.  Bounded to avoid stalling on a wedged bus.
+ */
+
+static int mcmcan_drain_tx(struct mcmcan_node_priv_s *np, uint32_t timeout_ms)
+{
+  uint32_t waited_us = 0;
+  uint32_t budget_us = timeout_ms * 1000u;
+
+  while (waited_us < budget_us)
+    {
+      if (can_mcan_txempty(&np->mcan))
+        {
+          return OK;
+        }
+
+      up_udelay(100);
+      waited_us += 100;
+    }
+
+  return -ETIMEDOUT;
+}
+
 static void mcmcan_rx_callback(struct can_mcan_priv_s *priv,
                                 const struct can_frame_s *frame,
                                 void *user_data)
@@ -450,6 +477,11 @@ static int mcmcan_ioctl(struct can_dev_s *dev, int cmd, unsigned long arg)
           was_started = np->mcan.data->started;
           if (was_started)
             {
+              /* Wait for in-flight TX to complete before halting the
+               * controller; can_mcan_stop() aborts pending transmissions.
+               */
+              mcmcan_drain_tx(np, 100);
+
               ret = can_mcan_stop(&np->mcan);
               if (ret != 0)
                 {
@@ -479,6 +511,9 @@ static int mcmcan_ioctl(struct can_dev_s *dev, int cmd, unsigned long arg)
             {
               bm->bm_loopback = loopback;
               bm->bm_silent   = silent;
+#ifdef CONFIG_CAN_FD_MODE
+              bm->bm_canfd    = (np->mcan.data->mode & CAN_MODE_FD) ? 1 : 0;
+#endif
             }
         }
         break;
@@ -494,9 +529,17 @@ static int mcmcan_ioctl(struct can_dev_s *dev, int cmd, unsigned long arg)
           if (bm->bm_loopback) mode |= CAN_MODE_LOOPBACK;
           if (bm->bm_silent)   mode |= CAN_MODE_LISTENONLY;
 
+#ifdef CONFIG_CAN_FD_MODE
+          if (bm->bm_canfd)    mode |= CAN_MODE_FD;
+#endif
          was_started = np->mcan.data->started;
           if (was_started)
             {
+              /* Wait for in-flight TX to complete before halting the
+               * controller; can_mcan_stop() aborts pending transmissions.
+               */
+              mcmcan_drain_tx(np, 100);
+
               ret = can_mcan_stop(&np->mcan);
               if (ret != 0)
                 {
