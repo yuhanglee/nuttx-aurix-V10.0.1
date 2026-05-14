@@ -192,7 +192,7 @@ static const struct tc4xx_spi_config_s g_spi0_config =
 
 
   .mosi_pin  = AURIX_GPIO(15, 6, GPIO_PERIPH, GPIO_ALT2) | GPIO_PERIPH_OWN_PAD,
-  .miso_pin  = AURIX_GPIO(15, 7, GPIO_INPUT,  GPIO_PULL_UP),
+  .miso_pin  = AURIX_GPIO(15, 7, GPIO_INPUT,  GPIO_PULL_NONE),
   .sclk_pin  = AURIX_GPIO(15, 8, GPIO_PERIPH, GPIO_ALT6) | GPIO_PERIPH_OWN_PAD,
   .cs_pin    = AURIX_GPIO(14, 7, GPIO_OUTPUT, GPIO_ALT0) | GPIO_OUTPUT_HIGH,
   .rx_alti   = ASCLIN_IOCR_ALTI_A,
@@ -521,18 +521,9 @@ static uint32_t spi_exchange_word(struct tc4xx_spi_priv_s *priv,
   uint32_t rxword;
   uint32_t timeout;
 
-  /* Flush both FIFOs */
+  /* Clear only TC flag. DO NOT flush FIFOs per byte. */
 
-  spi_modreg(cfg, ASCLIN_TXFIFOCON_OFFSET,
-             ASCLIN_TXFIFOCON_FLUSH, ASCLIN_TXFIFOCON_FLUSH);
-  spi_modreg(cfg, ASCLIN_RXFIFOCON_OFFSET,
-             ASCLIN_RXFIFOCON_FLUSH, ASCLIN_RXFIFOCON_FLUSH);
-
-  /* Clear TC and all relevant flags */
-
-  spi_putreg(cfg, ASCLIN_FLAGSCLEAR_OFFSET,
-             ASCLIN_FLAGSCLEAR_TCC | ASCLIN_FLAGSCLEAR_RRC |
-             ASCLIN_FLAGSCLEAR_THC | ASCLIN_FLAGSCLEAR_TRC);
+  spi_putreg(cfg, ASCLIN_FLAGSCLEAR_OFFSET, ASCLIN_FLAGSCLEAR_TCC);
 
   /* Write TX data */
 
@@ -559,10 +550,6 @@ static uint32_t spi_exchange_word(struct tc4xx_spi_priv_s *priv,
   /* Read received data */
 
   rxword = spi_getreg(cfg, ASCLIN_RXDATA_OFFSET);
-
-  /* Clear TC flag */
-
-  spi_putreg(cfg, ASCLIN_FLAGSCLEAR_OFFSET, ASCLIN_FLAGSCLEAR_TCC);
 
   return rxword;
 }
@@ -756,6 +743,7 @@ static void tc4xx_spi_exchange(FAR struct spi_dev_s *dev,
                                FAR void *rxbuffer, size_t nwords)
 {
   struct tc4xx_spi_priv_s *priv = (struct tc4xx_spi_priv_s *)dev;
+  const struct tc4xx_spi_config_s *cfg = priv->config;
   FAR const uint8_t *txp8 = (FAR const uint8_t *)txbuffer;
   FAR const uint16_t *txp16 = (FAR const uint16_t *)txbuffer;
   FAR uint8_t *rxp8 = (FAR uint8_t *)rxbuffer;
@@ -763,6 +751,16 @@ static void tc4xx_spi_exchange(FAR struct spi_dev_s *dev,
   size_t i;
 
   spiinfo("exchange nwords=%zu nbits=%d\n", nwords, priv->nbits);
+
+  /* Flush both FIFOs and clear all flags ONCE before the burst.
+   * Per-byte flushing corrupts the shifter mid-frame.
+   */
+
+  spi_modreg(cfg, ASCLIN_TXFIFOCON_OFFSET,
+             ASCLIN_TXFIFOCON_FLUSH, ASCLIN_TXFIFOCON_FLUSH);
+  spi_modreg(cfg, ASCLIN_RXFIFOCON_OFFSET,
+             ASCLIN_RXFIFOCON_FLUSH, ASCLIN_RXFIFOCON_FLUSH);
+  spi_putreg(cfg, ASCLIN_FLAGSCLEAR_OFFSET, ASCLIN_FLAGSCLEAR_ALL);
 
   for (i = 0; i < nwords; i++)
     {
