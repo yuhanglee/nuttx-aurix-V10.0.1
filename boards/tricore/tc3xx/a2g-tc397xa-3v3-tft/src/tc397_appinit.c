@@ -44,7 +44,7 @@ struct mtd_dev_s *tricore_flash_initialize(void);
 int mcmcan_board_initialize(void);
 #endif
 
-#ifdef CONFIG_TC3XX_QSPI2
+#if defined(CONFIG_TC3XX_QSPI2) || defined(CONFIG_TC3XX_QSPI3)
 int tc397_qspi_initialize(void);
 #endif
 
@@ -111,11 +111,11 @@ int board_app_initialize(uintptr_t arg)
     }
 #endif
 
-#ifdef CONFIG_TC3XX_QSPI2
+#if defined(CONFIG_TC3XX_QSPI2) || defined(CONFIG_TC3XX_QSPI3)
   ret = tc397_qspi_initialize();
   if (ret < 0)
     {
-      _err("QSPI2/TLF30682 init failed: %d\n", ret);
+      _err("QSPI init failed: %d\n", ret);
     }
 #endif
 
