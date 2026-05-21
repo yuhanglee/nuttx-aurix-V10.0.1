@@ -93,9 +93,10 @@ static uint16_t tc397_qspi2_lb_one(uint16_t tx)
       TC3X_QSPI_FLAGSCLEAR_TXC | TC3X_QSPI_FLAGSCLEAR_RXC;
 
 
+  /* iLLD pattern: BACON.BYTE=0, DL = bits - 1. 16-bit LB frame -> DL=15. */
+
   bacon = TC3X_QSPI_BACON_CS(1)
-        | (1u << TC3X_QSPI_BACON_DL_SHIFT)
-        | TC3X_QSPI_BACON_BYTE
+        | (15u << TC3X_QSPI_BACON_DL_SHIFT)
         | TC3X_QSPI_BACON_MSB
         | TC3X_QSPI_BACON_LAST
         | (1u << TC3X_QSPI_BACON_LPRE_SHIFT)
@@ -241,13 +242,22 @@ static void tc397_tlf30682_probe(FAR struct spi_dev_s *dev)
   tx[2] = tlf30682_build_read(TLF30682_REG_DEVID);
   tx[3] = tlf30682_build_read(TLF30682_REG_DEVCFG0);
 
+  /* The TLF35682 protocol is one 16-bit frame per register access — CS
+   * must rise between each pair. Issue 4 separate single-word EXCHANGEs
+   * so the chained-frame behavior of tc3x_qspi_exchange does not merge
+   * them into one 64-bit CS-held frame.
+   */
+
   SPI_LOCK(dev, true);
   SPI_SETMODE(dev, TLF30682_SPI_MODE);
   SPI_SETBITS(dev, TLF30682_SPI_NBITS);
   SPI_SETFREQUENCY(dev, TLF30682_SPI_FREQ_HZ);
-  SPI_SELECT(dev, TLF30682_SPI_DEVID, true);
-  SPI_EXCHANGE(dev, tx, rx, 4);
-  SPI_SELECT(dev, TLF30682_SPI_DEVID, false);
+  for (int i = 0; i < 4; i++)
+    {
+      SPI_SELECT(dev, TLF30682_SPI_DEVID, true);
+      SPI_EXCHANGE(dev, &tx[i], &rx[i], 1);
+      SPI_SELECT(dev, TLF30682_SPI_DEVID, false);
+    }
   SPI_LOCK(dev, false);
 
   printf("=== TLF30682 PMIC PROBE ===\n");
@@ -470,49 +480,96 @@ static void tc397_tlf30682_write_probe(FAR struct spi_dev_s *dev)
 }
 
 
+#undef QSPI2_REG
+
+#endif /* CONFIG_TC3XX_QSPI2 */
+
+#ifdef CONFIG_TC3XX_QSPI3
+
+static void tc397_qspi3_pinmux(void)
+{
+  aurix_config_gpio(AURIX_GPIO(2, 5, GPIO_INPUT,  GPIO_PULL_NONE));
+  aurix_config_gpio(AURIX_GPIO(2, 6, GPIO_PERIPH, GPIO_ALT3));
+  aurix_config_gpio(AURIX_GPIO(2, 7, GPIO_PERIPH, GPIO_ALT3));
+  aurix_config_gpio(AURIX_GPIO(2, 8, GPIO_PERIPH, GPIO_ALT2));
+}
+
+#endif /* CONFIG_TC3XX_QSPI3 */
+
+#if defined(CONFIG_TC3XX_QSPI2) || defined(CONFIG_TC3XX_QSPI3)
+
+static FAR struct spi_dev_s *
+tc397_qspi_register(int bus, int register_idx)
+{
+  FAR struct spi_dev_s *dev = tc3xx_qspibus_initialize(bus);
+  if (dev == NULL)
+    {
+      _err("QSPI%d: bus initialize failed\n", bus);
+      return NULL;
+    }
+
+#ifdef CONFIG_SPI_DRIVER
+  {
+    int ret = spi_register(dev, register_idx);
+    if (ret < 0)
+      {
+        _err("QSPI%d: spi_register(%d) failed: %d\n",
+             bus, register_idx, ret);
+        /* Non-fatal — caller may still use the dev for in-kernel
+         * bring-up (e.g. PMIC probes on QSPI2).
+         */
+      }
+  }
+#else
+  (void)register_idx;
+#endif
+
+  return dev;
+}
+
 int tc397_qspi_initialize(void)
 {
   static bool s_initialized;
-  FAR struct spi_dev_s *qspi2;
-#ifdef CONFIG_SPI_DRIVER
-  int ret;
-#endif
-
 
   if (s_initialized)
     {
       return OK;
     }
 
-  tc397_qspi2_pinmux();
+#ifdef CONFIG_TC3XX_QSPI2
+  {
+    FAR struct spi_dev_s *qspi2;
 
-  qspi2 = tc3xx_qspibus_initialize(2);
-  if (qspi2 == NULL)
-    {
-      printf("QSPI2 init FAILED\n");
-      fflush(stdout);
-      return -ENODEV;
-    }
+    tc397_qspi2_pinmux();
+    qspi2 = tc397_qspi_register(2, 0);
+    if (qspi2 == NULL)
+      {
+        return -ENODEV;
+      }
 
-#ifdef CONFIG_SPI_DRIVER
-
-  ret = spi_register(qspi2, 0);
-  if (ret < 0)
-    {
-      printf("QSPI2 spi_register failed: %d\n", ret);
-    }
+    printf("QSPI2 ready, probing TLF30682 PMIC...\n");
+    fflush(stdout);
+    tc397_qspi2_lb_self_test();
+    tc397_tlf30682_probe(qspi2);
+    tc397_tlf30682_write_probe(qspi2);
+  }
 #endif
 
-  printf("QSPI2 ready, probing TLF30682 PMIC...\n");
-  fflush(stdout);
-  tc397_qspi2_lb_self_test();
-  tc397_tlf30682_probe(qspi2);
-  tc397_tlf30682_write_probe(qspi2);
+#ifdef CONFIG_TC3XX_QSPI3
+  {
+    FAR struct spi_dev_s *qspi3;
+
+    tc397_qspi3_pinmux();
+    qspi3 = tc397_qspi_register(3, 3);
+    if (qspi3 == NULL)
+      {
+        return -ENODEV;
+      }
+  }
+#endif
 
   s_initialized = true;
   return OK;
 }
 
-#undef QSPI2_REG
-
-#endif /* CONFIG_TC3XX_QSPI2 */
+#endif /* CONFIG_TC3XX_QSPI2 || CONFIG_TC3XX_QSPI3 */
