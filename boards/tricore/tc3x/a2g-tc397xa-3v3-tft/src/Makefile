@@ -57,7 +57,7 @@ ifeq ($(CONFIG_CAN),y)
 CSRCS += tc397_can.c
 endif
 
-ifeq ($(CONFIG_TC3XX_QSPI2),y)
+ifeq ($(CONFIG_TC3XX_QSPI),y)
 CSRCS += tc397_qspi.c
 endif
 
