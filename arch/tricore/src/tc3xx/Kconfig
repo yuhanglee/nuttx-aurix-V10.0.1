@@ -190,6 +190,23 @@ config TC3XX_QSPI2_DEFAULT_CS
 
 endif # TC3XX_QSPI2
 
+config TC3XX_QSPI3
+	bool "TC3xx QSPI3 module"
+	default n
+	---help---
+		Enable the QSPI3 module driver. On the A2G-TC397XA-3V3-TFT board
+		QSPI3 is wired out via header X103 (P02.5/6/7/8) for external
+		SPI peripherals.
+
+config TC3XX_QSPI3_DEFAULT_CS
+	int "TC3xx QSPI3 default SLSO index"
+	depends on TC3XX_QSPI3
+	range 0 15
+	default 0
+	---help---
+		Hardware SLSO index used for the default chip select. For the
+		W25Q128JV flash wired to P02.8, this is SLSO0 (= 0).
+
 endif # TC3XX_QSPI
 
 # WDT

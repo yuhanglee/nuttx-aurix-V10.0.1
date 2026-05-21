@@ -58,15 +58,15 @@ struct tc3x_qspi_config_s
 
 struct tc3x_qspi_priv_s
 {
-  struct spi_dev_s              spidev;
-  const struct tc3x_qspi_config_s *config;
-  mutex_t                       lock;
-  uint32_t                      frequency;
-  uint32_t                      actual_freq;
-  enum spi_mode_e               mode;
-  uint8_t                       nbits;
-  uint8_t                       cs;
-  bool                          initialized;
+  struct spi_dev_s                  spidev;
+  const struct tc3x_qspi_config_s  *config;
+  mutex_t                           lock;
+  uint32_t                          frequency;
+  uint32_t                          actual_freq;
+  enum spi_mode_e                   mode;
+  uint8_t                           nbits;
+  uint8_t                           cs;
+  bool                              initialized;
 };
 
 
@@ -78,8 +78,7 @@ static uint32_t tc3x_qspi_setfrequency(FAR struct spi_dev_s *dev,
 static void     tc3x_qspi_setmode(FAR struct spi_dev_s *dev,
                                   enum spi_mode_e mode);
 static void     tc3x_qspi_setbits(FAR struct spi_dev_s *dev, int nbits);
-static uint8_t  tc3x_qspi_status(FAR struct spi_dev_s *dev,
-                                 uint32_t devid);
+static uint8_t  tc3x_qspi_status(FAR struct spi_dev_s *dev, uint32_t devid);
 static uint32_t tc3x_qspi_send(FAR struct spi_dev_s *dev, uint32_t wd);
 #ifdef CONFIG_SPI_EXCHANGE
 static void     tc3x_qspi_exchange(FAR struct spi_dev_s *dev,
@@ -91,7 +90,6 @@ static void     tc3x_qspi_sndblock(FAR struct spi_dev_s *dev,
 static void     tc3x_qspi_recvblock(FAR struct spi_dev_s *dev,
                                     FAR void *buffer, size_t nwords);
 #endif
-
 
 static const struct spi_ops_s g_tc3x_qspi_ops =
 {
@@ -153,6 +151,31 @@ static struct tc3x_qspi_priv_s g_qspi2_priv =
 
 #endif
 
+#ifdef CONFIG_TC3XX_QSPI3
+
+static const struct tc3x_qspi_config_s g_qspi3_config =
+{
+  .base       = TC3X_QSPI3_BASE,
+  .fspb       = CONFIG_TC3XX_QSPI_FSPB_HZ,
+  .bus        = 3,
+  .default_cs = CONFIG_TC3XX_QSPI3_DEFAULT_CS,
+  .mris       = 0,
+};
+
+static struct tc3x_qspi_priv_s g_qspi3_priv =
+{
+  .spidev      = { .ops = &g_tc3x_qspi_ops },
+  .config      = &g_qspi3_config,
+  .lock        = NXMUTEX_INITIALIZER,
+  .frequency   = 1000000u,
+  .actual_freq = 0u,
+  .mode        = SPIDEV_MODE0,
+  .nbits       = 8,
+  .cs          = CONFIG_TC3XX_QSPI3_DEFAULT_CS,
+  .initialized = false,
+};
+
+#endif
 
 static inline uint32_t qspi_getreg(const struct tc3x_qspi_config_s *cfg,
                                    uint32_t off)
@@ -173,17 +196,16 @@ static inline void qspi_modreg(const struct tc3x_qspi_config_s *cfg,
   modreg32(setbits, setbits | clrbits, cfg->base + off);
 }
 
+/* fSCLK = fSPB / ((Q+1) * (A+1)); A=1 (divide-by-2), 6-bit Q. */
 
 static uint32_t qspi_compute_econ(const struct tc3x_qspi_priv_s *priv,
                                   uint32_t freq, uint32_t *out_econ)
 {
   const struct tc3x_qspi_config_s *cfg = priv->config;
-  uint32_t a = 1;            /* clock divisor stage A: divide by (A+1)=2  */
+  uint32_t a = 1;
   uint32_t q;
   uint32_t actual;
   uint32_t econ;
-
-  /* fSCLK = fSPB / ((Q+1) * (A+1)) -> Q = fSPB / (freq * (A+1)) - 1 */
 
   if (freq == 0)
     {
@@ -223,6 +245,10 @@ static uint32_t qspi_compute_econ(const struct tc3x_qspi_priv_s *priv,
   return actual;
 }
 
+/* Engine-driven /CS: OEN[cs]=1 (engine drives the pad), AOL[cs]=0
+ * (active LOW). Engine holds idle = HIGH between BACON frames and
+ * deactivates after BACON.LAST=1.
+ */
 
 static void qspi_apply_cs(const struct tc3x_qspi_priv_s *priv)
 {
@@ -251,21 +277,17 @@ static void qspi_reconfigure(struct tc3x_qspi_priv_s *priv)
           (unsigned long)econ);
 }
 
-
 static int qspi_hw_init(struct tc3x_qspi_priv_s *priv)
 {
   const struct tc3x_qspi_config_s *cfg = priv->config;
   uint32_t timeout;
   uint32_t globalcon;
-  uint32_t tq;
 
-  /* Step 1: enable module clock (CLC.DISR = 0) */
+  /* CLC.DISR = 0 in an EndInit-protected window, then poll DISS clear. */
 
   aurix_cpu_endinit_enable(false);
   qspi_modreg(cfg, TC3X_QSPI_CLC_OFFSET, 0u, TC3X_QSPI_CLC_DISR);
   aurix_cpu_endinit_enable(true);
-
-  /* Step 2: poll DISS until module is enabled */
 
   timeout = TC3X_QSPI_POLL_TIMEOUT;
   while (timeout--)
@@ -275,45 +297,32 @@ static int qspi_hw_init(struct tc3x_qspi_priv_s *priv)
           break;
         }
     }
-
   if (timeout == 0)
     {
       spierr("QSPI%u: CLC enable timeout\n", cfg->bus);
       return -ETIMEDOUT;
     }
 
+  /* GLOBALCON: master, EN, CLKSEL, RESETS=RUN, TQ=0, EXPECT=15 (max
+   * receive-expect timeout so the engine doesn't latch a sticky error
+   * while software queues the next BACONENTRY in a chained transfer —
+   * see Zephyr aurix driver commit 72cb3a18).
+   */
 
-  if (cfg->fspb >= 100000000u)
-    {
-      tq = 0;       /* TQ=0 -> fTQ = fSPB; ECONx covers slower clocks    */
-    }
-  else
-    {
-      tq = 0;
-    }
-
-  globalcon = TC3X_QSPI_GLOBALCON_TQ(tq)
+  globalcon = TC3X_QSPI_GLOBALCON_TQ(0)
+            | TC3X_QSPI_GLOBALCON_EXPECT(15)
             | TC3X_QSPI_GLOBALCON_MS_MASTER
             | TC3X_QSPI_GLOBALCON_EN
             | TC3X_QSPI_GLOBALCON_CLKSEL
             | TC3X_QSPI_GLOBALCON_RESETS_RUN;
-
   qspi_putreg(cfg, TC3X_QSPI_GLOBALCON_OFFSET, globalcon);
 
-  /* Step 4: GLOBALCON1 -- single FIFO entry mode (TXFM=RXFM=0), no IRQs. */
-
-  qspi_putreg(cfg, TC3X_QSPI_GLOBALCON1_OFFSET, 0u);
-
-  /* PISEL -- route MRST input from the configured port pin (RxSel_a..h). */
+  qspi_putreg(cfg, TC3X_QSPI_GLOBALCON1_OFFSET, 0u);  /* single FIFO entry */
 
   qspi_putreg(cfg, TC3X_QSPI_PISEL_OFFSET,
               TC3X_QSPI_PISEL_MRIS(cfg->mris));
 
-  /* Step 5: default CS configuration (ECON + SSOC). */
-
   qspi_reconfigure(priv);
-
-  /* Clear any stale flags. */
 
   qspi_putreg(cfg, TC3X_QSPI_FLAGSCLEAR_OFFSET,
               TC3X_QSPI_FLAGSCLEAR_TXC |
@@ -322,23 +331,35 @@ static int qspi_hw_init(struct tc3x_qspi_priv_s *priv)
               TC3X_QSPI_FLAGSCLEAR_ERRORCLEAR_MASK);
 
   priv->initialized = true;
-
   spiinfo("QSPI%u initialized base=0x%08lx fSPB=%lu Hz\n",
           cfg->bus, (unsigned long)cfg->base, (unsigned long)cfg->fspb);
 
   return OK;
 }
 
+/* Shift 1..4 bytes through DATAENTRY[0] with one BACONENTRY entry.
+ *   is_last=true  -> BACON.LAST=1; engine deactivates SLSO after the chunk.
+ *   is_last=false -> engine holds SLSO asserted, waits for the next entry
+ *                    (multi-byte CS-held transfers, UM §37.3.2.5).
+ * BACON.BYTE=0, BACON.MSB=1, DL = (chunk_bytes*8)-1 (iLLD IfxQspi.c:88-89).
+ */
 
-static uint32_t qspi_xfer_word(struct tc3x_qspi_priv_s *priv,
-                               uint32_t txword)
+static uint32_t qspi_xfer_chunk(struct tc3x_qspi_priv_s *priv,
+                                uint32_t txword, size_t chunk_bytes,
+                                bool is_last)
 {
   const struct tc3x_qspi_config_s *cfg = priv->config;
   uint32_t bacon;
   uint32_t status;
   uint32_t timeout;
+  uint32_t dl_bits_minus_1;
 
-  /* Drain any leftover RX entries (defensive). */
+  if (chunk_bytes < 1 || chunk_bytes > 4)
+    {
+      spierr("QSPI%u: chunk_bytes=%zu out of range\n",
+             cfg->bus, chunk_bytes);
+      return 0;
+    }
 
   timeout = 16;
   while (timeout--)
@@ -365,34 +386,18 @@ static uint32_t qspi_xfer_word(struct tc3x_qspi_priv_s *priv,
           break;
         }
     }
-
   if (timeout == 0)
     {
       spierr("QSPI%u: TX FIFO never drained\n", cfg->bus);
       return 0;
     }
 
-  uint32_t dl_field;
-
-  if (priv->nbits <= 8)
-    {
-      dl_field = 0u;
-    }
-  else if (priv->nbits <= 16)
-    {
-      dl_field = 1u;
-    }
-  else
-    {
-      dl_field = (priv->nbits + 7u) / 8u - 1u;
-    }
-
+  dl_bits_minus_1 = (uint32_t)(chunk_bytes * 8u) - 1u;
   bacon = TC3X_QSPI_BACON_CS(priv->cs)
-        | ((dl_field << TC3X_QSPI_BACON_DL_SHIFT) &
+        | ((dl_bits_minus_1 << TC3X_QSPI_BACON_DL_SHIFT) &
            TC3X_QSPI_BACON_DL_MASK)
-        | TC3X_QSPI_BACON_BYTE
         | TC3X_QSPI_BACON_MSB
-        | TC3X_QSPI_BACON_LAST
+        | (is_last ? TC3X_QSPI_BACON_LAST : 0u)
         | (1u << TC3X_QSPI_BACON_LPRE_SHIFT)
         | TC3X_QSPI_BACON_LEAD(4)
         | (1u << TC3X_QSPI_BACON_TPRE_SHIFT)
@@ -414,18 +419,15 @@ static uint32_t qspi_xfer_word(struct tc3x_qspi_priv_s *priv,
         {
           break;
         }
-
       if (status & TC3X_QSPI_STATUS_ERRORFLAGS_MASK)
         {
           spierr("QSPI%u: error flags=0x%03lx\n", cfg->bus,
-                 (unsigned long)(status &
-                                 TC3X_QSPI_STATUS_ERRORFLAGS_MASK));
+                 (unsigned long)(status & TC3X_QSPI_STATUS_ERRORFLAGS_MASK));
           qspi_putreg(cfg, TC3X_QSPI_FLAGSCLEAR_OFFSET,
                       TC3X_QSPI_FLAGSCLEAR_ERRORCLEAR_MASK);
           return 0;
         }
     }
-
   if (timeout == 0)
     {
       spierr("QSPI%u: RX FIFO never filled (status=0x%08lx)\n",
@@ -433,8 +435,26 @@ static uint32_t qspi_xfer_word(struct tc3x_qspi_priv_s *priv,
       return 0;
     }
 
-  uint32_t rxword = qspi_getreg(cfg, TC3X_QSPI_RXEXIT_OFFSET);
+  return qspi_getreg(cfg, TC3X_QSPI_RXEXIT_OFFSET);
+}
 
+/* SPI_SEND: single-word path, always LAST=1. The 200-nop spin is
+ * load-bearing rate-limiting for the TLF35682 PMIC on QSPI2 — do not
+ * remove without measuring on hardware (see CLAUDE.md).
+ */
+
+static uint32_t qspi_xfer_word(struct tc3x_qspi_priv_s *priv,
+                               uint32_t txword)
+{
+  size_t chunk_bytes;
+  uint32_t rxword;
+
+  if (priv->nbits <= 8)        chunk_bytes = 1;
+  else if (priv->nbits <= 16)  chunk_bytes = 2;
+  else if (priv->nbits <= 24)  chunk_bytes = 3;
+  else                         chunk_bytes = 4;
+
+  rxword = qspi_xfer_chunk(priv, txword, chunk_bytes, true);
 
   for (volatile int i = 0; i < 200; i++)
     {
@@ -444,41 +464,39 @@ static uint32_t qspi_xfer_word(struct tc3x_qspi_priv_s *priv,
   return rxword;
 }
 
-
 static int tc3x_qspi_lock(FAR struct spi_dev_s *dev, bool lock)
 {
   struct tc3x_qspi_priv_s *priv = (struct tc3x_qspi_priv_s *)dev;
-
-  if (lock)
-    {
-      return nxmutex_lock(&priv->lock);
-    }
-
-  return nxmutex_unlock(&priv->lock);
+  return lock ? nxmutex_lock(&priv->lock) : nxmutex_unlock(&priv->lock);
 }
+
+/* Engine-driven /CS. The wire is asserted/deasserted by the engine via
+ * BACON.LAST + SSOC.OEN/AOL; the framework's selected=true/false is only
+ * used to detect SLSO switches between slaves on a shared bus, at which
+ * point we disable the old SLSO's OEN and reconfigure for the new one.
+ */
 
 static void tc3x_qspi_select(FAR struct spi_dev_s *dev, uint32_t devid,
                              bool selected)
 {
   struct tc3x_qspi_priv_s *priv = (struct tc3x_qspi_priv_s *)dev;
-
-
+  const struct tc3x_qspi_config_s *cfg = priv->config;
   uint8_t cs = (uint8_t)(SPIDEVID_INDEX(devid) & 0x0f);
-
-  if (cs != priv->cs)
-    {
-      /* Tear down old CS, set up new */
-
-      uint32_t ssoc = qspi_getreg(priv->config, TC3X_QSPI_SSOC_OFFSET);
-      ssoc &= ~TC3X_QSPI_SSOC_OEN_BIT(priv->cs);
-      qspi_putreg(priv->config, TC3X_QSPI_SSOC_OFFSET, ssoc);
-
-      priv->cs = cs;
-      qspi_reconfigure(priv);
-    }
-
+  uint32_t ssoc;
 
   UNUSED(selected);
+
+  if (cs == priv->cs)
+    {
+      return;
+    }
+
+  ssoc = qspi_getreg(cfg, TC3X_QSPI_SSOC_OFFSET);
+  ssoc &= ~TC3X_QSPI_SSOC_OEN_BIT(priv->cs);
+  qspi_putreg(cfg, TC3X_QSPI_SSOC_OFFSET, ssoc);
+
+  priv->cs = cs;
+  qspi_reconfigure(priv);
 }
 
 static uint32_t tc3x_qspi_setfrequency(FAR struct spi_dev_s *dev,
@@ -493,7 +511,6 @@ static uint32_t tc3x_qspi_setfrequency(FAR struct spi_dev_s *dev,
 
   priv->frequency = frequency;
   qspi_reconfigure(priv);
-
   return priv->actual_freq;
 }
 
@@ -506,7 +523,6 @@ static void tc3x_qspi_setmode(FAR struct spi_dev_s *dev,
     {
       return;
     }
-
   priv->mode = mode;
   qspi_reconfigure(priv);
 }
@@ -514,13 +530,11 @@ static void tc3x_qspi_setmode(FAR struct spi_dev_s *dev,
 static void tc3x_qspi_setbits(FAR struct spi_dev_s *dev, int nbits)
 {
   struct tc3x_qspi_priv_s *priv = (struct tc3x_qspi_priv_s *)dev;
-
   if (nbits < 2 || nbits > 32)
     {
       spierr("QSPI: invalid nbits=%d (allowed 2..32)\n", nbits);
       return;
     }
-
   priv->nbits = (uint8_t)nbits;
 }
 
@@ -538,17 +552,34 @@ static uint32_t tc3x_qspi_send(FAR struct spi_dev_s *dev, uint32_t wd)
 }
 
 #ifdef CONFIG_SPI_EXCHANGE
+/* One SPI_EXCHANGE = one CS-held block. LAST=0 on the first nwords-1
+ * entries (engine keeps SLSO asserted in EXPECT state); LAST=1 only on
+ * the final entry (engine deactivates SLSO at the end of the block).
+ */
+
 static void tc3x_qspi_exchange(FAR struct spi_dev_s *dev,
                                FAR const void *txbuffer,
                                FAR void *rxbuffer, size_t nwords)
 {
   struct tc3x_qspi_priv_s *priv = (struct tc3x_qspi_priv_s *)dev;
+  size_t chunk_bytes;
   size_t i;
+
+  if (nwords == 0)
+    {
+      return;
+    }
+
+  if (priv->nbits <= 8)        chunk_bytes = 1;
+  else if (priv->nbits <= 16)  chunk_bytes = 2;
+  else if (priv->nbits <= 24)  chunk_bytes = 3;
+  else                         chunk_bytes = 4;
 
   for (i = 0; i < nwords; i++)
     {
       uint32_t tx = 0xffffffffu;
       uint32_t rx;
+      bool is_last = (i == nwords - 1);
 
       if (txbuffer != NULL)
         {
@@ -566,7 +597,7 @@ static void tc3x_qspi_exchange(FAR struct spi_dev_s *dev,
             }
         }
 
-      rx = qspi_xfer_word(priv, tx);
+      rx = qspi_xfer_chunk(priv, tx, chunk_bytes, is_last);
 
       if (rxbuffer != NULL)
         {
@@ -599,7 +630,6 @@ static void tc3x_qspi_recvblock(FAR struct spi_dev_s *dev,
 }
 #endif
 
-
 FAR struct spi_dev_s *tc3xx_qspibus_initialize(int bus)
 {
   struct tc3x_qspi_priv_s *priv = NULL;
@@ -610,6 +640,11 @@ FAR struct spi_dev_s *tc3xx_qspibus_initialize(int bus)
 #ifdef CONFIG_TC3XX_QSPI2
       case 2:
         priv = &g_qspi2_priv;
+        break;
+#endif
+#ifdef CONFIG_TC3XX_QSPI3
+      case 3:
+        priv = &g_qspi3_priv;
         break;
 #endif
       default:
