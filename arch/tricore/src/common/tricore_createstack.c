@@ -131,6 +131,12 @@ int up_create_stack(struct tcb_s *tcb, size_t stack_size, uint8_t ttype)
 #endif /* CONFIG_STACK_COLORATION */
       tcb->flags |= TCB_FLAG_FREE_STACK;
 
+#ifdef CONFIG_ARCH_LEDS
+      /* Indicate that the first stack has been created (boot is complete) */
+
+      board_autoled_on(LED_STACKCREATED);
+#endif
+
       return OK;
     }
 

@@ -28,6 +28,8 @@
 
 #include <sys/types.h>
 
+#include <nuttx/board.h>
+
 #include "tricore_internal.h"
 
 /****************************************************************************
@@ -65,4 +67,8 @@ void up_allocate_heap(void **heap_start, size_t *heap_size)
 {
   *heap_start = (void *)_sheap;
   *heap_size  = (size_t)((uint32_t)_eheap - (uint32_t)_sheap);
+
+#ifdef CONFIG_ARCH_LEDS
+  board_autoled_on(LED_HEAPALLOCATE);
+#endif
 }
