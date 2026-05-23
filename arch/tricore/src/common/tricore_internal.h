@@ -36,7 +36,9 @@
 #  include <sys/types.h>
 #  include <stdint.h>
 #  include <syscall.h>
-
+#  ifdef CONFIG_ARCH_LEDS
+#    include <arch/board/board.h>
+#  endif
 #endif
 
 #ifndef CONFIG_DEV_CONSOLE

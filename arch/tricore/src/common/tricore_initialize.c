@@ -29,6 +29,10 @@
 #include <nuttx/board.h>
 #include <nuttx/init.h>
 
+#ifdef CONFIG_ARCH_LEDS
+#  include <arch/board/board.h>
+#endif
+
 #include "tricore_internal.h"
 
 /****************************************************************************
@@ -68,6 +72,12 @@ void up_initialize(void)
 
   aurix_earlyserialinit();
   aurix_serialinit();
+
+#ifdef CONFIG_ARCH_LEDS
+  /* Indicate that hardware interrupts are now enabled */
+
+  board_autoled_on(LED_IRQSENABLED);
+#endif
 }
 
 #if defined(CONFIG_ARCH_CHIP_FAMILY_TC4X)

@@ -33,6 +33,7 @@
 #include <nuttx/arch.h>
 #include <nuttx/addrenv.h>
 #include <nuttx/board.h>
+#include <arch/board/board.h>
 
 #include <sched/sched.h>
 
