@@ -26,6 +26,10 @@
 
 #include "tricore_gpio.h"
 
+#ifdef CONFIG_USERLED_LOWER
+#  include <nuttx/leds/userled.h>
+#endif
+
 #ifdef CONFIG_CAN
 int mcmcan_board_initialize(void);
 #endif
@@ -44,6 +48,15 @@ void board_aurix_setup_serial_pin(int idx)
 int board_app_initialize(uintptr_t arg)
 {
   int ret = OK;
+
+#ifdef CONFIG_USERLED_LOWER
+  ret = userled_lower_initialize("/dev/userleds");
+  if (ret < 0)
+    {
+      _err("ERROR: userled_lower_initialize failed: %d\n", ret);
+      return ret;
+    }
+#endif
 
 #ifdef CONFIG_CAN
   ret = mcmcan_board_initialize();

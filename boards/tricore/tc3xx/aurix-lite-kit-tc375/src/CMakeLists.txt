@@ -21,3 +21,13 @@
 # ##############################################################################
 
 set_property( GLOBAL PROPERTY LD_SCRIPT "${NUTTX_BOARD_DIR}/scripts/tricore-llvm.ld")
+
+set(SRCS tc375_appinit.c)
+
+if(CONFIG_ARCH_LEDS)
+  list(APPEND SRCS tc375_autoleds.c)
+else()
+  list(APPEND SRCS tc375_userleds.c)
+endif()
+
+target_sources(board PRIVATE ${SRCS})

@@ -5,6 +5,10 @@
 
 if ARCH_BOARD_AURIX_LITE_KIT_TC375
 
+config ARCH_HAVE_LEDS
+	bool
+	default y
+
 config BOARD_CAN_TLE9251V_STB_PIN
 	bool "Drive TLE9251V CAN_STB low at boot"
 	default y
