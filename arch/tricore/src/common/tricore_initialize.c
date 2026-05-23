@@ -25,6 +25,10 @@
 #include <nuttx/board.h>
 #include <nuttx/bits.h>
 
+#ifdef CONFIG_ARCH_LEDS
+#  include <arch/board/board.h>
+#endif
+
 #include "tricore_internal.h"
 
 
@@ -57,9 +61,14 @@ void up_initialize(void)
 
   up_color_intstack();
 
-
   aurix_earlyserialinit();
   aurix_serialinit();
+
+#ifdef CONFIG_ARCH_LEDS
+  /* Indicate that hardware interrupts are now enabled */
+
+  board_autoled_on(LED_IRQSENABLED);
+#endif
 }
 
 #if defined(CONFIG_ARCH_CHIP_FAMILY_TC4XX)
@@ -185,6 +194,12 @@ void tricore_start(int current_cpu)
 		for (;;) ;
 	}
 #else
-	nx_start();
+#ifdef CONFIG_ARCH_LEDS
+        /* Initialize LEDs and signal that NuttX is starting */
+
+        board_autoled_initialize();
+        board_autoled_on(LED_STARTED);
+#endif
+        nx_start();
 #endif
 }

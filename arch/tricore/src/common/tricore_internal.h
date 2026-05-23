@@ -33,7 +33,9 @@
 #  include <sys/types.h>
 #  include <stdint.h>
 #  include <syscall.h>
-
+#  ifdef CONFIG_ARCH_LEDS
+#    include <arch/board/board.h>
+#  endif
 #endif
 
 
@@ -166,7 +168,7 @@ extern uintptr_t        _eheap[];
 extern uintptr_t __USTACK[];
 #if defined(CONFIG_ARCH_INTERRUPTSTACK)
 extern uintptr_t        __istack[];
-#endif 
+#endif
 
 
 
