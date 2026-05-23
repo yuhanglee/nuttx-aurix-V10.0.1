@@ -21,3 +21,29 @@
 # ##############################################################################
 
 set_property( GLOBAL PROPERTY LD_SCRIPT "${NUTTX_BOARD_DIR}/scripts/tricore-llvm.ld")
+
+set(SRCS tc397_appinit.c tc397_amp_secondary.c)
+
+if(CONFIG_ARCH_LEDS)
+  list(APPEND SRCS tc397_autoleds.c)
+else()
+  list(APPEND SRCS tc397_userleds.c)
+endif()
+
+if(CONFIG_TC3XX_I2C)
+  list(APPEND SRCS tc3xx_i2c_bringup.c)
+endif()
+
+if(CONFIG_TC3XX_GETH)
+  list(APPEND SRCS tc397_ethernet.c)
+endif()
+
+if(CONFIG_CAN)
+  list(APPEND SRCS tc397_can.c)
+endif()
+
+if(CONFIG_TC3XX_QSPI2)
+  list(APPEND SRCS tc397_qspi.c)
+endif()
+
+target_sources(board PRIVATE ${SRCS})
