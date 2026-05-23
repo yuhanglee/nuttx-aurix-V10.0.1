@@ -5,6 +5,10 @@
 
 if ARCH_BOARD_A2G_TC397XA_3V3_TFT
 
+config ARCH_HAVE_LEDS
+        bool
+        default y
+
 config BOARD_PHY_AUTONEG
 	bool "Ethernet PHY autonegotiation"
         default y
