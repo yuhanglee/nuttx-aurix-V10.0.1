@@ -26,6 +26,10 @@
 #include <errno.h>
 #include "tricore_gpio.h"
 
+#ifdef CONFIG_USERLED_LOWER
+#  include <nuttx/leds/userled.h>
+#endif
+
 #ifdef CONFIG_TC3XX_I2C
 #include "tc3xx_i2c.h"
 #endif
@@ -82,17 +86,6 @@ static const gpio_pinset_t g_test_gpio_pins[] =
 int board_app_initialize(uintptr_t arg)
 {
   int ret = OK;
-#if 0
-  bool ledon = true;
-  uint8_t i = 10;
-  gpio_pinset_t led1 = AURIX_GPIO(GPIO_PORT33, GPIO_PIN1, GPIO_OUTPUT, GPIO_ALT0);
-
-  aurix_config_gpio(led1);
-  while (i--) {
-    aurix_gpio_write(led1, (ledon = !ledon));
-    usleep(500 * 1000);
-  }
-#endif
 
 #ifdef CONFIG_TC3XX_I2C
   ret = tc3xx_i2c_bringup();
@@ -160,6 +153,14 @@ int board_app_initialize(uintptr_t arg)
         {
           _err("GPIO /dev/gpio%zu register failed: %d\n", i, gret);
         }
+    }
+#endif
+
+#ifdef CONFIG_USERLED
+  ret = userled_lower_initialize("/dev/userleds");
+  if (ret < 0)
+    {
+      _err("userled_lower_initialize() failed: %d\n", ret);
     }
 #endif
 

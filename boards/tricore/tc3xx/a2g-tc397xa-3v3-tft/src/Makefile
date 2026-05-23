@@ -27,6 +27,12 @@ include $(TOPDIR)/Make.defs
 # configure the shared ASCLIN0 pins.
 CSRCS = tc397_appinit.c
 
+ifeq ($(CONFIG_ARCH_LEDS),y)
+CSRCS += tc397_autoleds.c
+else
+CSRCS += tc397_userleds.c
+endif
+
 # AMP secondary CPU init thread (used when INIT_ENTRYPOINT=amp_secondary_main)
 CSRCS += tc397_amp_secondary.c
 
