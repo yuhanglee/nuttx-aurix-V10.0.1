@@ -2457,6 +2457,7 @@ config ARCH_BOARD_SABRE_6QUAD
 config ARCH_BOARD_A2G_TC375_LITE
 	bool "Infineon AURIX Lite Kit (TC375)"
 	depends on TC3X_CHIP_TC375
+	select ARCH_HAVE_LEDS
 	---help---
 		Infineon AURIX Lite Kit evaluation board (KIT_A2G_TC375_LITE)
 		with the TC375 SoC.

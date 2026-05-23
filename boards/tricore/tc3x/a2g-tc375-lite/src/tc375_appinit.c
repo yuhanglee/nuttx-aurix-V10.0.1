@@ -28,6 +28,11 @@
 
 #include "tricore_gpio.h"
 
+#ifdef CONFIG_USERLED_LOWER
+#  include <debug.h>
+#  include <nuttx/leds/userled.h>
+#endif
+
 #ifdef CONFIG_TC3X_I2C
 #  include "tc375_i2c.h"
 #endif
@@ -79,6 +84,17 @@ int board_app_initialize(uintptr_t arg)
 
 void board_late_initialize(void)
 {
+#ifdef CONFIG_USERLED_LOWER
+  {
+    int ret = userled_lower_initialize("/dev/userleds");
+
+    if (ret < 0)
+      {
+        _err("ERROR: userled_lower_initialize failed: %d\n", ret);
+      }
+  }
+#endif
+
 #ifdef CONFIG_TC3X_I2C0
   tc375_i2c_bringup();
 #endif
