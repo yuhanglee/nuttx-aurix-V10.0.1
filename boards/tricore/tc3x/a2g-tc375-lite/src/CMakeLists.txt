@@ -40,7 +40,11 @@ endif()
 if(CONFIG_TC3X_I2C)
   target_sources(board PRIVATE tc375_i2c.c)
 endif()
+
 if(CONFIG_CAN_MCAN)
   target_sources(board PRIVATE tc375_can.c)
 endif()
 
+if(CONFIG_ARCH_BUTTONS)
+  target_sources(board PRIVATE tc375_buttons.c)
+endif()

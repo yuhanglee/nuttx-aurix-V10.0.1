@@ -87,4 +87,13 @@
 #define LED_PANIC         7
 #define LED_IDLE          8
 
+/* Button: P00.7, Low-active */
+
+#define BOARD_GPIO_BUTTON_PORT  0
+#define BOARD_GPIO_BUTTON_PIN   7
+
+#define BUTTON_USER1      0
+#define NUM_BUTTONS       1
+#define BUTTON_USER1_BIT  (1 << BUTTON_USER1)
+
 #endif /* __BOARDS_TRICORE_TC3X_A2G_TC375_LITE_INCLUDE_BOARD_H */

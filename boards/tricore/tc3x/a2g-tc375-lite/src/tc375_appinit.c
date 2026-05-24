@@ -33,12 +33,18 @@
 #  include <nuttx/leds/userled.h>
 #endif
 
-#ifdef CONFIG_TC3X_I2C
-#  include "tc375_i2c.h"
+#ifdef CONFIG_INPUT_BUTTONS_LOWER
+#  include <debug.h>
+#  include <nuttx/board.h>
+#  include <nuttx/input/buttons.h>
 #endif
 
 #ifdef CONFIG_TC3X_WDT
 int tc3x_wdt_initialize(const char *devpath, int wdtid);
+#endif
+
+#ifdef CONFIG_TC3X_I2C
+#  include "tc375_i2c.h"
 #endif
 
 #ifdef CONFIG_CAN_MCAN
@@ -95,6 +101,10 @@ void board_late_initialize(void)
   }
 #endif
 
+#ifdef CONFIG_TC3X_WDT
+  tc3x_wdt_initialize("/dev/watchdog0", 0);
+#endif
+
 #ifdef CONFIG_TC3X_I2C0
   tc375_i2c_bringup();
 #endif
@@ -103,7 +113,16 @@ void board_late_initialize(void)
   mcmcan_board_initialize();
 #endif
 
-#ifdef CONFIG_TC3X_WDT
-  tc3x_wdt_initialize("/dev/watchdog0", 0);
+#if defined(CONFIG_ARCH_BUTTONS) && defined(CONFIG_INPUT_BUTTONS_LOWER)
+  {
+    int ret;
+
+    board_button_initialize();
+    ret = btn_lower_initialize("/dev/buttons");
+    if (ret < 0)
+      {
+        _err("BUTTON register failed: %d\n", ret);
+      }
+  }
 #endif
 }
