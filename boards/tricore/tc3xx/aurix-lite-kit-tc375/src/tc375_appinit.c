@@ -20,9 +20,18 @@
  *
  ****************************************************************************/
 
+/****************************************************************************
+ * Included Files
+ ****************************************************************************/
+
 #include <nuttx/config.h>
 #include <debug.h>
-#include <errno.h>
+
+#include <nuttx/board.h>
+
+#ifdef CONFIG_INPUT_BUTTONS_LOWER
+#  include <nuttx/input/buttons.h>
+#endif
 
 #include "tricore_gpio.h"
 
@@ -30,9 +39,17 @@
 #  include <nuttx/leds/userled.h>
 #endif
 
+/****************************************************************************
+ * Private Function Prototypes
+ ****************************************************************************/
+
 #ifdef CONFIG_CAN
 int mcmcan_board_initialize(void);
 #endif
+
+/****************************************************************************
+ * Public Functions
+ ****************************************************************************/
 
 void board_aurix_setup_serial_pin(int idx)
 {
@@ -47,7 +64,7 @@ void board_aurix_setup_serial_pin(int idx)
 
 int board_app_initialize(uintptr_t arg)
 {
-  int ret = OK;
+  int ret = 0;
 
 #ifdef CONFIG_USERLED_LOWER
   ret = userled_lower_initialize("/dev/userleds");
@@ -63,6 +80,15 @@ int board_app_initialize(uintptr_t arg)
   if (ret < 0)
     {
       _err("CAN init failed: %d\n", ret);
+    }
+#endif
+
+#if defined(CONFIG_ARCH_BUTTONS) && defined(CONFIG_INPUT_BUTTONS_LOWER)
+  board_button_initialize();
+  ret = btn_lower_initialize("/dev/buttons");
+  if (ret < 0)
+    {
+      _err("BUTTON register failed: %d\n", ret);
     }
 #endif
 

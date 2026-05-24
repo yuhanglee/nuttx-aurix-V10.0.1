@@ -27,7 +27,7 @@
  * Included Files
  ****************************************************************************/
 
-#include <nuttx/config.h>
+#include <stdint.h>
 
 /****************************************************************************
  * Pre-processor Definitions
@@ -86,5 +86,14 @@
 #define LED_ASSERTION     6
 #define LED_PANIC         7
 #define LED_IDLE          8
+
+/* Button: P00.7, Low-active */
+
+#define BOARD_GPIO_BUTTON_PORT  0
+#define BOARD_GPIO_BUTTON_PIN   7
+
+#define BUTTON_USER1      0
+#define NUM_BUTTONS       1
+#define BUTTON_USER1_BIT  (1 << BUTTON_USER1)
 
 #endif /* __BOARDS_TRICORE_TC3XX_AURIX_LITE_KIT_TC375_INCLUDE_BOARD_H */

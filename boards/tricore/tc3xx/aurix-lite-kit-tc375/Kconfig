@@ -19,4 +19,20 @@ config BOARD_CAN_TLE9251V_STB_PIN
 		boots in standby; the CPU must drive P20.6 low to enable
 		normal operating mode before any frame leaves the bus.
 
+config BOARD_TC375_BUTTONS
+	bool "Enable button support"
+	default y
+	---help---
+		Enable support for the user push button (Button1) on the
+		AURIX Lite Kit V2.  The button is wired to P00.7 and is
+		active-low (pulls against GND when pressed).
+
+config ARCH_BUTTONS
+	bool
+	default y
+
+config ARCH_IRQBUTTONS
+	bool
+	default y
+
 endif
