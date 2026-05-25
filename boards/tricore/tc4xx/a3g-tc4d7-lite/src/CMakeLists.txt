@@ -1,5 +1,5 @@
 # ##############################################################################
-# boards/tricore/tc397/a2g-tc397-5v-tft/src/CMakeLists.txt
+# boards/tricore/tc4xx/a3g-tc4d7-lite/src/CMakeLists.txt
 #
 # SPDX-License-Identifier: Apache-2.0
 #
@@ -20,4 +20,26 @@
 #
 # ##############################################################################
 
-set_property( GLOBAL PROPERTY LD_SCRIPT "${NUTTX_BOARD_DIR}/scripts/tricore-llvm.ld")
+set(SRCS tc4d7_appinit.c tc4d7_amp_secondary.c)
+
+if(CONFIG_TC4XX_I2C)
+  list(APPEND SRCS tc4xx_i2c_bringup.c)
+endif()
+
+if(CONFIG_TC4XX_GETH)
+  list(APPEND SRCS tc4d7_ethernet.c)
+endif()
+
+if(CONFIG_CAN)
+  list(APPEND SRCS tc4d7_can.c)
+endif()
+
+if(CONFIG_ARCH_LEDS)
+  list(APPEND SRCS tc4d7_autoleds.c)
+elseif(CONFIG_USERLED)
+  list(APPEND SRCS tc4d7_userleds.c)
+endif()
+
+target_sources(board PRIVATE ${SRCS})
+
+set_property(GLOBAL PROPERTY LD_SCRIPT "${NUTTX_BOARD_DIR}/scripts/tricore-llvm.ld")

@@ -1,5 +1,5 @@
 ############################################################################
-# boards/tricore/tc397/a2g-tc397-5v-tft/src/Makefile
+# boards/tricore/tc4xx/a3g-tc4d7-lite/src/Makefile
 #
 # SPDX-License-Identifier: Apache-2.0
 #
@@ -40,6 +40,12 @@ endif
 
 ifeq ($(CONFIG_CAN),y)
 CSRCS += tc4d7_can.c
+endif
+
+ifeq ($(CONFIG_ARCH_LEDS),y)
+CSRCS += tc4d7_autoleds.c
+else ifeq ($(CONFIG_USERLED),y)
+CSRCS += tc4d7_userleds.c
 endif
 
 include $(TOPDIR)/boards/Board.mk
