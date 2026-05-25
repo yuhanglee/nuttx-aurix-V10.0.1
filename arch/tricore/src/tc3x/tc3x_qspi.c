@@ -39,7 +39,6 @@
 #include "hardware/tc3x_qspi.h"
 #include "tc3x_qspi.h"
 
-
 #ifndef CONFIG_TC3X_QSPI_FSPB_HZ
 #  define CONFIG_TC3X_QSPI_FSPB_HZ   100000000u
 #endif
@@ -131,8 +130,6 @@ static const struct tc3x_qspi_config_s g_qspi2_config =
   .fspb       = CONFIG_TC3X_QSPI_FSPB_HZ,
   .bus        = 2,
   .default_cs = CONFIG_TC3X_QSPI2_DEFAULT_CS,
-
-
   .mris       = 1,
 };
 
@@ -260,21 +257,28 @@ static void qspi_apply_cs(const struct tc3x_qspi_priv_s *priv)
   qspi_putreg(cfg, TC3X_QSPI_SSOC_OFFSET, ssoc);
 }
 
-
 static void qspi_reconfigure(struct tc3x_qspi_priv_s *priv)
 {
   const struct tc3x_qspi_config_s *cfg = priv->config;
-  uint32_t econ;
+  uint32_t new_econ;
+  uint32_t cur_econ;
+  uint8_t slot = priv->cs & 0x07;   /* ECON0..7 only; SLSO N and N+8 share */
 
-  priv->actual_freq = qspi_compute_econ(priv, priv->frequency, &econ);
-  qspi_putreg(cfg, TC3X_QSPI_ECON_OFFSET(priv->cs), econ);
+  priv->actual_freq = qspi_compute_econ(priv, priv->frequency, &new_econ);
+  cur_econ = qspi_getreg(cfg, TC3X_QSPI_ECON_OFFSET(slot));
+
+  if (cur_econ != new_econ)
+    {
+      qspi_putreg(cfg, TC3X_QSPI_ECON_OFFSET(slot), new_econ);
+      spiinfo("QSPI%u cs=%u slot=%u mode=%d nbits=%u f=%lu actual=%lu "
+              "econ=0x%08lx (write)\n",
+              cfg->bus, priv->cs, slot, priv->mode, priv->nbits,
+              (unsigned long)priv->frequency,
+              (unsigned long)priv->actual_freq,
+              (unsigned long)new_econ);
+    }
+
   qspi_apply_cs(priv);
-
-  spiinfo("QSPI%u cs=%u mode=%d nbits=%u f=%lu actual=%lu econ=0x%08lx\n",
-          cfg->bus, priv->cs, priv->mode, priv->nbits,
-          (unsigned long)priv->frequency,
-          (unsigned long)priv->actual_freq,
-          (unsigned long)econ);
 }
 
 static int qspi_hw_init(struct tc3x_qspi_priv_s *priv)
@@ -303,7 +307,7 @@ static int qspi_hw_init(struct tc3x_qspi_priv_s *priv)
       return -ETIMEDOUT;
     }
 
-  /* GLOBALCON: master, EN, CLKSEL, RESETS=RUN, TQ=0, EXPECT=15 (max
+  /* GLOBALCON: controller, EN, CLKSEL, RESETS=RUN, TQ=0, EXPECT=15 (max
    * receive-expect timeout so the engine doesn't latch a sticky error
    * while software queues the next BACONENTRY in a chained transfer —
    * see Zephyr aurix driver commit 72cb3a18).
@@ -370,11 +374,8 @@ static uint32_t qspi_xfer_chunk(struct tc3x_qspi_priv_s *priv,
         {
           break;
         }
-
       (void)qspi_getreg(cfg, TC3X_QSPI_RXEXIT_OFFSET);
     }
-
-  /* Wait for TX FIFO to have room (level < max). */
 
   timeout = TC3X_QSPI_POLL_TIMEOUT;
   while (timeout--)
@@ -407,8 +408,6 @@ static uint32_t qspi_xfer_chunk(struct tc3x_qspi_priv_s *priv,
 
   qspi_putreg(cfg, TC3X_QSPI_BACONENTRY_OFFSET, bacon);
   qspi_putreg(cfg, TC3X_QSPI_DATAENTRY_OFFSET(0), txword);
-
-  /* Wait for one entry in RX FIFO. */
 
   timeout = TC3X_QSPI_POLL_TIMEOUT;
   while (timeout--)
@@ -470,12 +469,6 @@ static int tc3x_qspi_lock(FAR struct spi_dev_s *dev, bool lock)
   return lock ? nxmutex_lock(&priv->lock) : nxmutex_unlock(&priv->lock);
 }
 
-/* Engine-driven /CS. The wire is asserted/deasserted by the engine via
- * BACON.LAST + SSOC.OEN/AOL; the framework's selected=true/false is only
- * used to detect SLSO switches between slaves on a shared bus, at which
- * point we disable the old SLSO's OEN and reconfigure for the new one.
- */
-
 static void tc3x_qspi_select(FAR struct spi_dev_s *dev, uint32_t devid,
                              bool selected)
 {
@@ -486,16 +479,14 @@ static void tc3x_qspi_select(FAR struct spi_dev_s *dev, uint32_t devid,
 
   UNUSED(selected);
 
-  if (cs == priv->cs)
+  if (cs != priv->cs)
     {
-      return;
+      ssoc = qspi_getreg(cfg, TC3X_QSPI_SSOC_OFFSET);
+      ssoc &= ~TC3X_QSPI_SSOC_OEN_BIT(priv->cs);
+      qspi_putreg(cfg, TC3X_QSPI_SSOC_OFFSET, ssoc);
+      priv->cs = cs;
     }
 
-  ssoc = qspi_getreg(cfg, TC3X_QSPI_SSOC_OFFSET);
-  ssoc &= ~TC3X_QSPI_SSOC_OEN_BIT(priv->cs);
-  qspi_putreg(cfg, TC3X_QSPI_SSOC_OFFSET, ssoc);
-
-  priv->cs = cs;
   qspi_reconfigure(priv);
 }
 
@@ -503,6 +494,7 @@ static uint32_t tc3x_qspi_setfrequency(FAR struct spi_dev_s *dev,
                                        uint32_t frequency)
 {
   struct tc3x_qspi_priv_s *priv = (struct tc3x_qspi_priv_s *)dev;
+  uint32_t unused_econ;
 
   if (priv->frequency == frequency && priv->actual_freq != 0)
     {
@@ -510,7 +502,7 @@ static uint32_t tc3x_qspi_setfrequency(FAR struct spi_dev_s *dev,
     }
 
   priv->frequency = frequency;
-  qspi_reconfigure(priv);
+  priv->actual_freq = qspi_compute_econ(priv, frequency, &unused_econ);
   return priv->actual_freq;
 }
 
@@ -524,7 +516,6 @@ static void tc3x_qspi_setmode(FAR struct spi_dev_s *dev,
       return;
     }
   priv->mode = mode;
-  qspi_reconfigure(priv);
 }
 
 static void tc3x_qspi_setbits(FAR struct spi_dev_s *dev, int nbits)
