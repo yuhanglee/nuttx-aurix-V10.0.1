@@ -2,6 +2,7 @@
 
 CHIP_CSRCS += tc4x_clockconfig.c
 CHIP_CSRCS += tc4x_wdt.c
+CHIP_CSRCS += tc4xx_endinit.c
 CHIP_CSRCS += tc4xx_gpio.c
 
 ifeq ($(CONFIG_TC4XX_I2C),y)
@@ -10,6 +11,11 @@ endif
 
 ifeq ($(CONFIG_TC4XX_GETH),y)
 CHIP_CSRCS += tc4x_geth.c
+endif
+
+# QSPI
+ifeq ($(CONFIG_TC4XX_QSPI),y)
+CHIP_CSRCS += tc4x_qspi.c
 endif
 
 # SPI
