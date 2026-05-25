@@ -23,4 +23,61 @@
 #ifndef __BOARDS_TRICORE_TC4X_A3G_TC4D7_LITE_INCLUDE_BOARD_H
 #define __BOARDS_TRICORE_TC4X_A3G_TC4D7_LITE_INCLUDE_BOARD_H
 
+/****************************************************************************
+ * Included Files
+ ****************************************************************************/
+
+#include <nuttx/config.h>
+
+/****************************************************************************
+ * Pre-processor Definitions
+ ****************************************************************************/
+
+/* LED index values for use with board_userled() ****************************
+ *
+ * A3G-TC4D7-Lite Kit user LED connections:
+ *   LED1 (green): P03.9  - active LOW (pull against GND)
+ *   LED2 (green): P03.10 - active LOW (pull against GND)
+ *   LED5 (red):   ESR0   - hardware fault indicator, not software-controlled
+ *
+ ****************************************************************************/
+
+#define BOARD_LED1    0
+#define BOARD_LED2    1
+#define BOARD_NLEDS   2
+
+/* LED bits for use with board_userled_all() */
+
+#define BOARD_LED1_BIT  (1 << BOARD_LED1)
+#define BOARD_LED2_BIT  (1 << BOARD_LED2)
+
+/* Automatic LED state values (CONFIG_ARCH_LEDS) ****************************
+ *
+ * LED1 (P03.9  green) and LED2 (P03.10 green) encode system state.
+ * LED5 (ESR0   red)   is hardware-driven and requires no software init.
+ *
+ *  SYMBOL               MEANING                      LED1  LED2
+ *  -------------------  ---------------------------  ----  ----
+ *  LED_STARTED       0  NuttX has been started        ON   OFF
+ *  LED_HEAPALLOCATE  1  Heap has been allocated       ON    ON
+ *  LED_IRQSENABLED   2  Interrupts enabled            ON    ON
+ *  LED_STACKCREATED  3  Idle stack created            ON    ON
+ *  LED_INIRQ         4  In an interrupt               TGGL  NC
+ *  LED_SIGNAL        5  In a signal handler            NC  TGGL
+ *  LED_ASSERTION     6  An assertion failed           ON    ON
+ *  LED_PANIC         7  System crash                  ON    ON
+ *  LED_IDLE          8  CPU idle (no change)           NC    NC
+ *
+ ****************************************************************************/
+
+#define LED_STARTED       0
+#define LED_HEAPALLOCATE  1
+#define LED_IRQSENABLED   2
+#define LED_STACKCREATED  3
+#define LED_INIRQ         4
+#define LED_SIGNAL        5
+#define LED_ASSERTION     6
+#define LED_PANIC         7
+#define LED_IDLE          8
+
 #endif /* __BOARDS_TRICORE_TC4X_A3G_TC4D7_LITE_INCLUDE_BOARD_H */

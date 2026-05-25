@@ -26,6 +26,13 @@ CSRCS = tc4d7_appinit.c
 
 # AMP secondary CPU init thread (used when INIT_ENTRYPOINT=amp_secondary_main)
 CSRCS += tc4d7_amp_secondary.c
+
+ifeq ($(CONFIG_ARCH_LEDS),y)
+CSRCS += tc4d7_autoleds.c
+else ifeq ($(CONFIG_USERLED),y)
+CSRCS += tc4d7_userleds.c
+endif
+
 ifeq ($(CONFIG_TC4X_I2C),y)
 CSRCS += tc4d7_i2c.c
 endif

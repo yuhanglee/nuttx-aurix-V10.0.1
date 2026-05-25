@@ -2467,6 +2467,7 @@ config ARCH_BOARD_A2G_TC375_LITE
 config ARCH_BOARD_A3G_TC4D7_LITE
 	bool "Infineon AURIX Lite Kit (TC4D7)"
 	depends on TC4X_CHIP_TC4D7
+	select ARCH_HAVE_LEDS
 	---help---
 		Infineon AURIX Lite Kit evaluation board (KIT_A3G_TC4D7_LITE)
 		with the TC4D7 SoC.

@@ -29,6 +29,11 @@
 
 #include "tricore_gpio.h"
 
+#ifdef CONFIG_USERLED_LOWER
+#  include <debug.h>
+#  include <nuttx/leds/userled.h>
+#endif
+
 #ifdef CONFIG_TC4X_WDT
 #  include <debug.h>
 #  include "hardware/tc4x_wdt.h"
@@ -119,6 +124,17 @@ int board_app_initialize(uintptr_t arg)
 
 void board_late_initialize(void)
 {
+#ifdef CONFIG_USERLED_LOWER
+  {
+    int ret = userled_lower_initialize("/dev/userleds");
+
+    if (ret < 0)
+      {
+        _err("ERROR: userled_lower_initialize failed: %d\n", ret);
+      }
+  }
+#endif
+
 #ifdef CONFIG_TC4X_WDT
   {
     int ret = tc4x_wdt_initialize("/dev/watchdog0", TC4X_WDT_CPU0);
