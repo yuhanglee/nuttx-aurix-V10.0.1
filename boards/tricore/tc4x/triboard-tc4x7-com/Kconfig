@@ -4,4 +4,9 @@
 #
 
 if ARCH_BOARD_TRIBOARD_TC4X7_COM
+
+config ARCH_HAVE_LEDS
+	bool
+	default y
+
 endif

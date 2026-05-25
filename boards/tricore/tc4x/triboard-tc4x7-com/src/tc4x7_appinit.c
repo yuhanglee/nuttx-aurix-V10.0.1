@@ -20,6 +20,10 @@
  *
  ****************************************************************************/
 
+/****************************************************************************
+ * Included Files
+ ****************************************************************************/
+
 #include <sys/types.h>
 #include <debug.h>
 #include <sys/sysinfo.h>
@@ -39,6 +43,14 @@
 #ifdef CONFIG_TC4XX_I2C
 #include "tc4xx_i2c.h"
 #endif
+
+#ifdef CONFIG_USERLED_LOWER
+#  include <nuttx/leds/userled.h>
+#endif
+
+/****************************************************************************
+ * Public Functions
+ ****************************************************************************/
 
 void board_aurix_setup_i2c_pin(int bus)
 {
@@ -65,13 +77,17 @@ int board_app_initialize(uintptr_t arg)
   bool ledon = true;
   uint8_t i = 10;
   int ret;
-  gpio_pinset_t led1 = AURIX_GPIO(GPIO_PORT13, GPIO_PIN0, GPIO_OUTPUT, GPIO_ALT0);
+  gpio_pinset_t led1 = AURIX_GPIO(GPIO_PORT13, GPIO_PIN0,
+                                  GPIO_OUTPUT, GPIO_ALT0);
 
   aurix_config_gpio(led1);
-  while (i--) {
-    aurix_gpio_write(led1, (ledon = !ledon));
-    usleep(500 * 1000);
-  }
+  while (i--)
+    {
+      aurix_gpio_write(led1, (ledon = !ledon));
+      usleep(500 * 1000);
+    }
+
+  aurix_gpio_write(led1, false);  /* D406 back ON: solid after startup blink */
 
 #ifdef CONFIG_TC4X_WDT
   ret = tc4x_wdt_initialize("/dev/watchdog0", TC4X_WDT_CPU0);
@@ -102,6 +118,14 @@ int board_app_initialize(uintptr_t arg)
   if (ret < 0)
     {
       _err("ERROR: tc4x7_xspi_initialize failed: %d\n", ret);
+    }
+#endif
+
+#ifdef CONFIG_USERLED_LOWER
+  ret = userled_lower_initialize("/dev/userleds");
+  if (ret < 0)
+    {
+      _err("ERROR: userled_lower_initialize failed: %d\n", ret);
     }
 #endif
 
