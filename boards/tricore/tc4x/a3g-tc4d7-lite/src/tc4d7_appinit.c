@@ -40,6 +40,10 @@
 #  include <nuttx/input/buttons.h>
 #endif
 
+#ifdef CONFIG_TC4X_QSPI
+int tc4d7_qspi_bringup(void);
+#endif
+
 #ifdef CONFIG_TC4X_WDT
 #  include <debug.h>
 #  include "hardware/tc4x_wdt.h"
@@ -139,6 +143,10 @@ void board_late_initialize(void)
         _err("ERROR: userled_lower_initialize failed: %d\n", ret);
       }
   }
+#endif
+
+#ifdef CONFIG_TC4X_QSPI
+  tc4d7_qspi_bringup();
 #endif
 
 #ifdef CONFIG_TC4X_WDT
