@@ -54,6 +54,14 @@
 #  include "hardware/tc4xx_asclin_spi.h"
 #endif
 
+#ifdef CONFIG_TC4XX_QSPI
+#  include "tc4x_qspi.h"
+#endif
+
+#ifdef CONFIG_TC4XX_QSPI
+int tc4d7_qspi_bringup(void);
+#endif
+
 #ifdef CONFIG_TRICORE_FLASH_MTD
 #  include <nuttx/mtd/mtd.h>
 #  include <nuttx/drivers/drivers.h>
@@ -180,12 +188,20 @@ int board_app_initialize(uintptr_t arg)
     }
 
 #ifdef CONFIG_TC4XX_ASCLIN_SPI_CHARDEV
-  ret = spi_register(spi, 0);
+  ret = spi_register(spi, 0);  /* /dev/spi0 */
   if (ret < 0)
     {
       _err("SPI register failed: %d\n", ret);
     }
 #endif
+#endif
+
+#ifdef CONFIG_TC4XX_QSPI
+  ret = tc4d7_qspi_bringup();
+  if (ret < 0)
+    {
+      _err("ERROR: tc4d7_qspi_bringup failed: %d\n", ret);
+    }
 #endif
 
 #ifdef CONFIG_TRICORE_FLASH_MTD
