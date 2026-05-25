@@ -53,4 +53,8 @@ ifeq ($(CONFIG_TC4XX_XSPI),y)
 CSRCS += tc4x7_xspi.c
 endif
 
+ifeq ($(CONFIG_TC4XX_QSPI),y)
+CSRCS += tc4x7_qspi.c
+endif
+
 include $(TOPDIR)/boards/Board.mk

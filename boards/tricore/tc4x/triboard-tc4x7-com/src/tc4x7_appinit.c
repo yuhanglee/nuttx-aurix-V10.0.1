@@ -49,6 +49,10 @@
 #  include <nuttx/leds/userled.h>
 #endif
 
+#ifdef CONFIG_TC4XX_QSPI
+int tc4x7_qspi_bringup(void);
+#endif
+
 /****************************************************************************
  * Public Functions
  ****************************************************************************/
@@ -112,6 +116,14 @@ int board_app_initialize(uintptr_t arg)
 
 #ifdef CONFIG_CAN
   mcmcan_board_initialize();
+#endif
+
+#ifdef CONFIG_TC4XX_QSPI
+  ret = tc4x7_qspi_bringup();
+  if (ret < 0)
+    {
+      _err("ERROR: tc4x7_qspi_bringup failed: %d\n", ret);
+    }
 #endif
 
 #ifdef CONFIG_TC4XX_XSPI
