@@ -1,3 +1,29 @@
+/****************************************************************************
+ * boards/tricore/tc4xx/a3g-tc4d7-lite/src/tc4d7_appinit.c
+ *
+ * SPDX-License-Identifier: Apache-2.0
+ *
+ * Licensed to the Apache Software Foundation (ASF) under one or more
+ * contributor license agreements.  See the NOTICE file distributed with
+ * this work for additional information regarding copyright ownership.  The
+ * ASF licenses this file to you under the Apache License, Version 2.0 (the
+ * "License"); you may not use this file except in compliance with the
+ * License.  You may obtain a copy of the License at
+ *
+ *   http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS, WITHOUT
+ * WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.  See the
+ * License for the specific language governing permissions and limitations
+ * under the License.
+ *
+ ****************************************************************************/
+
+/****************************************************************************
+ * Included Files
+ ****************************************************************************/
+
 #include <sys/types.h>
 #include <debug.h>
 #include <sys/sysinfo.h>
@@ -10,6 +36,10 @@
 #include <nuttx/irq.h>
 #include "tricore_gpio.h"
 #include "tc4xx_gpio.h"
+
+#ifdef CONFIG_USERLED_LOWER
+#  include <nuttx/leds/userled.h>
+#endif
 
 #ifdef CONFIG_TC4X_WDT
 #include "hardware/tc4x_wdt.h"
@@ -32,6 +62,10 @@ struct mtd_dev_s *tricore_flash_initialize(void);
 #ifdef CONFIG_CAN
 int mcmcan_board_initialize(void);
 #endif
+
+/****************************************************************************
+ * Public Functions
+ ****************************************************************************/
 
 void board_aurix_setup_i2c_pin(int bus)
 {
@@ -85,6 +119,16 @@ static const gpio_pinset_t g_user_led_pin =
 int board_app_initialize(uintptr_t arg)
 {
   int ret = OK;
+
+#ifdef CONFIG_USERLED_LOWER
+  ret = userled_lower_initialize("/dev/userleds");
+  if (ret < 0)
+    {
+      _err("ERROR: userled_lower_initialize failed: %d\n", ret);
+      return ret;
+    }
+#endif
+
 #if 0
   bool ledon = true;
   uint8_t i = 10;

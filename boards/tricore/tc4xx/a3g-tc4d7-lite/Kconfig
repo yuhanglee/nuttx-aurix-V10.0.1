@@ -5,6 +5,11 @@
 
 if ARCH_BOARD_A3G_TC4D7_LITE
 
+config ARCH_HAVE_LEDS
+	bool
+	default y
+
+
 config BOARD_PHY_AUTONEG
 	bool "Ethernet PHY autonegotiation"
 	default y
