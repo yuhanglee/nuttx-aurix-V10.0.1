@@ -54,4 +54,8 @@ ifeq ($(CONFIG_USERLED),y)
 CSRCS += tc4d7_userleds.c
 endif
 
+ifeq ($(CONFIG_TC4XX_QSPI),y)
+CSRCS += tc4d7_qspi.c
+endif
+
 include $(TOPDIR)/boards/Board.mk
