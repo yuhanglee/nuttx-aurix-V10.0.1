@@ -118,6 +118,199 @@ config TC4X_I2C2_PISEL
 endif # TC4X_I2C2
 
 endif # TC4X_I2C
+
+# QSPI
+menuconfig TC4X_QSPI
+	bool "TC4xx QSPI master driver"
+	default n
+	depends on SPI
+        select SPI_DRIVER
+        select SPI_EXCHANGE
+        ---help---
+                Enable the polled-mode QSPI master driver for TC4Dx.
+                Provides a NuttX spi_ops_s lower-half built on top of the
+                dedicated QSPI peripheral with hardware SLSO chip selects.
+                Automatically enables the SPI character driver (/dev/spiN)
+                and the spi_exchange() transfer operation.
+
+if TC4X_QSPI
+
+config TC4X_QSPI_FPER_HZ
+        int "fPER clock feeding the QSPI module (Hz)"
+        default 200000000
+        ---help---
+                Peripheral PLL clock frequency driving the QSPI module.
+                TC4Dx boards typically run fPER at 200 MHz via the PER PLL
+                (PERCCUCON0.CLKSELQSPI=2, QSPIDIV=1).  Adjust if a different
+                clock source or divider is configured in tc4x_clockconfig.c.
+
+if TC4X_QSPI0
+config TC4X_QSPI0_DEFAULT_CS
+	int "QSPI0 default hardware CS (SLSO index)"
+	default 0
+	range 0 15
+config TC4X_QSPI0_MRIS
+	int "QSPI0 MRIS pin input select"
+	default 0
+	range 0 7
+endif # TC4X_QSPI0
+
+config TC4X_QSPI1
+	bool "Enable QSPI1"
+	default n
+
+if TC4X_QSPI1
+config TC4X_QSPI1_DEFAULT_CS
+	int "QSPI1 default hardware CS (SLSO index)"
+	default 0
+	range 0 15
+config TC4X_QSPI1_MRIS
+	int "QSPI1 MRIS pin input select"
+	default 0
+	range 0 7
+endif # TC4X_QSPI1
+
+config TC4X_QSPI2
+	bool "Enable QSPI2"
+	default n
+
+if TC4X_QSPI2
+config TC4X_QSPI2_DEFAULT_CS
+	int "QSPI2 default hardware CS (SLSO index)"
+	default 0
+	range 0 15
+config TC4X_QSPI2_MRIS
+	int "QSPI2 MRIS pin input select"
+	default 0
+	range 0 7
+endif # TC4X_QSPI2
+
+config TC4X_QSPI3
+	bool "Enable QSPI3"
+	default n
+
+if TC4X_QSPI3
+config TC4X_QSPI3_DEFAULT_CS
+	int "QSPI3 default hardware CS (SLSO index)"
+	default 0
+	range 0 15
+config TC4X_QSPI3_MRIS
+	int "QSPI3 MRIS pin input select"
+	default 0
+	range 0 7
+endif # TC4X_QSPI3
+
+config TC4X_QSPI4
+	bool "Enable QSPI4 (mikroBUS SPI header)"
+	default n
+	---help---
+		Enable QSPI4.  On the a3g-tc4d7-lite board QSPI4 is wired
+                to the SEMPER Flash / mikroBUS SPI header:
+                MOSI=P22.0 (QSPI4_MTSR_F, ALT3),
+                MISO=P22.1 (QSPI4_MRSTB_F, MRIS=1, input),
+                SCLK=P22.3 (QSPI4_SCLK_F, ALT3),
+                CS=SLSO6 (P23.1, ALT3).
+
+if TC4X_QSPI4
+config TC4X_QSPI4_DEFAULT_CS
+        int "QSPI4 default hardware CS (SLSO index)"
+        default 6
+        range 0 15
+config TC4X_QSPI4_MRIS
+        int "QSPI4 MRIS pin input select"
+        default 1
+        range 0 7
+config TC4X_QSPI4_LOOPBACK
+        bool "Enable internal loopback on QSPI4"
+        default n
+        ---help---
+                Enable GLOBALCON.LB to internally connect MTSR to MRST.
+                Use this for spi_test /dev/spi1 without an external
+                MOSI->MISO jumper wire.
+endif # TC4X_QSPI4
+
+config TC4X_QSPI5
+	bool "Enable QSPI5"
+	default n
+
+if TC4X_QSPI5
+config TC4X_QSPI5_DEFAULT_CS
+	int "QSPI5 default hardware CS (SLSO index)"
+	default 0
+	range 0 15
+config TC4X_QSPI5_MRIS
+	int "QSPI5 MRIS pin input select"
+	default 0
+	range 0 7
+endif # TC4X_QSPI5
+
+config TC4X_QSPI6
+	bool "Enable QSPI6"
+	default n
+
+if TC4X_QSPI6
+config TC4X_QSPI6_DEFAULT_CS
+	int "QSPI6 default hardware CS (SLSO index)"
+	default 0
+	range 0 15
+config TC4X_QSPI6_MRIS
+	int "QSPI6 MRIS pin input select"
+	default 0
+	range 0 7
+endif # TC4X_QSPI6
+
+config TC4X_QSPI7
+	bool "Enable QSPI7"
+	default n
+
+if TC4X_QSPI7
+config TC4X_QSPI7_DEFAULT_CS
+	int "QSPI7 default hardware CS (SLSO index)"
+	default 0
+	range 0 15
+config TC4X_QSPI7_MRIS
+	int "QSPI7 MRIS pin input select"
+	default 0
+	range 0 7
+endif # TC4X_QSPI7
+
+endif # TC4X_QSPI
+
+config TC4X_XSPI
+	bool "xSPI controller"
+	default n
+	select XSPI
+	select XSPI_DW_SSI
+	select XSPI_DW_SSI_HAS_DDR
+	select XSPI_DW_SSI_HAS_HYPERBUS
+	select XSPI_DW_SSI_HAS_DMA
+	select XSPI_DW_SSI_HAS_XIP
+	---help---
+		Enable the TC4xx xSPI controller. Provides SoC glue around
+		the Synopsys DWC_SSI IP core driver for the single xSPI
+		instance on TC4Dx devices.
+
+if TC4X_XSPI
+
+config TC4X_XSPI_SSI_CLK_HZ
+	int "xSPI SSI_clk rate (Hz)"
+	default 100000000
+	---help---
+		Input SSI_clk frequency feeding the xSPI controller. Used by
+		the IP driver to compute the BAUDR divider. The default is a
+		placeholder; set from the board clock tree.
+
+config TC4X_XSPI_PORTSEL_GPIO
+	bool "Route via GPIO pads (port 20) instead of HSFAST (port 16)"
+	default n
+	---help---
+		Select GPIO pad routing for reduced functionality mode:
+		SDR only, quad max, 25 MHz max, 3 V devices only.
+		Useful for early bring-up on boards that expose port 20 pins
+		on headers. Clear this for production HSFAST routing.
+
+endif # TC4X_XSPI
+
 # SPI
 config TC4X_ASCLIN_SPI
 	bool "ASCLIN SPI master support"
@@ -168,39 +361,4 @@ config TC4X_ASCLIN_SPI_CHARDEV
 		Enables userspace access through standard SPI ioctls.
 
 endif # TC4X_ASCLIN_SPI
-
-config TC4X_XSPI
-	bool "xSPI controller"
-	default n
-	select XSPI
-	select XSPI_DW_SSI
-	select XSPI_DW_SSI_HAS_DDR
-	select XSPI_DW_SSI_HAS_HYPERBUS
-	select XSPI_DW_SSI_HAS_DMA
-	select XSPI_DW_SSI_HAS_XIP
-	---help---
-		Enable the TC4xx xSPI controller. Provides SoC glue around
-		the Synopsys DWC_SSI IP core driver for the single xSPI
-		instance on TC4Dx devices.
-
-if TC4X_XSPI
-
-config TC4X_XSPI_SSI_CLK_HZ
-	int "xSPI SSI_clk rate (Hz)"
-	default 100000000
-	---help---
-		Input SSI_clk frequency feeding the xSPI controller. Used by
-		the IP driver to compute the BAUDR divider. The default is a
-		placeholder; set from the board clock tree.
-
-config TC4X_XSPI_PORTSEL_GPIO
-	bool "Route via GPIO pads (port 20) instead of HSFAST (port 16)"
-	default n
-	---help---
-		Select GPIO pad routing for reduced functionality mode:
-		SDR only, quad max, 25 MHz max, 3 V devices only.
-		Useful for early bring-up on boards that expose port 20 pins
-		on headers. Clear this for production HSFAST routing.
-
-endif # TC4X_XSPI
 

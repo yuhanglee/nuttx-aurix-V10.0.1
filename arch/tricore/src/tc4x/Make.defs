@@ -28,9 +28,8 @@ ifeq ($(CONFIG_TC4X_I2C),y)
 CHIP_CSRCS += tc4x_i2c.c
 endif
 
-# SPI
-ifeq ($(CONFIG_TC4X_ASCLIN_SPI),y)
-CHIP_CSRCS += tc4x_asclin_spi.c
+ifeq ($(CONFIG_TC4X_QSPI),y)
+CHIP_CSRCS += tc4x_qspi.c
 endif
 
 # XSPI
@@ -39,6 +38,11 @@ CHIP_CSRCS += tc4x_xspi.c
 ifneq ($(CONFIG_TC4X_XSPI_PORTSEL_GPIO),y)
 CHIP_CSRCS += tc4x_hsphy.c
 endif
+endif
+
+# SPI
+ifeq ($(CONFIG_TC4X_ASCLIN_SPI),y)
+CHIP_CSRCS += tc4x_asclin_spi.c
 endif
 
 VPATH += tc4x

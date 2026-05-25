@@ -408,7 +408,7 @@ static void tc4x_ccu_set_dividers(void)
                     fqspi_div);
   val |= FIELD_PREP(TC4X_PERCCUCON0_CLKSELQSPI_MASK,
                     TC4X_PERCCUCON0_CLKSELQSPI_SHIFT,
-                    TC4X_CLKSEL_QSPI_FSPB);
+                    TC4X_CLKSEL_QSPI_FSOURCE2);
 
   val |= FIELD_PREP(TC4X_PERCCUCON0_I2CDIV_MASK,
                     TC4X_PERCCUCON0_I2CDIV_SHIFT,

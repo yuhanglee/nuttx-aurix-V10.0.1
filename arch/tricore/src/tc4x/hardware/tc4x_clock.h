@@ -265,8 +265,9 @@ enum tc4x_rootclk_domain
 #define TC4X_CLKSEL_MCAN_FXBAR      2u
 #define TC4X_CLKSEL_MCAN_FPLL1_K1   3u
 
-#define TC4X_CLKSEL_QSPI_FSPB       0u
-#define TC4X_CLKSEL_QSPI_FSOURCE3   1u
+#define TC4X_CLKSEL_QSPI_STOP       0u
+#define TC4X_CLKSEL_QSPI_FSOURCE1   1u
+#define TC4X_CLKSEL_QSPI_FSOURCE2   2u
 
 #define TC4X_CLKSEL_ASCLINS_FOSC0   1u
 
