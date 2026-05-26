@@ -34,6 +34,12 @@
 #  include <nuttx/leds/userled.h>
 #endif
 
+#ifdef CONFIG_INPUT_BUTTONS_LOWER
+#  include <debug.h>
+#  include <nuttx/board.h>
+#  include <nuttx/input/buttons.h>
+#endif
+
 #ifdef CONFIG_TC4X_WDT
 #  include <debug.h>
 #  include "hardware/tc4x_wdt.h"
@@ -204,6 +210,19 @@ void board_late_initialize(void)
         _err("SPI register failed: %d\n", ret);
       }
 #endif
+  }
+#endif
+
+#if defined(CONFIG_ARCH_BUTTONS) && defined(CONFIG_INPUT_BUTTONS_LOWER)
+  {
+    int ret;
+
+    board_button_initialize();
+    ret = btn_lower_initialize("/dev/buttons");
+    if (ret < 0)
+      {
+        _err("BUTTON register failed: %d\n", ret);
+      }
   }
 #endif
 

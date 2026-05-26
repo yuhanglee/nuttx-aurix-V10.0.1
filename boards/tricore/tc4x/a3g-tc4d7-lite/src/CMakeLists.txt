@@ -46,3 +46,7 @@ endif()
 if(CONFIG_CAN_MCAN)
   target_sources(board PRIVATE tc4d7_can.c)
 endif()
+
+if(CONFIG_ARCH_BUTTONS)
+  target_sources(board PRIVATE tc4d7_buttons.c)
+endif()

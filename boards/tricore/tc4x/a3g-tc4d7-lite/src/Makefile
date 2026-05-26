@@ -43,4 +43,8 @@ ifeq ($(CONFIG_CAN_MCAN),y)
 CSRCS += tc4d7_can.c
 endif
 
+ifeq ($(CONFIG_ARCH_BUTTONS),y)
+CSRCS += tc4d7_buttons.c
+endif
+
 include $(TOPDIR)/boards/Board.mk
