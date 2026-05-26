@@ -9,4 +9,19 @@ config ARCH_HAVE_LEDS
 	bool
 	default y
 
+config BOARD_TC4X7_BUTTONS
+	bool "Enable button support"
+	default y
+	---help---
+		Enable support for the user push button on the
+		AURIX TC4X7 Triboard. The software-visible button is wired
+		to P33.11.
+
+config ARCH_BUTTONS
+	bool
+	default y
+
+config ARCH_IRQBUTTONS
+	bool
+	default y
 endif

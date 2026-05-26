@@ -28,6 +28,7 @@
  ****************************************************************************/
 
 #include <nuttx/config.h>
+#include <stdint.h>
 
 /****************************************************************************
  * Pre-processor Definitions
@@ -69,5 +70,14 @@
 #define LED_ASSERTION     6
 #define LED_PANIC         7
 #define LED_IDLE          8
+
+/* Button: P33.11 */
+
+#define BOARD_GPIO_BUTTON_PORT  33
+#define BOARD_GPIO_BUTTON_PIN   11
+
+#define BUTTON_USER1      0
+#define NUM_BUTTONS       1
+#define BUTTON_USER1_BIT  (1 << BUTTON_USER1)
 
 #endif /* __BOARDS_TRICORE_TC4XX_TRIBOARD_TC4X7_COM_INCLUDE_BOARD_H */
