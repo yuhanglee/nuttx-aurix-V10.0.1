@@ -36,8 +36,14 @@ endif()
 
 if(CONFIG_ARCH_LEDS)
   list(APPEND SRCS tc4d7_autoleds.c)
-elseif(CONFIG_USERLED)
+endif()
+
+if(CONFIG_USERLED)
   list(APPEND SRCS tc4d7_userleds.c)
+endif()
+
+if(CONFIG_ARCH_BUTTONS)
+  list(APPEND SRCS tc4d7_buttons.c)
 endif()
 
 target_sources(board PRIVATE ${SRCS})

@@ -33,6 +33,7 @@
 #include <sched.h>
 #include <unistd.h>
 #include <nuttx/board.h>
+#include <nuttx/input/buttons.h>
 #include <nuttx/irq.h>
 #include "tricore_gpio.h"
 #include "tc4xx_gpio.h"
@@ -132,13 +133,15 @@ int board_app_initialize(uintptr_t arg)
 #if 0
   bool ledon = true;
   uint8_t i = 10;
-  gpio_pinset_t led1 = AURIX_GPIO(GPIO_PORT3, GPIO_PIN9, GPIO_OUTPUT, GPIO_ALT0);
+  gpio_pinset_t led1 = AURIX_GPIO(GPIO_PORT3, GPIO_PIN9, GPIO_OUTPUT,
+                                  GPIO_ALT0);
 
   aurix_config_gpio(led1);
-  while (i--) {
-    aurix_gpio_write(led1, (ledon = !ledon));
-    usleep(500 * 1000);
-  }
+  while (i--)
+    {
+      aurix_gpio_write(led1, (ledon = !ledon));
+      usleep(500 * 1000);
+    }
 #endif
 
 #ifdef CONFIG_TC4X_WDT
@@ -175,6 +178,7 @@ int board_app_initialize(uintptr_t arg)
     {
       _err("SPI init failed\n");
     }
+
 #ifdef CONFIG_TC4XX_ASCLIN_SPI_CHARDEV
   ret = spi_register(spi, 0);
   if (ret < 0)
@@ -185,25 +189,25 @@ int board_app_initialize(uintptr_t arg)
 #endif
 
 #ifdef CONFIG_TRICORE_FLASH_MTD
-  {
-    struct mtd_dev_s *mtd = tricore_flash_initialize();
-    if (mtd == NULL)
-      {
-        _err("DFLASH MTD init failed\n");
-      }
-    else
-      {
-        ret = register_mtddriver("/dev/dflash0", mtd, 0666, NULL);
-        if (ret < 0)
-          {
-            _err("DFLASH MTD register failed: %d\n", ret);
-          }
-      }
-  }
+  struct mtd_dev_s *mtd = tricore_flash_initialize();
+  if (mtd == NULL)
+    {
+      _err("DFLASH MTD init failed\n");
+    }
+  else
+    {
+      ret = register_mtddriver("/dev/dflash0", mtd, 0666, NULL);
+      if (ret < 0)
+        {
+          _err("DFLASH MTD register failed: %d\n", ret);
+        }
+    }
 #endif
 
 #ifdef CONFIG_BOARD_GPIO_TEST
-  for (size_t i = 0; i < sizeof(g_test_gpio_pins) / sizeof(g_test_gpio_pins[0]); i++)
+  for (size_t i = 0;
+       i < sizeof(g_test_gpio_pins) / sizeof(g_test_gpio_pins[0]);
+       i++)
     {
       int gret = aurix_gpio_lower_register(g_test_gpio_pins[i], (int)i);
       if (gret < 0)
@@ -214,13 +218,20 @@ int board_app_initialize(uintptr_t arg)
 #endif
 
 #ifdef CONFIG_BOARD_USER_LED_GPIO
-  {
-    int gret = aurix_gpio_lower_register(g_user_led_pin, 0);
-    if (gret < 0)
-      {
-        _err("USER_LED /dev/gpio0 register failed: %d\n", gret);
-      }
-  }
+  ret = aurix_gpio_lower_register(g_user_led_pin, 0);
+  if (ret < 0)
+    {
+      _err("USER_LED /dev/gpio0 register failed: %d\n", ret);
+    }
+#endif
+
+#if defined(CONFIG_ARCH_BUTTONS) && defined(CONFIG_INPUT_BUTTONS_LOWER)
+  board_button_initialize();
+  ret = btn_lower_initialize("/dev/buttons");
+  if (ret < 0)
+    {
+      _err("BUTTON register failed: %d\n", ret);
+    }
 #endif
 
   return ret;
