@@ -33,6 +33,10 @@ ifeq ($(CONFIG_USERLED),y)
 CSRCS += tc4x7_userleds.c
 endif
 
+ifeq ($(CONFIG_ARCH_BUTTONS),y)
+CSRCS += tc4x7_buttons.c
+endif
+
 ifeq ($(CONFIG_TC4XX_I2C),y)
 CSRCS += tc4xx_i2c_bringup.c
 endif
