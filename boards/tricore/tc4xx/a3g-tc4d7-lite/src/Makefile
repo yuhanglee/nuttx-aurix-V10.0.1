@@ -30,6 +30,10 @@ CSRCS = tc4d7_appinit.c
 # AMP secondary CPU init thread (used when INIT_ENTRYPOINT=amp_secondary_main)
 CSRCS += tc4d7_amp_secondary.c
 
+ifeq ($(CONFIG_ARCH_BUTTONS),y)
+CSRCS += tc4d7_buttons.c
+endif
+
 ifeq ($(CONFIG_TC4XX_I2C),y)
 CSRCS += tc4xx_i2c_bringup.c
 endif

@@ -9,6 +9,21 @@ config ARCH_HAVE_LEDS
 	bool
 	default y
 
+config BOARD_TC4D7_BUTTONS
+	bool "Enable button support"
+	default y
+	---help---
+		Enable support for the user push button on the
+		AURIX TC4D7 Lite board. The button is wired to P03.11
+		and is active-low.
+
+config ARCH_BUTTONS
+	bool
+	default y
+
+config ARCH_IRQBUTTONS
+	bool
+	default y
 
 config BOARD_PHY_AUTONEG
 	bool "Ethernet PHY autonegotiation"
