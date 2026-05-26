@@ -20,4 +20,13 @@
 #
 # ##############################################################################
 
-set_property( GLOBAL PROPERTY LD_SCRIPT "${NUTTX_BOARD_DIR}/scripts/tricore-llvm.ld")
+set(SRCS tc4x7_appinit.c)
+
+if(CONFIG_ARCH_BUTTONS)
+  list(APPEND SRCS tc4x7_buttons.c)
+endif()
+
+target_sources(board PRIVATE ${SRCS})
+
+set_property(GLOBAL PROPERTY LD_SCRIPT
+                             "${NUTTX_BOARD_DIR}/scripts/tricore-llvm.ld")

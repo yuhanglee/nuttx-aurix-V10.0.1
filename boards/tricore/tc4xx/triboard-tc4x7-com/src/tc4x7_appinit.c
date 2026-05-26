@@ -26,14 +26,15 @@
 
 #include <sys/types.h>
 #include <debug.h>
-#include <sys/sysinfo.h>
 
 #include <nuttx/config.h>
-#include <nuttx/kthread.h>
-#include <sched.h>
-#include <unistd.h>
 #include <nuttx/board.h>
 #include <nuttx/irq.h>
+
+#ifdef CONFIG_INPUT_BUTTONS_LOWER
+#  include <nuttx/input/buttons.h>
+#endif
+
 #include "tricore_gpio.h"
 
 #ifdef CONFIG_TC4X_WDT
@@ -76,7 +77,7 @@ int board_app_initialize(uintptr_t arg)
 {
   bool ledon = true;
   uint8_t i = 10;
-  int ret;
+  int ret = 0;
   gpio_pinset_t led1 = AURIX_GPIO(GPIO_PORT13, GPIO_PIN0,
                                   GPIO_OUTPUT, GPIO_ALT0);
 
@@ -129,5 +130,14 @@ int board_app_initialize(uintptr_t arg)
     }
 #endif
 
-  return OK;
+#if defined(CONFIG_ARCH_BUTTONS) && defined(CONFIG_INPUT_BUTTONS_LOWER)
+  board_button_initialize();
+  ret = btn_lower_initialize("/dev/buttons");
+  if (ret < 0)
+    {
+      _err("BUTTON register failed: %d\n", ret);
+    }
+#endif
+
+  return ret;
 }
