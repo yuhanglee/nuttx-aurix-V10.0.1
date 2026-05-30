@@ -14,7 +14,7 @@ MEMORY
 {
 #if CPU == 0
   dsram  (rw): ORIGIN = 0x70000000, LENGTH = 240K
-  psram  (rw): ORIGIN = 0x70100000, LENGTH = 64K
+  psram  (rwx): ORIGIN = 0x70100000, LENGTH = 64K
   lmu    (rw): ORIGIN = 0x90400000, LENGTH = 512K
   lmu_nc (rw): ORIGIN = 0xB0400000, LENGTH = 512K
   dlmu   (rw): ORIGIN = 0x90000000, LENGTH = 512K
@@ -24,7 +24,7 @@ MEMORY
 
 #if CPU == 1
   dsram  (rw): ORIGIN = 0x60000000, LENGTH = 240K
-  psram  (rw): ORIGIN = 0x60100000, LENGTH = 64K
+  psram  (rwx): ORIGIN = 0x60100000, LENGTH = 64K
   lmu    (rw): ORIGIN = 0x90480000, LENGTH = 512K
   dlmu   (rw): ORIGIN = 0x90080000, LENGTH = 512K
   pflash (rx): ORIGIN = 0x80400000, LENGTH = 4M
@@ -33,7 +33,7 @@ MEMORY
 
 #if CPU == 2
   dsram  (rw): ORIGIN = 0x50000000, LENGTH = 240K
-  psram  (rw): ORIGIN = 0x50100000, LENGTH = 64K
+  psram  (rwx): ORIGIN = 0x50100000, LENGTH = 64K
   lmu    (rw): ORIGIN = 0x90500000, LENGTH = 512K
   dlmu   (rw): ORIGIN = 0x90100000, LENGTH = 512K
   pflash (rx): ORIGIN = 0x80800000, LENGTH = 2M
@@ -42,7 +42,7 @@ MEMORY
 
 #if CPU == 3
   dsram  (rw): ORIGIN = 0x40000000, LENGTH = 240K
-  psram  (rw): ORIGIN = 0x40100000, LENGTH = 64K
+  psram  (rwx): ORIGIN = 0x40100000, LENGTH = 64K
   lmu    (rw): ORIGIN = 0x90580000, LENGTH = 512K
   dlmu   (rw): ORIGIN = 0x90180000, LENGTH = 512K
   pflash (rx): ORIGIN = 0x80A00000, LENGTH = 4M
@@ -51,7 +51,7 @@ MEMORY
 
 #if CPU == 4
   dsram  (rw): ORIGIN = 0x30000000, LENGTH = 240K
-  psram  (rw): ORIGIN = 0x30100000, LENGTH = 64K
+  psram  (rwx): ORIGIN = 0x30100000, LENGTH = 64K
   lmu    (rw): ORIGIN = 0x90600000, LENGTH = 512K
   dlmu   (rw): ORIGIN = 0x90200000, LENGTH = 512K
   pflash (rx): ORIGIN = 0x80E00000, LENGTH = 4M
@@ -60,7 +60,7 @@ MEMORY
 
 #if CPU == 5
   dsram  (rw): ORIGIN = 0x20000000, LENGTH = 240K
-  psram  (rw): ORIGIN = 0x20100000, LENGTH = 64K
+  psram  (rwx): ORIGIN = 0x20100000, LENGTH = 64K
   lmu    (rw): ORIGIN = 0x90680000, LENGTH = 512K
   dlmu   (rw): ORIGIN = 0x90280000, LENGTH = 512K
   pflash (rx): ORIGIN = 0x81200000, LENGTH = 2M
@@ -135,7 +135,7 @@ SECTIONS
     LONG(pflash5_base);
   } > CODE_MEM
 
-  .psram_base :
+  .psram_base ALIGN(8) (NOLOAD):
   {
     . += CONFIG_TRICORE_INITIAL_STACK_OFFSET;
      __PSRAM_USTACK = . ;

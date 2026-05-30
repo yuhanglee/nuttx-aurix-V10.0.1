@@ -36,7 +36,7 @@ MEMORY
 {
 #if CPU == 0
   dsram  (rw): ORIGIN = 0x70000000, LENGTH = 240K
-  psram  (rw): ORIGIN = 0x70100000, LENGTH = 64K
+  psram  (rwx): ORIGIN = 0x70100000, LENGTH = 64K
   dlmu   (rw): ORIGIN = 0x90000000, LENGTH = 64K
   pflash (rx): ORIGIN = 0x80000000, LENGTH = 1M
 #endif
@@ -44,7 +44,7 @@ MEMORY
 
 #if CPU == 1
   dsram  (rw): ORIGIN = 0x60000000, LENGTH = 240K
-  psram  (rw): ORIGIN = 0x60100000, LENGTH = 64K
+  psram  (rwx): ORIGIN = 0x60100000, LENGTH = 64K
   dlmu   (rw): ORIGIN = 0x90010000, LENGTH = 64K
   pflash (rx): ORIGIN = 0x80100000, LENGTH = 1M
 #endif
@@ -52,7 +52,7 @@ MEMORY
 
 #if CPU == 2
   dsram  (rw): ORIGIN = 0x50000000, LENGTH = 96K
-  psram  (rw): ORIGIN = 0x50100000, LENGTH = 64K
+  psram  (rwx): ORIGIN = 0x50100000, LENGTH = 64K
   dlmu   (rw): ORIGIN = 0x90020000, LENGTH = 64K
   pflash (rx): ORIGIN = 0x80200000, LENGTH = 1M
 #endif
@@ -116,7 +116,7 @@ SECTIONS
     LONG(pflash2_base);
   } > CODE_MEM
 
-  .psram_base :
+  .psram_base ALIGN(8) (NOLOAD):
   {
     . += CONFIG_TRICORE_INITIAL_STACK_OFFSET;
      __PSRAM_USTACK = . ;

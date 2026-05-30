@@ -36,7 +36,7 @@ MEMORY
 {
 #if CPU == 0
   dsram  (rw): ORIGIN = 0x70000000, LENGTH = 240K
-  psram  (rw): ORIGIN = 0x70100000, LENGTH = 64K
+  psram  (rwx): ORIGIN = 0x70100000, LENGTH = 64K
   dlmu   (rw): ORIGIN = 0x90000000, LENGTH = 64K
   pflash (rx): ORIGIN = 0x80000000, LENGTH = 3M
 #endif
@@ -49,7 +49,7 @@ MEMORY
 
 #if CPU == 1
   dsram  (rw): ORIGIN = 0x60000000, LENGTH = 240K
-  psram  (rw): ORIGIN = 0x60100000, LENGTH = 64K
+  psram  (rwx): ORIGIN = 0x60100000, LENGTH = 64K
   dlmu   (rw): ORIGIN = 0x90010000, LENGTH = 64K
   pflash (rx): ORIGIN = 0x80300000, LENGTH = 3M
 #endif
@@ -57,7 +57,7 @@ MEMORY
 
 #if CPU == 2
   dsram  (rw): ORIGIN = 0x50000000, LENGTH = 96K
-  psram  (rw): ORIGIN = 0x50100000, LENGTH = 64K
+  psram  (rwx): ORIGIN = 0x50100000, LENGTH = 64K
   dlmu   (rw): ORIGIN = 0x90020000, LENGTH = 64K
   pflash (rx): ORIGIN = 0x80600000, LENGTH = 3M
 #endif
@@ -65,7 +65,7 @@ MEMORY
 
 #if CPU == 3
   dsram  (rw): ORIGIN = 0x40000000, LENGTH = 96K
-  psram  (rw): ORIGIN = 0x40100000, LENGTH = 64K
+  psram  (rwx): ORIGIN = 0x40100000, LENGTH = 64K
   dlmu   (rw): ORIGIN = 0x90030000, LENGTH = 64K
   pflash (rx): ORIGIN = 0x80900000, LENGTH = 3M
 #endif
@@ -73,7 +73,7 @@ MEMORY
 
 #if CPU == 4
   dsram  (rw): ORIGIN = 0x30000000, LENGTH = 96K
-  psram  (rw): ORIGIN = 0x30100000, LENGTH = 64K
+  psram  (rwx): ORIGIN = 0x30100000, LENGTH = 64K
   dlmu   (rw): ORIGIN = 0x90100000, LENGTH = 64K
   pflash (rx): ORIGIN = 0x80C00000, LENGTH = 3M
 #endif
@@ -81,7 +81,7 @@ MEMORY
 
 #if CPU == 5
   dsram  (rw): ORIGIN = 0x10000000, LENGTH = 96K
-  psram  (rw): ORIGIN = 0x10100000, LENGTH = 64K
+  psram  (rwx): ORIGIN = 0x10100000, LENGTH = 64K
   dlmu   (rw): ORIGIN = 0x90110000, LENGTH = 64K
   pflash (rx): ORIGIN = 0x80F00000, LENGTH = 1M
 #endif
@@ -172,7 +172,7 @@ SECTIONS
     LONG(pflash5_base);
   } > CODE_MEM
 
-  .psram_base :
+  .psram_base ALIGN(8) (NOLOAD):
   {
     . += CONFIG_TRICORE_INITIAL_STACK_OFFSET;
      __PSRAM_USTACK = . ;
