@@ -33,7 +33,9 @@ target_sources(board PRIVATE tc4d7_appinit.c tc4d7_amp_secondary.c)
 
 if(CONFIG_ARCH_LEDS)
   target_sources(board PRIVATE tc4d7_autoleds.c)
-elseif(CONFIG_USERLED)
+endif()
+
+if(CONFIG_USERLED)
   target_sources(board PRIVATE tc4d7_userleds.c)
 endif()
 

@@ -29,7 +29,9 @@ CSRCS += tc4d7_amp_secondary.c
 
 ifeq ($(CONFIG_ARCH_LEDS),y)
 CSRCS += tc4d7_autoleds.c
-else ifeq ($(CONFIG_USERLED),y)
+endif
+
+ifeq ($(CONFIG_USERLED),y)
 CSRCS += tc4d7_userleds.c
 endif
 
