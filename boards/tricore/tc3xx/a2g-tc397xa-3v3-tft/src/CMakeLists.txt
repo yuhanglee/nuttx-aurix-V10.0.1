@@ -26,7 +26,9 @@ set(SRCS tc397_appinit.c tc397_amp_secondary.c)
 
 if(CONFIG_ARCH_LEDS)
   list(APPEND SRCS tc397_autoleds.c)
-else()
+endif()
+
+if(CONFIG_USERLED)
   list(APPEND SRCS tc397_userleds.c)
 endif()
 

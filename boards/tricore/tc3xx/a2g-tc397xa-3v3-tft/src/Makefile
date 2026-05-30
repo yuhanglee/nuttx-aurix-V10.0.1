@@ -29,7 +29,9 @@ CSRCS = tc397_appinit.c
 
 ifeq ($(CONFIG_ARCH_LEDS),y)
 CSRCS += tc397_autoleds.c
-else
+endif
+
+ifeq ($(CONFIG_USERLED),y)
 CSRCS += tc397_userleds.c
 endif
 
