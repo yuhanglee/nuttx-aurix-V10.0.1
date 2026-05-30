@@ -35,8 +35,6 @@
 
 #include "tc4x7.h"
 
-#ifndef CONFIG_ARCH_LEDS
-
 /****************************************************************************
  * Private Data
  ****************************************************************************/
@@ -134,5 +132,3 @@ void board_userled_all(uint32_t ledset)
   aurix_gpio_write(g_led_map[BOARD_LED7], !(ledset & BOARD_LED7_BIT));
   aurix_gpio_write(g_led_map[BOARD_LED8], !(ledset & BOARD_LED8_BIT));
 }
-
-#endif /* !CONFIG_ARCH_LEDS */

@@ -27,7 +27,9 @@ endif
 
 ifeq ($(CONFIG_ARCH_LEDS),y)
 CSRCS += tc4x7_autoleds.c
-else ifeq ($(CONFIG_USERLED),y)
+endif
+
+ifeq ($(CONFIG_USERLED),y)
 CSRCS += tc4x7_userleds.c
 endif
 
