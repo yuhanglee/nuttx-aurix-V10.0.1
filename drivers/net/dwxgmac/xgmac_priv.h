@@ -87,36 +87,6 @@ struct eth_xgmac_rdes_wb
   } rdes3;
 };
 
-
-struct eth_xgmac_tdes_rd
-{
-  struct { uint32_t buf1ap; }  tdes0;
-  struct { uint32_t buf2ap; }  tdes1;
-  struct
-  {
-    uint32_t b1l  : 14;
-    uint32_t vtir : 2;
-    uint32_t b2l  : 14;
-    uint32_t ttse : 1;
-    uint32_t ioc  : 1;
-  } tdes2;
-  struct
-  {
-    uint32_t fl       : 15;
-    uint32_t tpl      : 1;
-    uint32_t cic      : 2;
-    uint32_t tse      : 1;
-    uint32_t slotnum  : 4;
-    uint32_t saic     : 3;
-    uint32_t cpc      : 2;
-    uint32_t ld       : 1;
-    uint32_t fd       : 1;
-    uint32_t ctxt     : 1;
-    uint32_t own      : 1;
-  } tdes3;
-};
-
-
 struct eth_xgmac_tdes_wb
 {
   uint32_t tdes0;
@@ -178,46 +148,6 @@ static inline void eth_dwmac_rdes_rd_set(void *d, uintptr_t buf)
   rdes->rdes1.buf1ap_high = 0;
   rdes->rdes2.buf2ap = 0;
   *(volatile uint32_t *)&rdes->rdes3 = BIT(30) | BIT(31);
-}
-
-static inline void eth_dwmac_tdes_rd_set_buffer(struct eth_xgmac_tdes_rd *t,
-                                                 uint8_t *buf, uint16_t len)
-{
-  t->tdes0.buf1ap = (uint32_t)(uintptr_t)buf;
-  t->tdes1.buf2ap = 0;
-  t->tdes2.b1l = len;
-  t->tdes2.b2l = 0;
-}
-
-static inline void eth_dwmac_tdes_rd_set(struct eth_xgmac_tdes_rd *t,
-                                         bool fd, bool ld, uint16_t len,
-                                         bool txcoe, bool ts)
-{
-  t->tdes2.ioc = ld ? 1 : 0;
-  t->tdes2.ttse = ts ? 1 : 0;
-
-  uint32_t d3 = 0;
-  d3 |= (len & 0x7FFF) |  BIT(31);
-  txcoe ? d3 |= (3u << 16) : d3;
-  ld ? d3 |= BIT(28) : d3;
-  fd ? d3 |= BIT(29) : d3;
-
-  *(volatile uint32_t *)&t->tdes3 = d3;
-}
-
-static inline bool eth_dwmac_tdes_own(void *d)
-{
-  return ((struct eth_xgmac_tdes_wb *)d)->tdes3.own;
-}
-
-static inline bool eth_dwmac_tdes_last(void *d)
-{
-  return ((struct eth_xgmac_tdes_wb *)d)->tdes3.ld;
-}
-
-static inline bool eth_dwmac_tdes_error(void *d)
-{
-  return ((struct eth_xgmac_tdes_wb *)d)->tdes3.derr;
 }
 
 static inline void eth_dwmac_dma_rx_set_tail(const struct xgmac_driver_s *priv,

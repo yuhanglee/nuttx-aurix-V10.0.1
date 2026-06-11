@@ -248,8 +248,21 @@ static void set_link_state(FAR struct xgmac_driver_s *priv, bool up)
 
   if (up)
     {
+#if defined(CONFIG_DWXGMAC_QOS)
+      /* EQOS MAC_CONFIGURATION speed field is {PS, FES}:
+       * 1000Mbps: PS=0 FES=0; 100Mbps: PS=1 FES=1; 10Mbps: PS=1 FES=0
+       */
+#  if CONFIG_DWXGMAC_LINK_SPEED == 1000
+      eth_dwmac_mac_set_link(priv, 0, true);
+#  elif CONFIG_DWXGMAC_LINK_SPEED == 100
+      eth_dwmac_mac_set_link(priv, 3, true);
+#  else
+      eth_dwmac_mac_set_link(priv, 2, true);
+#  endif
+#else
       /* 100Mbps full duplex: SS=4 for XGMAC 100M */
       eth_dwmac_mac_set_link(priv, 4, true);
+#endif
 
       for (ch = 0; ch < cfg->dma_tx_channel; ch++)
         eth_dwmac_dma_tx_start(priv, ch);

@@ -126,34 +126,6 @@ struct eth_qos_rdes_ctx
   } rdes3;
 };
 
-struct eth_qos_tdes_rd
-{
-  struct { uint32_t buf1ap; } tdes0;
-  struct { uint32_t buf2ap; } tdes1;
-  struct
-  {
-    uint32_t b1l  : 14;
-    uint32_t vtir : 2;
-    uint32_t b2l  : 14;
-    uint32_t ttse : 1;
-    uint32_t ioc  : 1;
-  } tdes2;
-  struct
-  {
-    uint32_t fl      : 15;
-    uint32_t tpl     : 1;
-    uint32_t cic     : 2;
-    uint32_t tse     : 1;
-    uint32_t slotnum : 4;
-    uint32_t saic    : 3;
-    uint32_t cpc     : 2;
-    uint32_t ld      : 1;
-    uint32_t fd      : 1;
-    uint32_t ctxt    : 1;
-    uint32_t own     : 1;
-  } tdes3;
-};
-
 struct eth_qos_tdes_wb
 {
   struct { uint32_t ttsl; } tdes0;
@@ -235,50 +207,6 @@ static inline void eth_dwmac_rdes_rd_set(void *d, uintptr_t buf)
   rdes->rdes2.buf2ap = 0;
 
   *(volatile uint32_t *)&rdes->rdes3 = BIT(24) | BIT(30) | BIT(31);
-}
-
-static inline void eth_dwmac_tdes_rd_set_buffer(struct eth_qos_tdes_rd *t,
-                                                uint8_t *buf, uint16_t len)
-{
-  t->tdes0.buf1ap = (uint32_t)(uintptr_t)buf;
-#if UINTPTR_MAX == UINT64_MAX
-  t->tdes1.buf2ap = (uint32_t)((uintptr_t)buf >> 32u);
-#else
-  t->tdes1.buf2ap = 0;
-#endif
-  t->tdes2.b1l = len;
-  t->tdes2.b2l = 0;
-}
-
-static inline void eth_dwmac_tdes_rd_set(struct eth_qos_tdes_rd *t,
-                                         bool fd, bool ld, uint16_t len,
-                                         bool txcoe, bool ts)
-{
-  t->tdes2.ioc  = ld ? 1 : 0;
-  t->tdes2.ttse = ts ? 1 : 0;
-
-  uint32_t d3 = 0;
-  d3 |= (len & 0x7fffu) | BIT(31);
-  if (txcoe) d3 |= (3u << 16);
-  if (ld)    d3 |= BIT(28);
-  if (fd)    d3 |= BIT(29);
-
-  *(volatile uint32_t *)&t->tdes3 = d3;
-}
-
-static inline bool eth_dwmac_tdes_own(void *d)
-{
-  return ((struct eth_qos_tdes_rd *)d)->tdes3.own;
-}
-
-static inline bool eth_dwmac_tdes_last(void *d)
-{
-  return ((struct eth_qos_tdes_wb *)d)->tdes3.ld;
-}
-
-static inline bool eth_dwmac_tdes_error(void *d)
-{
-  return ((struct eth_qos_tdes_wb *)d)->tdes3.derr;
 }
 
 static inline bool eth_dwmac_tdes_has_ts(void *d)
@@ -496,6 +424,28 @@ static inline void eth_dwmac_dma_tx_queue_flush(const struct xgmac_driver_s *pri
 
   xgmac_modreg(MTL_TXQi_OPERATION_MODE_TQS,
                  MTL_TXQi_OPERATION_MODE_TQS, reg);
+}
+
+static inline int eth_dwmac_dma_reset(const struct xgmac_driver_s *priv)
+{
+  uint32_t v;
+  int i;
+
+  v = xgmac_read(priv->base + DMA_MODE);
+  xgmac_write(v | DMA_MODE_SWR, priv->base + DMA_MODE);
+
+  /* SWR self-clears only once the PHY supplies the RX clock,
+   * which can take ~100ms on (R)GMII/RMII links.
+   */
+
+  for (i = 0; i < 5000; i++)
+    {
+      if ((xgmac_read(priv->base + DMA_MODE) & DMA_MODE_SWR) == 0)
+        return 0;
+      up_udelay(100);
+    }
+
+  return -EIO;
 }
 
 static inline void eth_dwmac_dma_set_sysbus(const struct xgmac_driver_s *priv)

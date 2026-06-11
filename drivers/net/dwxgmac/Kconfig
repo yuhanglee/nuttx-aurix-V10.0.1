@@ -42,6 +42,13 @@ config DWXGMAC_QOS
 	---help---
 		Enable QOS version of designware xgmac Ethernet driver.
 
+config DWXGMAC_LINK_SPEED
+	int "Fixed MAC link speed in Mbps (10/100/1000)"
+	default 1000
+	---help---
+		Speed programmed into the MAC at link-up (full duplex).
+		Must match what the PHY negotiates: 10, 100 or 1000.
+
 config NET_DWXGMAC_MAC_LOOPBACK
 	bool "Enable MAC-internal loopback (debug only)"
 	default n
@@ -50,8 +57,13 @@ config NET_DWXGMAC_MAC_LOOPBACK
 		frame back into its own receive path, bypassing the MII/RMII
 		PHY pads.  Use this only to isolate MAC vs. PHY/board issues.
 
+config NET_DWXGMAC_DMA_SECTION_USE
+	bool "Place DMA descriptors and RX buffers in a custom linker section"
+	default n
+
 config NET_DWXGMAC_DMA_SECTION
 	string "Linker section for DMA descriptors and RX buffers"
+	depends on NET_DWXGMAC_DMA_SECTION_USE
 	---help---
 		If non-empty, place the DMA descriptors and RX buffer pool
 		into the named linker section.  Required on systems where the
