@@ -73,6 +73,15 @@ static uint8_t
               [ALIGN_UP(CONFIG_NET_ETH_PKTSIZE, 8)]
   aligned_data(64) DWXGMAC_DMA_SECTION;
 
+static uint8_t
+  g_txbuf_pool[CONFIG_DWXGMAC_NUM_TX_DMA_DESCRIPTORS]
+              [ALIGN_UP(CONFIG_NET_ETH_PKTSIZE, 8)]
+  aligned_data(64) DWXGMAC_DMA_SECTION;
+
+static uint8_t
+  g_pollbuf[ALIGN_UP(CONFIG_NET_ETH_PKTSIZE + CONFIG_NET_GUARDSIZE, 8)]
+  aligned_data(8);
+
 static struct eth_dwmac_dma_ch_config g_dma_rx_cfg[1] =
 {
   { .descs = g_rx0_descs,
@@ -143,6 +152,7 @@ static struct eth_xgmac_data g_xgmac_data[CONFIG_DWXGMAC_NETHERNET] =
 static struct xgmac_driver_s g_xgmac[CONFIG_DWXGMAC_NETHERNET];
 
 static void xgmac_dma_rx_process(FAR struct xgmac_driver_s *priv, uint8_t ch);
+void xgmac_txavail_work(FAR void *arg);
 
 
 static void dma_tx_data_init(FAR struct xgmac_driver_s *priv, uint8_t ch)
@@ -290,8 +300,9 @@ static int xgmac_send(FAR struct xgmac_driver_s *priv,
   struct eth_dwmac_dma_tx_ch_data *td = &priv->data->dwmac.dma_tx[0];
   struct eth_dwmac_dma_ch_config *dcfg = &cfg->dma_tx[0];
   struct eth_xgmac_tdes_rd *tdes;
+  FAR uint8_t *txbuf;
 
-  if (!buf || len == 0)
+  if (!buf || len == 0 || len > sizeof(g_txbuf_pool[0]))
     return -EINVAL;
 
   nxmutex_lock(&td->lock);
@@ -302,9 +313,12 @@ static int xgmac_send(FAR struct xgmac_driver_s *priv,
       return -ETIMEDOUT;
     }
 
+  txbuf = g_txbuf_pool[td->tail];
+  memcpy(txbuf, buf, len);
+
   tdes = (struct eth_xgmac_tdes_rd *)&dcfg->descs[td->tail];
 
-  eth_dwmac_tdes_rd_set_buffer(tdes, buf, len);
+  eth_dwmac_tdes_rd_set_buffer(tdes, txbuf, len);
   UP_DSB();
   eth_dwmac_tdes_rd_set(tdes, true, true, len, priv->txcoe, false);
   UP_DSB();
@@ -330,131 +344,133 @@ static int xgmac_txpoll(FAR struct net_driver_s *dev)
    return  0;
 }
 
+static void xgmac_rx_input(FAR struct xgmac_driver_s *priv)
+{
+  struct net_driver_s *dev = &priv->dev;
+  struct eth_hdr_s *eth = (struct eth_hdr_s *)dev->d_buf;
+
+#ifdef CONFIG_NET_IPv4
+  if (eth->type == HTONS(ETHTYPE_IP))
+    {
+      NETDEV_RXIPV4(dev);
+      ipv4_input(dev);
+      if (dev->d_len > 0)
+        {
+          xgmac_send(priv, dev->d_buf, dev->d_len);
+          dev->d_len = 0;
+        }
+    }
+  else
+#endif
+#ifdef CONFIG_NET_IPv6
+  if (eth->type == HTONS(ETHTYPE_IP6))
+    {
+      NETDEV_RXIPV6(dev);
+      ipv6_input(dev);
+      if (dev->d_len > 0)
+        {
+          xgmac_send(priv, dev->d_buf, dev->d_len);
+          dev->d_len = 0;
+        }
+    }
+  else
+#endif
+#ifdef CONFIG_NET_ARP
+  if (eth->type == HTONS(ETHTYPE_ARP))
+    {
+      NETDEV_RXARP(dev);
+      arp_input(dev);
+      if (dev->d_len > 0)
+        {
+          xgmac_send(priv, dev->d_buf, dev->d_len);
+          dev->d_len = 0;
+        }
+    }
+  else
+#endif
+    {
+      NETDEV_RXDROPPED(dev);
+    }
+
+  dev->d_len = 0;
+}
+
 static void xgmac_rx_work(FAR void *arg)
 {
   FAR struct xgmac_driver_s *priv = arg;
   struct net_driver_s *dev = &priv->dev;
-  struct eth_hdr_s *eth;
+  uint8_t ch;
 
   net_lock();
 
-  if (dev->d_len > 0)
+  for (ch = 0; ch < priv->config->dwmac.dma_rx_channel; ch++)
     {
-      eth = (struct eth_hdr_s *)dev->d_buf;
+      const struct eth_dwmac_dma_ch_config *dcfg =
+        &priv->config->dwmac.dma_rx[ch];
+      struct eth_dwmac_dma_rx_ch_data *d = &priv->data->dwmac.dma_rx[ch];
+      bool processed = false;
 
-#ifdef CONFIG_NET_IPv4
-      if (eth->type == HTONS(ETHTYPE_IP))
+      for (; ; )
         {
-          NETDEV_RXIPV4(dev);
-          ipv4_input(dev);
-          if (dev->d_len > 0)
+          void *desc = &dcfg->descs[d->head];
+
+          if (eth_dwmac_rdes_own(desc))
+            break;
+
+          if (eth_dwmac_rdes_desc_error(desc))
             {
-              xgmac_send(priv, dev->d_buf, dev->d_len);
-              dev->d_len = 0;
+              nerr("RX desc error at %d\n", d->head);
+              NETDEV_RXERRORS(dev);
             }
-        }
-      else
-#endif
-#ifdef CONFIG_NET_IPv6
-      if (eth->type == HTONS(ETHTYPE_IP6))
-        {
-          NETDEV_RXIPV6(dev);
-          ipv6_input(dev);
-          if (dev->d_len > 0)
+          else if (eth_dwmac_rdes_context(desc))
             {
-              xgmac_send(priv, dev->d_buf, dev->d_len);
-              dev->d_len = 0;
+              /* ignore context descriptors */
             }
-        }
-      else
-#endif
-#ifdef CONFIG_NET_ARP
-      if (eth->type == HTONS(ETHTYPE_ARP))
-        {
-          NETDEV_RXARP(dev);
-          arp_input(dev);
-          if (dev->d_len > 0)
+          else if (eth_dwmac_rdes_pkt_error(desc))
             {
-              xgmac_send(priv, dev->d_buf, dev->d_len);
-              dev->d_len = 0;
+              NETDEV_RXERRORS(dev);
             }
+          else if (eth_dwmac_rdes_last(desc))
+            {
+              uint16_t pktlen = eth_dwmac_rdes_packet_length(desc);
+
+              if (pktlen > 0 && pktlen <= CONFIG_NET_ETH_PKTSIZE)
+                {
+                  dev->d_buf = d->data[d->head];
+                  dev->d_len = pktlen;
+                  NETDEV_RXPACKETS(dev);
+                  xgmac_rx_input(priv);
+                }
+            }
+
+          eth_dwmac_rdes_rd_set(desc, (uintptr_t)d->data[d->head]);
+          d->head = (d->head + 1) % dcfg->descs_count;
+          processed = true;
         }
-      else
-#endif
+
+      if (processed)
         {
-          NETDEV_RXDROPPED(dev);
+          d->tail = dcfg->descs_count;
+          eth_dwmac_dma_rx_set_tail(priv, ch);
         }
     }
 
+  dev->d_buf = g_pollbuf;
   dev->d_len = 0;
   net_unlock();
 }
 
 static void xgmac_dma_rx_process(FAR struct xgmac_driver_s *priv, uint8_t ch)
 {
-  const struct eth_dwmac_dma_ch_config *dcfg = &priv->config->dwmac.dma_rx[ch];
-  struct eth_dwmac_dma_rx_ch_data *d = &priv->data->dwmac.dma_rx[ch];
-  struct net_driver_s *dev = &priv->dev;
-  int idx;
-
   eth_dwmac_dma_rx_clear_irq(priv, ch);
-
-  for (idx = 0; idx < (int)dcfg->descs_count; idx++)
-    {
-      void *desc = &dcfg->descs[d->head];
-
-      if (eth_dwmac_rdes_own(desc))
-        break;
-
-      if (eth_dwmac_rdes_desc_error(desc))
-        {
-          nerr("RX desc error at %d\n", d->head);
-          NETDEV_RXERRORS(dev);
-          goto refill;
-        }
-
-      if (eth_dwmac_rdes_context(desc))
-        goto refill;
-
-      if (eth_dwmac_rdes_pkt_error(desc))
-        {
-          NETDEV_RXERRORS(dev);
-          goto refill;
-        }
-
-      if (eth_dwmac_rdes_last(desc))
-        {
-          uint16_t pktlen = eth_dwmac_rdes_packet_length(desc);
-
-          if (pktlen > 0 && pktlen <= CONFIG_NET_ETH_PKTSIZE)
-            {
-              FAR uint8_t *_p = d->data[d->head];
-              ninfo("xgmac_rx: head=%d len=%u dst=%02x%02x%02x%02x%02x%02x "
-                    "src=%02x%02x%02x%02x%02x%02x type=%02x%02x\n",
-                    d->head, pktlen,
-                    _p[0], _p[1], _p[2], _p[3], _p[4], _p[5],
-                    _p[6], _p[7], _p[8], _p[9], _p[10], _p[11],
-                    _p[12], _p[13]);
-              dev->d_buf = d->data[d->head];
-              dev->d_len = pktlen;
-              NETDEV_RXPACKETS(dev);
-              work_queue(ETHWORK, &priv->rxwork, xgmac_rx_work, priv, 0);
-            }
-        }
-
-refill:
-      eth_dwmac_rdes_rd_set(desc, (uintptr_t)d->data[d->head]);
-      d->head = (d->head + 1) % dcfg->descs_count;
-    }
-
-  d->tail = dcfg->descs_count;
-  eth_dwmac_dma_rx_set_tail(priv, ch);
+  work_queue(ETHWORK, &priv->rxwork, xgmac_rx_work, priv, 0);
 }
 
 static void xgmac_dma_tx_process(FAR struct xgmac_driver_s *priv, uint8_t ch)
 {
   const struct eth_dwmac_dma_ch_config *dcfg = &priv->config->dwmac.dma_tx[ch];
   struct eth_dwmac_dma_tx_ch_data *td = &priv->data->dwmac.dma_tx[ch];
+  bool freed = false;
 
   eth_dwmac_dma_tx_clear_irq(priv, ch);
 
@@ -473,7 +489,11 @@ static void xgmac_dma_tx_process(FAR struct xgmac_driver_s *priv, uint8_t ch)
 
       td->head = (td->head + 1) % dcfg->descs_count;
       nxsem_post(&td->desc_used);
+      freed = true;
     }
+
+  if (freed && priv->ifup && work_available(&priv->pollwork))
+    work_queue(ETHWORK, &priv->pollwork, xgmac_txavail_work, priv, 0);
 }
 
 int dwxgmac_mac_isr(int irq, FAR void *context, FAR void *arg)
@@ -618,6 +638,7 @@ int xgmac_initialize(int intf)
   priv->dev.d_ifdown  = dwxgmac_ifdown;
   priv->dev.d_txavail = dwxgmac_txavail;
   priv->dev.d_private = priv;
+  priv->dev.d_buf     = g_pollbuf;
 
   for (ch = 0; ch < priv->config->dwmac.dma_tx_channel; ch++)
     dma_tx_data_init(priv, ch);
