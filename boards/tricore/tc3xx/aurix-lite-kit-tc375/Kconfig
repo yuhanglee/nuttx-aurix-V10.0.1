@@ -9,6 +9,11 @@ config ARCH_HAVE_LEDS
 	bool
 	default y
 
+config BOARD_PHY_AUTONEG
+	bool "Ethernet PHY autonegotiation"
+	default y
+	depends on TC3XX_GETH
+
 config BOARD_CAN_TLE9251V_STB_PIN
 	bool "Drive TLE9251V CAN_STB low at boot"
 	default y

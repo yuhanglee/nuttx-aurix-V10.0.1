@@ -34,4 +34,8 @@ if(CONFIG_ARCH_BUTTONS)
   list(APPEND SRCS tc375_buttons.c)
 endif()
 
+if(CONFIG_TC3XX_GETH)
+  list(APPEND SRCS tc375_ethernet.c)
+endif()
+
 target_sources(board PRIVATE ${SRCS})

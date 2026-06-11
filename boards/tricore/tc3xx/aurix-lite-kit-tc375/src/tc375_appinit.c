@@ -47,6 +47,10 @@
 int mcmcan_board_initialize(void);
 #endif
 
+#ifdef CONFIG_TC3XX_GETH
+int tc375_ethernet_initialize(void);
+#endif
+
 /****************************************************************************
  * Public Functions
  ****************************************************************************/
@@ -80,6 +84,14 @@ int board_app_initialize(uintptr_t arg)
   if (ret < 0)
     {
       _err("CAN init failed: %d\n", ret);
+    }
+#endif
+
+#ifdef CONFIG_TC3XX_GETH
+  ret = tc375_ethernet_initialize();
+  if (ret < 0)
+    {
+      _err("eth init failed: %d\n", ret);
     }
 #endif
 

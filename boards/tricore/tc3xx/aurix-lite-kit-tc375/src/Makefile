@@ -23,6 +23,10 @@ include $(TOPDIR)/Make.defs
 
 CSRCS = tc375_appinit.c
 
+ifeq ($(CONFIG_TC3XX_GETH),y)
+CSRCS += tc375_ethernet.c
+endif
+
 ifeq ($(CONFIG_ARCH_LEDS),y)
 CSRCS += tc375_autoleds.c
 else
