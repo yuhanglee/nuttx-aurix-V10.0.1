@@ -37,9 +37,16 @@
 #define TC3XX_ETH_RST_STAT          (TC3XX_ETH_BASE + 0x01C)
 #define TC3XX_ETH_ACCEN_CH_WRA(i)   (TC3XX_ETH_BASE + 0x020 + 0x8 * (i))
 #define TC3XX_ETH_ACCEN_CH_WRB(i)   (TC3XX_ETH_BASE + 0x024 + 0x8 * (i))
+#define TC3XX_ETH_SKEWCTL           (TC3XX_ETH_BASE + 0x040)
 
 
 #define TC3XX_ETH_PHY_MODE_MASK     GENMASK(24, 22)
-#define TC3XX_ETH_PHY_MODE(mode)    (mode << 22)
+#define TC3XX_ETH_PHY_MODE(mode)    ((uint32_t)(mode) << 22)
+
+/* GPCTL.EPR PHY interface mode encodings */
+
+#define TC3XX_ETH_PHY_MODE_MII      0
+#define TC3XX_ETH_PHY_MODE_RGMII    1
+#define TC3XX_ETH_PHY_MODE_RMII     4
 
 #endif /* ETHERNET_TC3X_GETH_H */
