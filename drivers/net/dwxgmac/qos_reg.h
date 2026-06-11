@@ -610,9 +610,17 @@ enum
 
 #define MAC_ADDRESSi_LOW(i) (0x0304 + 8 * (i))
 
+#define MMC_CONTROL               0x0700
+#define MMC_CONTROL_CNTRST        BIT(0)
+#define MMC_CONTROL_CNTSTOPRO     BIT(1)
+#define MMC_CONTROL_RSTONRD       BIT(2)
+#define MMC_CONTROL_MCF           BIT(3)
+#define MMC_RX_INTERRUPT          0x0704
+#define MMC_TX_INTERRUPT          0x0708
 #define MMC_RX_INTERRUPT_MASK     0x070c
 #define MMC_TX_INTERRUPT_MASK     0x0710
 #define MMC_IPC_RX_INTERRUPT_MASK 0x0800
+#define MMC_IPC_RX_INTERRUPT      0x0808
 #define MMC_FPE_TX_INTERRUPT_MASK 0x08a4
 #define MMC_FPE_RX_INTERRUPT_MASK 0x08c0
 

@@ -481,14 +481,14 @@ int dwxgmac_mac_isr(int irq, FAR void *context, FAR void *arg)
   FAR struct xgmac_driver_s *priv = &g_xgmac[(int)arg];
   uint32_t dma_status;
 
-  dma_status = xgmac_read(priv->base + DMA_INTERRUPT_STATUS);
+  dma_status = xgmac_read(priv->base + DMA_INTERRUPT_STATUS) & 0xFFFF;
 
   while (dma_status)
     {
       uint8_t dma_ch = __builtin_ctz(dma_status);
       uint32_t ch_sts = xgmac_read(priv->base + DMA_CHi_STATUS(dma_ch));
 
-      if (ch_sts & DMA_CHi_STATUS_RI)
+      if (ch_sts & (DMA_CHi_STATUS_RI | DMA_CHi_STATUS_RBU))
         xgmac_dma_rx_process(priv, dma_ch);
 
       if (ch_sts & DMA_CHi_STATUS_TI)
@@ -499,6 +499,17 @@ int dwxgmac_mac_isr(int irq, FAR void *context, FAR void *arg)
 
       dma_status &= ~(1u << dma_ch);
     }
+
+#ifdef CONFIG_DWXGMAC_QOS
+  if (xgmac_read(priv->base + MAC_INTERRUPT_STATUS) &
+      (MAC_INTERRUPT_STATUS_MMCIS | MAC_INTERRUPT_STATUS_MMCRXIS |
+       MAC_INTERRUPT_STATUS_MMCTXIS | MAC_INTERRUPT_STATUS_MMCRXIPIS))
+    {
+      xgmac_read(priv->base + MMC_RX_INTERRUPT);
+      xgmac_read(priv->base + MMC_TX_INTERRUPT);
+      xgmac_read(priv->base + MMC_IPC_RX_INTERRUPT);
+    }
+#endif
 
   return OK;
 }
@@ -614,13 +625,19 @@ int xgmac_initialize(int intf)
   for (ch = 0; ch < priv->config->dwmac.dma_rx_channel; ch++)
     dma_rx_data_init(priv, ch);
 
-  xgmac_write(MAC_INTERRUPT_ENABLE_TSIE,
-              priv->base + MAC_INTERRUPT_ENABLE);
+  dma_init(priv);
+
+  xgmac_write(0, priv->base + MAC_INTERRUPT_ENABLE);
   xgmac_write(0xFFFFFFFF, priv->base + MMC_FPE_RX_INTERRUPT_MASK);
   xgmac_write(0xFFFFFFFF, priv->base + MMC_FPE_TX_INTERRUPT_MASK);
   xgmac_write(0xFFFFFFFF, priv->base + MMC_IPC_RX_INTERRUPT_MASK);
+#ifdef CONFIG_DWXGMAC_QOS
+  xgmac_write(0xFFFFFFFF, priv->base + MMC_RX_INTERRUPT_MASK);
+  xgmac_write(0xFFFFFFFF, priv->base + MMC_TX_INTERRUPT_MASK);
+  xgmac_write(MMC_CONTROL_MCF | MMC_CONTROL_CNTRST,
+              priv->base + MMC_CONTROL);
+#endif
 
-  dma_init(priv);
   mtl_init(priv);
   mac_init(priv);
 
