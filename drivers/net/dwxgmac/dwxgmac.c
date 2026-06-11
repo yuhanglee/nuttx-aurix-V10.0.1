@@ -98,10 +98,16 @@ static struct eth_dwmac_dma_ch_config g_dma_tx_cfg[1] =
   },
 };
 
+/* Queue sizes match the synthesized FIFOs (HW_FEATURE1: TX 4KB,
+ * RX 8KB on TC3xx GETH).  Checksum insertion requires the complete
+ * frame to fit in the TX FIFO: with only ALIGN_UP(PKTSIZE, 256) the
+ * MAC silently dropped every full-size frame once TX COE was on.
+ */
+
 static struct eth_dwmac_rx_queue g_mtl_rx_cfg[1] =
 {
   { .nr = 0,
-    .size = ALIGN_UP(CONFIG_NET_ETH_PKTSIZE, 256),
+    .size = 8192,
     .priority = 0xFF,
     .threshold = 64,
     .sf = true,
@@ -113,7 +119,7 @@ static struct eth_dwmac_rx_queue g_mtl_rx_cfg[1] =
 static struct eth_dwmac_tx_queue g_mtl_tx_cfg[1] =
 {
   { .nr = 0,
-    .size = ALIGN_UP(CONFIG_NET_ETH_PKTSIZE, 256),
+    .size = 4096,
     .threshold = 64,
     .sf = true
   },
@@ -430,6 +436,10 @@ static void xgmac_rx_work(FAR void *arg)
             {
               NETDEV_RXERRORS(dev);
             }
+          else if (eth_dwmac_rdes_csum_error(desc))
+            {
+              NETDEV_RXERRORS(dev);
+            }
           else if (eth_dwmac_rdes_last(desc))
             {
               uint16_t pktlen = eth_dwmac_rdes_packet_length(desc);
@@ -657,6 +667,20 @@ int xgmac_initialize(int intf)
   xgmac_write(0xFFFFFFFF, priv->base + MMC_TX_INTERRUPT_MASK);
   xgmac_write(MMC_CONTROL_MCF | MMC_CONTROL_CNTRST,
               priv->base + MMC_CONTROL);
+
+  /* Use the hardware checksum engines when synthesized: TDES CIC=3
+   * inserts IP/TCP/UDP/ICMP checksums on TX, MAC_CONFIGURATION.IPC
+   * (set in mac_init) verifies on RX and flags errors in RDES1.
+   */
+
+  {
+    uint32_t hwf0 = xgmac_read(priv->base + MAC_HW_FEATURE0);
+
+    priv->txcoe = (hwf0 & MAC_HW_FEATURE0_TXCOESEL) != 0;
+    priv->data->dwmac.txcoe_available = priv->txcoe;
+    priv->data->dwmac.rxcoe_available =
+      (hwf0 & MAC_HW_FEATURE0_RXCOESEL) != 0;
+  }
 #endif
 
   mtl_init(priv);

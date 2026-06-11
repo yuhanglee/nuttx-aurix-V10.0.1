@@ -190,6 +190,16 @@ static inline bool eth_dwmac_rdes_desc_error(void *d)
   return wb->rdes3.fd == 1 && wb->rdes3.ctxt == 1;
 }
 
+static inline bool eth_dwmac_rdes_csum_error(void *d)
+{
+  struct eth_qos_rdes_wb *wb = d;
+
+  /* RDES1 checksum status is valid only when RS1V is set */
+
+  return wb->rdes3.ld && wb->rdes3.rs1v &&
+         (wb->rdes1.iphe || wb->rdes1.ipce);
+}
+
 static inline uint16_t eth_dwmac_rdes_packet_length(void *d)
 {
   return ((struct eth_qos_rdes_wb *)d)->rdes3.pl;
@@ -349,6 +359,13 @@ static inline void eth_dwmac_dma_tx_init(const struct xgmac_driver_s *priv,
   xgmac_write(FIELD_PREP(DMA_CHi_TXDESC_RING_LENGTH_TDRL,
                 dcfg->descs_count - 1),
                 dma + DMA_CHi_TXDESC_RING_LENGTH(hw_ch));
+
+  /* Operate on second frame: fetch the next frame while the current
+   * one is still being transmitted.
+   */
+
+  xgmac_modreg(DMA_CHi_TX_CONTROL_OSF, DMA_CHi_TX_CONTROL_OSF,
+                 dma + DMA_CHi_TX_CONTROL(hw_ch));
   xgmac_write((uint32_t)(uintptr_t)dcfg->descs,
                 dma + DMA_CHi_TXDESC_TAIL_POINTER(hw_ch));
 }
@@ -537,7 +554,10 @@ static inline void eth_dwmac_mtl_rxq_init(const struct xgmac_driver_s *priv,
 {
   const struct eth_dwmac_rx_queue *qcfg = &priv->config->dwmac.mtl_rx[queue];
 
-  xgmac_write(FIELD_PREP(MTL_RXQi_OPERATION_MODE_RQS, qcfg->size / 256) |
+  /* RQS holds (queue size / 256) - 1 */
+
+  xgmac_write(FIELD_PREP(MTL_RXQi_OPERATION_MODE_RQS,
+                         (qcfg->size + 255) / 256 - 1) |
                 (qcfg->sf ? MTL_RXQi_OPERATION_MODE_RSF
                            : FIELD_PREP(MTL_RXQi_OPERATION_MODE_RTC,
                                         qcfg->threshold)),

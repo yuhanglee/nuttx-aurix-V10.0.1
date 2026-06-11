@@ -136,6 +136,11 @@ static inline bool eth_dwmac_rdes_desc_error(void *d)
   return wb->rdes3.fd == 1 && wb->rdes3.ld == 1 && wb->rdes3.ctxt == 1;
 }
 
+static inline bool eth_dwmac_rdes_csum_error(void *d)
+{
+  return false;
+}
+
 static inline uint16_t eth_dwmac_rdes_packet_length(void *d)
 {
   return ((struct eth_xgmac_rdes_wb *)d)->rdes3.pl;
