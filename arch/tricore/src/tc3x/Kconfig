@@ -501,5 +501,22 @@ config TRICORE_GETH_BASE
     hex "Tricore GETH base address"
     default 0xf001f000
 
+config TRICORE_GETH_PHY_MODE
+    int "GETH PHY interface mode (GPCTL.EPR)"
+    default 1
+    ---help---
+        PHY interface mode written to GETH_GPCTL.EPR:
+        0 = MII, 1 = RGMII, 4 = RMII.
+
+config TRICORE_GETH_GPCTL_ALTI
+    hex "GETH GPCTL input alternate selects"
+    default 0x1
+    ---help---
+        Raw value for the GETH_GPCTL input select fields (bits 21:0).
+        Each GETH input signal has a 2-bit select choosing the input
+        pad alternative A(0)/B(1)/C(2)/D(3); bits 1:0 select the MDIO
+        input pad.  E.g. 0x1 routes MDIO from alternative B (TC397
+        TFT, P12.1), 0x3 from alternative D (TC375 lite kit, P21.3).
+
 endif # TC3XX_GETH
 

@@ -58,17 +58,6 @@ noinline_function void xgmac_modreg(uint32_t value, uint32_t mask, uintptr_t reg
   modreg32(value, mask, reg);
 }
 
-static int init_phy_mode_input_cfg(int port)
-{
-  /* phy in rgmii mode */
-  xgmac_modreg(TC3XX_ETH_PHY_MODE(1), TC3XX_ETH_PHY_MODE_MASK, TC3XX_ETH_GPCTL);
-
-  /* mdio pins in alt1 */
-  xgmac_modreg(BIT(1), GENMASK(1, 0), TC3XX_ETH_GPCTL);
-  /* all pins in alt0 */
-  xgmac_modreg(0, GENMASK(10, 2), TC3XX_ETH_GPCTL);
-}
-
 static int init_geth(int port)
 {
   int i;
@@ -86,6 +75,10 @@ static int init_geth(int port)
 
   if (i == 100)
     return -EIO;
+
+  /* Errata: GPCTL and SKEWCTL must be zero across kernel reset */
+  xgmac_write(0, TC3XX_ETH_GPCTL);
+  xgmac_write(0, TC3XX_ETH_SKEWCTL);
 
   aurix_cpu_endinit_enable(false);
 
@@ -121,17 +114,19 @@ static int init_geth(int port)
       xgmac_write(0xFFFFFFFF, TC3XX_ETH_ACCEN_CH_WRB(i));
     }
 
+  xgmac_write((CONFIG_TRICORE_GETH_GPCTL_ALTI & ~TC3XX_ETH_PHY_MODE_MASK) |
+              TC3XX_ETH_PHY_MODE(CONFIG_TRICORE_GETH_PHY_MODE),
+              TC3XX_ETH_GPCTL);
+
+  if (CONFIG_TRICORE_GETH_PHY_MODE == TC3XX_ETH_PHY_MODE_RGMII)
+    xgmac_write(9, TC3XX_ETH_SKEWCTL);
+
   return OK;
 }
 
 int tc3x_geth_init(int intf)
 {
   int ret;
-
-  /* mode must be set before reset */
-  ret = init_phy_mode_input_cfg(intf);
-  if (ret < 0)
-    return ret;
 
   ret = init_geth(intf);
   if (ret < 0)

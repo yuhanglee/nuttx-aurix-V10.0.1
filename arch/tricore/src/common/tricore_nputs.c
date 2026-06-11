@@ -32,10 +32,12 @@
  * Public Functions
  ****************************************************************************/
 
+#ifndef CONFIG_MCU_SERIAL
 void weak_function up_putc(int ch)
 {
   (void)ch;
 }
+#endif
 
 /****************************************************************************
  * Name: up_nputs
