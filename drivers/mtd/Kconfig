@@ -1492,4 +1492,14 @@ config MTD_XSPI_NOR
 		Generic JEDEC SPI NOR flash driver using the xSPI subsystem.
 		Current scope is JEDEC RDID probe only. Read, program and
 		erase support will follow with the MTD adapter.
+
+config MTD_XSPI_HYPERFLASH
+	bool "JEDEC HyperBus HyperFlash over xSPI"
+	default n
+	depends on XSPI
+	---help---
+		HyperBus / HyperFlash protocol driver using the xSPI
+		subsystem. Provides MTD vtable (erase / bread / bwrite /
+		read / ioctl) for JEDEC HyperBus parts (e.g. Infineon /
+		Cypress S26HS family).
 endif # MTD
