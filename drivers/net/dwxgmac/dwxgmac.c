@@ -78,9 +78,11 @@ static uint8_t
               [ALIGN_UP(CONFIG_NET_ETH_PKTSIZE, 8)]
   aligned_data(64) DWXGMAC_DMA_SECTION;
 
+static uint8_t *g_txslot_buf[CONFIG_DWXGMAC_NUM_TX_DMA_DESCRIPTORS];
+
 static uint8_t
   g_pollbuf[ALIGN_UP(CONFIG_NET_ETH_PKTSIZE + CONFIG_NET_GUARDSIZE, 8)]
-  aligned_data(8);
+  aligned_data(64) DWXGMAC_DMA_SECTION;
 
 static struct eth_dwmac_dma_ch_config g_dma_rx_cfg[1] =
 {
@@ -97,12 +99,6 @@ static struct eth_dwmac_dma_ch_config g_dma_tx_cfg[1] =
     .nr = 0
   },
 };
-
-/* Queue sizes match the synthesized FIFOs (HW_FEATURE1: TX 4KB,
- * RX 8KB on TC3xx GETH).  Checksum insertion requires the complete
- * frame to fit in the TX FIFO: with only ALIGN_UP(PKTSIZE, 256) the
- * MAC silently dropped every full-size frame once TX COE was on.
- */
 
 static struct eth_dwmac_rx_queue g_mtl_rx_cfg[1] =
 {
@@ -166,12 +162,19 @@ static void dma_tx_data_init(FAR struct xgmac_driver_s *priv, uint8_t ch)
   struct eth_dwmac_dma_tx_ch_data *d = &priv->data->dwmac.dma_tx[ch];
   int cnt = priv->config->dwmac.dma_tx[ch].descs_count;
 
+  int i;
+
   d->head = 0;
   d->tail = 0;
   nxmutex_init(&d->lock);
   nxsem_init(&d->desc_used, 0, cnt - 1);
   memset(priv->config->dwmac.dma_tx[ch].descs, 0,
          cnt * sizeof(struct eth_dwmac_dma_desc));
+
+  for (i = 0; i < cnt; i++)
+    {
+      g_txslot_buf[i] = g_txbuf_pool[i];
+    }
 }
 
 static void dma_rx_data_init(FAR struct xgmac_driver_s *priv, uint8_t ch)
@@ -300,7 +303,7 @@ static void set_link_state(FAR struct xgmac_driver_s *priv, bool up)
 }
 
 static int xgmac_send(FAR struct xgmac_driver_s *priv,
-                      FAR uint8_t *buf, uint16_t len)
+                      FAR uint8_t *buf, uint16_t len, bool swap)
 {
   struct eth_dwmac_config *cfg = &priv->config->dwmac;
   struct eth_dwmac_dma_tx_ch_data *td = &priv->data->dwmac.dma_tx[0];
@@ -319,8 +322,27 @@ static int xgmac_send(FAR struct xgmac_driver_s *priv,
       return -ETIMEDOUT;
     }
 
-  txbuf = g_txbuf_pool[td->tail];
-  memcpy(txbuf, buf, len);
+  if (swap)
+    {
+      /* Zero-copy: hand the caller's buffer (d_buf) to the DMA and
+       * give the stack the slot's previous buffer, which the
+       * descriptor-grant guarantees is no longer in flight.
+       */
+
+      txbuf = buf;
+      priv->dev.d_buf = g_txslot_buf[td->tail];
+      g_txslot_buf[td->tail] = buf;
+    }
+  else
+    {
+      /* Copy into the slot-owned buffer so the caller's buffer (an
+       * RX ring buffer carrying an in-place reply) is free for reuse
+       * immediately.
+       */
+
+      txbuf = g_txslot_buf[td->tail];
+      memcpy(txbuf, buf, len);
+    }
 
   tdes = (struct eth_xgmac_tdes_rd *)&dcfg->descs[td->tail];
 
@@ -343,7 +365,7 @@ static int xgmac_txpoll(FAR struct net_driver_s *dev)
 {
   if (dev->d_len > 0)
     {
-      xgmac_send(dev->d_private, dev->d_buf, dev->d_len);
+      xgmac_send(dev->d_private, dev->d_buf, dev->d_len, true);
       dev->d_len = 0;
     }
 
@@ -362,7 +384,7 @@ static void xgmac_rx_input(FAR struct xgmac_driver_s *priv)
       ipv4_input(dev);
       if (dev->d_len > 0)
         {
-          xgmac_send(priv, dev->d_buf, dev->d_len);
+          xgmac_send(priv, dev->d_buf, dev->d_len, false);
           dev->d_len = 0;
         }
     }
@@ -375,7 +397,7 @@ static void xgmac_rx_input(FAR struct xgmac_driver_s *priv)
       ipv6_input(dev);
       if (dev->d_len > 0)
         {
-          xgmac_send(priv, dev->d_buf, dev->d_len);
+          xgmac_send(priv, dev->d_buf, dev->d_len, false);
           dev->d_len = 0;
         }
     }
@@ -388,7 +410,7 @@ static void xgmac_rx_input(FAR struct xgmac_driver_s *priv)
       arp_input(dev);
       if (dev->d_len > 0)
         {
-          xgmac_send(priv, dev->d_buf, dev->d_len);
+          xgmac_send(priv, dev->d_buf, dev->d_len, false);
           dev->d_len = 0;
         }
     }
@@ -408,6 +430,14 @@ static void xgmac_rx_work(FAR void *arg)
   uint8_t ch;
 
   net_lock();
+
+  /* d_buf temporarily points at RX ring buffers below; remember the
+   * stack's current TX compose buffer.  An ACK sent from the input
+   * path uses the copy path, but a zero-copy swap can still occur if
+   * the poll path runs from this work item, so reload via priv.
+   */
+
+  priv->pollbuf = dev->d_buf;
 
   for (ch = 0; ch < priv->config->dwmac.dma_rx_channel; ch++)
     {
@@ -465,7 +495,7 @@ static void xgmac_rx_work(FAR void *arg)
         }
     }
 
-  dev->d_buf = g_pollbuf;
+  dev->d_buf = priv->pollbuf;
   dev->d_len = 0;
   net_unlock();
 }
@@ -667,11 +697,6 @@ int xgmac_initialize(int intf)
   xgmac_write(0xFFFFFFFF, priv->base + MMC_TX_INTERRUPT_MASK);
   xgmac_write(MMC_CONTROL_MCF | MMC_CONTROL_CNTRST,
               priv->base + MMC_CONTROL);
-
-  /* Use the hardware checksum engines when synthesized: TDES CIC=3
-   * inserts IP/TCP/UDP/ICMP checksums on TX, MAC_CONFIGURATION.IPC
-   * (set in mac_init) verifies on RX and flags errors in RDES1.
-   */
 
   {
     uint32_t hwf0 = xgmac_read(priv->base + MAC_HW_FEATURE0);

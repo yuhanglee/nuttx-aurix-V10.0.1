@@ -223,6 +223,8 @@ struct xgmac_driver_s
   struct work_s rxwork;
   struct work_s pollwork;
 
+  FAR uint8_t *pollbuf;   /* stack TX compose buffer during rx work */
+
   bool ifup;
   bool txcoe;
 };
