@@ -124,9 +124,10 @@ int aurix_config_gpio(gpio_pinset_t pinset)
 
   if (GPIO_IS_PERIPH_OWN_PAD(pinset))
     {
-      uintptr_t protse = base + PORT_PROTSE_OFFSET;
+      uintptr_t pcsrsel = base + PORT_PCSRSEL_OFFSET;
+      uintptr_t protse  = base + PORT_PROTSE_OFFSET;
       tc4x_prot_set_config(protse);
-      putreg32(BIT(pin), base + PORT_PCSRSEL_OFFSET);
+      putreg32(getreg32(pcsrsel) | BIT(pin), pcsrsel);
       tc4x_prot_set_run(protse);
     }
 
