@@ -54,3 +54,7 @@ endif()
 if(CONFIG_ARCH_BUTTONS)
   target_sources(board PRIVATE tc375_buttons.c)
 endif()
+
+if(CONFIG_TC3XX_GETH)
+  target_sources(board PRIVATE tc375_ethernet.c)
+endif()

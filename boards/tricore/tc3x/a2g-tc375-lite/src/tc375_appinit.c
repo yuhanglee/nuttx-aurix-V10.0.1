@@ -84,6 +84,10 @@ int mcmcan_board_initialize(void);
 #  include "tc3x_gpt12_cap.h"
 #endif
 
+#ifdef CONFIG_TC3XX_GETH
+int tc375_ethernet_initialize(void);
+#endif
+
 /****************************************************************************
  * Public Functions
  ****************************************************************************/
