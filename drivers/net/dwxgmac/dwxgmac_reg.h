@@ -1452,7 +1452,7 @@
 #define DMA_CHi_TX_CONTROL_TFSEL                         GENMASK(30, 29)
 #define DMA_CHi_RX_CONTROL(i)                            (0xF108 + i * 0x80)
 #define DMA_CHi_RX_CONTROL_SR                            BIT(0)
-#define DMA_CHi_RX_CONTROL_RBSZ                          GENMASK(14, 4)
+#define DMA_CHi_RX_CONTROL_RBSZ                          GENMASK(14, 1)
 #define DMA_CHi_RX_CONTROL_RXPBL                         GENMASK(21, 16)
 #define DMA_CHi_RX_CONTROL_RQOS                          GENMASK(27, 24)
 #define DMA_CHi_RX_CONTROL_RPF                           BIT(31)
