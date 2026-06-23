@@ -541,23 +541,33 @@ int dwxgmac_mac_isr(int irq, FAR void *context, FAR void *arg)
   FAR struct xgmac_driver_s *priv = &g_xgmac[(int)arg];
   uint32_t dma_status;
 
-  dma_status = xgmac_read(priv->base + DMA_INTERRUPT_STATUS) & 0xFFFF;
+  /* Drain the DMA channel-status line until it reads zero before
+   * returning.  The GETH interrupt is delivered through an
+   * edge-triggered AURIX SRC, so the IRQ line must be deasserted
+   * before the ISR exits or the next completion will not produce a
+   * new rising edge and the SRC will not re-arm.
+   */
 
-  while (dma_status)
+  while ((dma_status =
+          xgmac_read(priv->base + DMA_INTERRUPT_STATUS) & 0xFFFF) != 0)
     {
-      uint8_t dma_ch = __builtin_ctz(dma_status);
-      uint32_t ch_sts = xgmac_read(priv->base + DMA_CHi_STATUS(dma_ch));
+      while (dma_status)
+        {
+          uint8_t dma_ch = __builtin_ctz(dma_status);
+          uint32_t ch_sts =
+            xgmac_read(priv->base + DMA_CHi_STATUS(dma_ch));
 
-      if (ch_sts & (DMA_CHi_STATUS_RI | DMA_CHi_STATUS_RBU))
-        xgmac_dma_rx_process(priv, dma_ch);
+          if (ch_sts & (DMA_CHi_STATUS_RI | DMA_CHi_STATUS_RBU))
+            xgmac_dma_rx_process(priv, dma_ch);
 
-      if (ch_sts & DMA_CHi_STATUS_TI)
-        xgmac_dma_tx_process(priv, dma_ch);
+          if (ch_sts & DMA_CHi_STATUS_TI)
+            xgmac_dma_tx_process(priv, dma_ch);
 
-      /* Clear all status bits for this channel */
-      xgmac_write(ch_sts, priv->base + DMA_CHi_STATUS(dma_ch));
+          /* Clear all status bits for this channel */
+          xgmac_write(ch_sts, priv->base + DMA_CHi_STATUS(dma_ch));
 
-      dma_status &= ~(1u << dma_ch);
+          dma_status &= ~(1u << dma_ch);
+        }
     }
 
 #ifdef CONFIG_DWXGMAC_QOS
