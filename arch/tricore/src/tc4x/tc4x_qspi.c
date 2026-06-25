@@ -39,7 +39,12 @@
 #include <nuttx/mutex.h>
 #include <nuttx/spi/spi.h>
 
+#include <nuttx/irq.h>
+#include <nuttx/semaphore.h>
+#include <nuttx/clock.h>
+
 #include "tricore_internal.h"
+#include "tricore_irq.h"
 #include "hardware/tc4x_qspi.h"
 #include "tc4x_qspi.h"
 
@@ -48,10 +53,15 @@
  ****************************************************************************/
 
 #ifndef CONFIG_TC4X_QSPI_FPER_HZ
-#  define CONFIG_TC4X_QSPI_FPER_HZ   200000000u
+#  define CONFIG_TC4X_QSPI_FPER_HZ   200000000u  /* TC4Dx fPER = 200 MHz */
 #endif
 
 #define TC4X_QSPI_POLL_TIMEOUT        1000000u
+
+/* GLOBALCON1 TXFM / RXFM FIFO mode encoding */
+
+#define TC4X_QSPI_FIFO_COMBINED_MODE    0u  /* TXFM=0: combined (BACON+DATA pair)   */
+#define TC4X_QSPI_FIFO_SINGLE_MOVE_MODE 1u  /* RXFM=1: single-move (one word/event) */
 
 /****************************************************************************
  * Private Types
@@ -64,6 +74,9 @@ struct tc4x_qspi_config_s
   uint8_t   bus;        /* NuttX SPI bus number                            */
   uint8_t   default_cs; /* Default hardware SLSO index (0..15)             */
   uint8_t   mris;       /* MRST input port selector (0..7)                 */
+  uint16_t  srpn_tx;    /* TX interrupt node index (IRQ_QSPIwTX)           */
+  uint16_t  srpn_rx;    /* RX interrupt node index (IRQ_QSPIwRX)           */
+  uint16_t  srpn_err;   /* Error interrupt node index (IRQ_QSPIwERR)       */
 };
 
 struct tc4x_qspi_priv_s
@@ -77,6 +90,22 @@ struct tc4x_qspi_priv_s
   uint8_t                           nbits;       /* Bits per word (2..32)  */
   uint8_t                           cs;          /* Active SLSO index      */
   bool                              initialized;
+
+  /* Interrupt-driven transfer state */
+
+  sem_t             sem_transfer;    /* Transfer-complete semaphore (init=0) */
+  volatile bool     transfer_active; /* True while a transfer is in progress  */
+  const void       *tx_buf;          /* Current TX buffer pointer            */
+  void             *rx_buf;          /* Current RX buffer pointer            */
+  size_t            tx_remaining;    /* Words remaining to transmit          */
+  size_t            rx_remaining;    /* Words remaining to receive           */
+  size_t            tx_idx;          /* TX word index into tx_buf            */
+  size_t            rx_idx;          /* RX word index into rx_buf            */
+
+  /* ISR diagnostic counters (cleared at start of each exchange) */
+
+  volatile uint32_t isr_tx_count;   /* Number of TXF ISR invocations         */
+  volatile uint32_t isr_rx_count;   /* Number of RXF ISR invocations         */
 };
 
 /****************************************************************************
@@ -93,6 +122,7 @@ static void     tc4x_qspi_setmode(FAR struct spi_dev_s *dev,
 static void     tc4x_qspi_setbits(FAR struct spi_dev_s *dev, int nbits);
 static uint8_t  tc4x_qspi_status(FAR struct spi_dev_s *dev, uint32_t devid);
 static uint32_t tc4x_qspi_send(FAR struct spi_dev_s *dev, uint32_t wd);
+static int      tc4x_qspi_isr(int irq, FAR void *context, FAR void *arg);
 static void     tc4x_qspi_exchange(FAR struct spi_dev_s *dev,
                                    FAR const void *txbuffer,
                                    FAR void *rxbuffer, size_t nwords);
@@ -147,6 +177,9 @@ static const struct tc4x_qspi_config_s g_qspi0_config =
   .bus        = 0,
   .default_cs = CONFIG_TC4X_QSPI0_DEFAULT_CS,
   .mris       = CONFIG_TC4X_QSPI0_MRIS,
+  .srpn_tx    = CONFIG_TC4X_QSPI0_TXIRQ,
+  .srpn_rx    = CONFIG_TC4X_QSPI0_RXIRQ,
+  .srpn_err   = CONFIG_TC4X_QSPI0_ERIRQ,
 };
 
 static struct tc4x_qspi_priv_s g_qspi0_priv =
@@ -174,6 +207,9 @@ static const struct tc4x_qspi_config_s g_qspi1_config =
   .bus        = 1,
   .default_cs = CONFIG_TC4X_QSPI1_DEFAULT_CS,
   .mris       = CONFIG_TC4X_QSPI1_MRIS,
+  .srpn_tx    = CONFIG_TC4X_QSPI1_TXIRQ,
+  .srpn_rx    = CONFIG_TC4X_QSPI1_RXIRQ,
+  .srpn_err   = CONFIG_TC4X_QSPI1_ERIRQ,
 };
 
 static struct tc4x_qspi_priv_s g_qspi1_priv =
@@ -201,6 +237,9 @@ static const struct tc4x_qspi_config_s g_qspi2_config =
   .bus        = 2,
   .default_cs = CONFIG_TC4X_QSPI2_DEFAULT_CS,
   .mris       = CONFIG_TC4X_QSPI2_MRIS,
+  .srpn_tx    = CONFIG_TC4X_QSPI2_TXIRQ,
+  .srpn_rx    = CONFIG_TC4X_QSPI2_RXIRQ,
+  .srpn_err   = CONFIG_TC4X_QSPI2_ERIRQ,
 };
 
 static struct tc4x_qspi_priv_s g_qspi2_priv =
@@ -228,6 +267,9 @@ static const struct tc4x_qspi_config_s g_qspi3_config =
   .bus        = 3,
   .default_cs = CONFIG_TC4X_QSPI3_DEFAULT_CS,
   .mris       = CONFIG_TC4X_QSPI3_MRIS,
+  .srpn_tx    = CONFIG_TC4X_QSPI3_TXIRQ,
+  .srpn_rx    = CONFIG_TC4X_QSPI3_RXIRQ,
+  .srpn_err   = CONFIG_TC4X_QSPI3_ERIRQ,
 };
 
 static struct tc4x_qspi_priv_s g_qspi3_priv =
@@ -255,6 +297,9 @@ static const struct tc4x_qspi_config_s g_qspi4_config =
   .bus        = 4,
   .default_cs = CONFIG_TC4X_QSPI4_DEFAULT_CS,
   .mris       = CONFIG_TC4X_QSPI4_MRIS,
+  .srpn_tx    = CONFIG_TC4X_QSPI4_TXIRQ,
+  .srpn_rx    = CONFIG_TC4X_QSPI4_RXIRQ,
+  .srpn_err   = CONFIG_TC4X_QSPI4_ERIRQ,
 };
 
 static struct tc4x_qspi_priv_s g_qspi4_priv =
@@ -282,6 +327,9 @@ static const struct tc4x_qspi_config_s g_qspi5_config =
   .bus        = 5,
   .default_cs = CONFIG_TC4X_QSPI5_DEFAULT_CS,
   .mris       = CONFIG_TC4X_QSPI5_MRIS,
+  .srpn_tx    = CONFIG_TC4X_QSPI5_TXIRQ,
+  .srpn_rx    = CONFIG_TC4X_QSPI5_RXIRQ,
+  .srpn_err   = CONFIG_TC4X_QSPI5_ERIRQ,
 };
 
 static struct tc4x_qspi_priv_s g_qspi5_priv =
@@ -309,6 +357,9 @@ static const struct tc4x_qspi_config_s g_qspi6_config =
   .bus        = 6,
   .default_cs = CONFIG_TC4X_QSPI6_DEFAULT_CS,
   .mris       = CONFIG_TC4X_QSPI6_MRIS,
+  .srpn_tx    = CONFIG_TC4X_QSPI6_TXIRQ,
+  .srpn_rx    = CONFIG_TC4X_QSPI6_RXIRQ,
+  .srpn_err   = CONFIG_TC4X_QSPI6_ERIRQ,
 };
 
 static struct tc4x_qspi_priv_s g_qspi6_priv =
@@ -336,6 +387,9 @@ static const struct tc4x_qspi_config_s g_qspi7_config =
   .bus        = 7,
   .default_cs = CONFIG_TC4X_QSPI7_DEFAULT_CS,
   .mris       = CONFIG_TC4X_QSPI7_MRIS,
+  .srpn_tx    = CONFIG_TC4X_QSPI7_TXIRQ,
+  .srpn_rx    = CONFIG_TC4X_QSPI7_RXIRQ,
+  .srpn_err   = CONFIG_TC4X_QSPI7_ERIRQ,
 };
 
 static struct tc4x_qspi_priv_s g_qspi7_priv =
@@ -427,6 +481,188 @@ static inline void qspi_modreg(const struct tc4x_qspi_config_s *cfg,
   modreg32(setbits, setbits | clrbits, cfg->base + off);
 }
 
+/* BACON fields common to all transfers; caller ORs in LAST as needed. */
+
+static inline uint32_t qspi_bacon_base(const struct tc4x_qspi_priv_s *priv)
+{
+  return TC4X_QSPI_BACON_CS(priv->cs)
+       | TC4X_QSPI_BACON_DL(priv->nbits)
+       | TC4X_QSPI_BACON_MSB
+       | (1u << TC4X_QSPI_BACON_LPRE_SHIFT)
+       | TC4X_QSPI_BACON_LEAD(4u)
+       | (1u << TC4X_QSPI_BACON_TPRE_SHIFT)
+       | TC4X_QSPI_BACON_TRAIL(7u)
+       | (2u << TC4X_QSPI_BACON_IPRE_SHIFT)
+       | TC4X_QSPI_BACON_IDLE(4u);
+}
+
+/* Enter PROTE CONFIG state; caller must restore RUN (0x0C) when done. */
+
+static void qspi_enter_config(const struct tc4x_qspi_config_s *cfg)
+{
+  uintptr_t prote = cfg->base + TC4X_QSPI_PROTE_OFFSET;
+
+  if ((getreg32(prote) & 0x07u) == 4u)
+    {
+      putreg32(0x09u, prote);      /* CONFIG state + SWEN */
+    }
+}
+
+/****************************************************************************
+ * Name: qspi_isr_txload
+ *
+ * Description:
+ *   Write the next BACON+DATA pair to the TX FIFO (combined mode).
+ *
+ ****************************************************************************/
+
+static void qspi_isr_txload(struct tc4x_qspi_priv_s *priv)
+{
+  const struct tc4x_qspi_config_s *cfg = priv->config;
+  uint32_t bacon;
+  uint32_t tx;
+  bool last;
+
+  last = (priv->tx_remaining == 1u);
+
+  /* Fetch transmit data word (send 0xFF dummy if no TX buffer provided) */
+
+  if (priv->tx_buf == NULL)
+    {
+      tx = 0xffffffffu;
+    }
+  else if (priv->nbits <= 8)
+    {
+      tx = ((const uint8_t *)priv->tx_buf)[priv->tx_idx];
+    }
+  else if (priv->nbits <= 16)
+    {
+      tx = ((const uint16_t *)priv->tx_buf)[priv->tx_idx];
+    }
+  else
+    {
+      tx = ((const uint32_t *)priv->tx_buf)[priv->tx_idx];
+    }
+
+  /* Build BACON: LAST=1 on the final word to end the frame */
+
+  bacon = qspi_bacon_base(priv) | (last ? TC4X_QSPI_BACON_LAST : 0u);
+
+  /* Write BACONENTRY then DATAENTRY (combined-mode TX FIFO) */
+
+  qspi_putreg(cfg, TC4X_QSPI_BACONENTRY_OFFSET, bacon);
+  qspi_putreg(cfg, TC4X_QSPI_DATAENTRY_OFFSET(0), tx);
+
+  priv->tx_idx++;
+  priv->tx_remaining--;
+}
+
+/****************************************************************************
+ * Name: qspi_isr_rxread
+ *
+ * Description:
+ *   Read one word from RXEXIT into rx_buf (single-move mode).
+ *
+ ****************************************************************************/
+
+static void qspi_isr_rxread(struct tc4x_qspi_priv_s *priv)
+{
+  const struct tc4x_qspi_config_s *cfg = priv->config;
+  uint32_t rx;
+
+  rx = qspi_getreg(cfg, TC4X_QSPI_RXEXIT_OFFSET);
+
+  /* Store received word into rx_buf using correct element width */
+
+  if (priv->rx_buf != NULL)
+    {
+      if (priv->nbits <= 8)
+        {
+          ((uint8_t *)priv->rx_buf)[priv->rx_idx] = (uint8_t)rx;
+        }
+      else if (priv->nbits <= 16)
+        {
+          ((uint16_t *)priv->rx_buf)[priv->rx_idx] = (uint16_t)rx;
+        }
+      else
+        {
+          ((uint32_t *)priv->rx_buf)[priv->rx_idx] = rx;
+        }
+    }
+
+  priv->rx_idx++;
+  priv->rx_remaining--;
+}
+
+/****************************************************************************
+ * Name: tc4x_qspi_isr
+ *
+ * Description:
+ *   Shared ISR for QSPI TX, RX, and ERR nodes.  Loads next BACON+DATA on
+ *   TXF, drains one word on RXF, posts sem_transfer when both reach 0.
+ *
+ ****************************************************************************/
+
+static int tc4x_qspi_isr(int irq, FAR void *context, FAR void *arg)
+{
+  struct tc4x_qspi_priv_s *priv = (struct tc4x_qspi_priv_s *)arg;
+  const struct tc4x_qspi_config_s *cfg = priv->config;
+  uint32_t status;
+
+  UNUSED(irq);
+  UNUSED(context);
+
+  /* Re-read STATUS for each flag check; TX and RX arrive on separate
+   * SRC nodes but share this ISR.
+   */
+
+  /* TX: combined mode (TXFM=0), TXF fires when TXFIFO level=0. */
+
+  if (qspi_getreg(cfg, TC4X_QSPI_STATUS_OFFSET) & TC4X_QSPI_STATUS_TXF)
+    {
+      priv->isr_tx_count++;
+      qspi_putreg(cfg, TC4X_QSPI_FLAGSCLEAR_OFFSET,
+                  TC4X_QSPI_FLAGSCLEAR_TXC);
+      if (priv->tx_remaining > 0u)
+        {
+          qspi_isr_txload(priv);
+        }
+    }
+
+  /* RX: single-move mode (RXFM=1), RXF fires on 0-to-1 RXFIFO transition. */
+
+  if (qspi_getreg(cfg, TC4X_QSPI_STATUS_OFFSET) & TC4X_QSPI_STATUS_RXF)
+    {
+      priv->isr_rx_count++;
+      qspi_putreg(cfg, TC4X_QSPI_FLAGSCLEAR_OFFSET,
+                  TC4X_QSPI_FLAGSCLEAR_RXC);
+      if (priv->rx_remaining > 0u)
+        {
+          qspi_isr_rxread(priv);
+        }
+    }
+
+  /* Clear any error flags. */
+
+  status = qspi_getreg(cfg, TC4X_QSPI_STATUS_OFFSET);
+  if (status & TC4X_QSPI_STATUS_ERRORFLAGS_MASK)
+    {
+      qspi_putreg(cfg, TC4X_QSPI_FLAGSCLEAR_OFFSET,
+                  TC4X_QSPI_FLAGSCLEAR_ERRORCLEAR_MASK);
+    }
+
+  /* Wake exchange() when transfer is complete. */
+
+  if (priv->transfer_active &&
+      priv->tx_remaining == 0u && priv->rx_remaining == 0u)
+    {
+      priv->transfer_active = false;
+      nxsem_post(&priv->sem_transfer);
+    }
+
+  return OK;
+}
+
 /****************************************************************************
  * Name: qspi_drain_rx
  *
@@ -456,126 +692,6 @@ static void qspi_drain_rx(const struct tc4x_qspi_config_s *cfg)
         }
 
       (void)qspi_getreg(cfg, TC4X_QSPI_RXEXIT_OFFSET);
-    }
-}
-
-/****************************************************************************
- * Name: qspi_bacon_base
- *
- * Description:
- *   Compute the fixed BACON register fields common to every transfer on
- *   this device.  The LAST bit is not included; callers OR it in as needed.
- *
- * Input Parameters:
- *   priv - Pointer to the QSPI driver private state.
- *
- * Returned Value:
- *   The 32-bit BACON base value.
- *
- ****************************************************************************/
-
-static inline uint32_t qspi_bacon_base(const struct tc4x_qspi_priv_s *priv)
-{
-  return TC4X_QSPI_BACON_CS(priv->cs)
-       | TC4X_QSPI_BACON_DL(priv->nbits)
-       | TC4X_QSPI_BACON_MSB
-       | (1u << TC4X_QSPI_BACON_LPRE_SHIFT)
-       | TC4X_QSPI_BACON_LEAD(4u)
-       | (1u << TC4X_QSPI_BACON_TPRE_SHIFT)
-       | TC4X_QSPI_BACON_TRAIL(4u)
-       | (2u << TC4X_QSPI_BACON_IPRE_SHIFT)
-       | TC4X_QSPI_BACON_IDLE(4u);
-}
-
-/****************************************************************************
- * Name: qspi_poll_rx
- *
- * Description:
- *   Poll until one RX FIFO entry is available, then read it into *rx_out.
- *
- * Input Parameters:
- *   cfg    - Pointer to the QSPI bus configuration.
- *   rx_out - Location to store the received word on success.
- *
- * Returned Value:
- *   true on success; false on error flag or timeout.
- *
- ****************************************************************************/
-
-static bool qspi_poll_rx(const struct tc4x_qspi_config_s *cfg,
-                         FAR uint32_t *rx_out)
-{
-  uint32_t status;
-  uint32_t fifo_level;
-  uint32_t timeout;
-
-  timeout = TC4X_QSPI_POLL_TIMEOUT;
-  while (timeout > 0u)
-    {
-      status     = qspi_getreg(cfg, TC4X_QSPI_STATUS_OFFSET);
-      fifo_level = (status & TC4X_QSPI_STATUS_RXFIFOLEVEL_MASK)
-                   >> TC4X_QSPI_STATUS_RXFIFOLEVEL_SHIFT;
-      if (fifo_level > 0u)
-        {
-          break;
-        }
-
-      if (status & TC4X_QSPI_STATUS_ERRORFLAGS_MASK)
-        {
-          qspi_putreg(cfg, TC4X_QSPI_FLAGSCLEAR_OFFSET,
-                      TC4X_QSPI_FLAGSCLEAR_ERRORCLEAR_MASK);
-          return false;
-        }
-
-      timeout--;
-    }
-
-  if (timeout == 0u)
-    {
-      return false;
-    }
-
-  *rx_out = qspi_getreg(cfg, TC4X_QSPI_RXEXIT_OFFSET);
-  return true;
-}
-
-/****************************************************************************
- * Name: qspi_store_rx
- *
- * Description:
- *   Store one received word into rxbuffer at the given index using the
- *   correct element width for priv->nbits.  No-op when rxbuffer is NULL.
- *
- * Input Parameters:
- *   priv     - Pointer to the QSPI driver private state.
- *   rxbuffer - Destination buffer, or NULL to discard.
- *   idx      - Element index into rxbuffer.
- *   rx       - Raw 32-bit word read from RXEXIT.
- *
- * Returned Value:
- *   None.
- *
- ****************************************************************************/
-
-static void qspi_store_rx(const struct tc4x_qspi_priv_s *priv,
-                          FAR void *rxbuffer, size_t idx, uint32_t rx)
-{
-  if (rxbuffer == NULL)
-    {
-      return;
-    }
-
-  if (priv->nbits <= 8)
-    {
-      ((uint8_t *)rxbuffer)[idx] = (uint8_t)rx;
-    }
-  else if (priv->nbits <= 16)
-    {
-      ((uint16_t *)rxbuffer)[idx] = (uint16_t)rx;
-    }
-  else
-    {
-      ((uint32_t *)rxbuffer)[idx] = rx;
     }
 }
 
@@ -719,23 +835,14 @@ static void qspi_reconfigure(struct tc4x_qspi_priv_s *priv)
 static int qspi_hw_init(struct tc4x_qspi_priv_s *priv)
 {
   const struct tc4x_qspi_config_s *cfg = priv->config;
-  uintptr_t prote;
-  uint32_t  pval;
   uint32_t timeout;
   uint32_t globalcon_base;
 
-  /* Enable module clock via PROTE  */
+  /* Enable module clock via PROTE */
 
-  prote = cfg->base + TC4X_QSPI_PROTE_OFFSET;
-  pval  = getreg32(prote);
-
-  if ((pval & 0x07u) == 0u)        /* RUN state -- must switch first   */
-    {
-      putreg32(0x09u, prote);      /* CONFIG state + SWEN              */
-    }
-
+  qspi_enter_config(cfg);
   qspi_modreg(cfg, TC4X_QSPI_CLC_OFFSET, 0u, TC4X_QSPI_CLC_DISR);
-  putreg32(0x08u, prote);          /* RUN state + SWEN                 */
+  putreg32(0x0cu, cfg->base + TC4X_QSPI_PROTE_OFFSET); /* RUN state + SWEN */
 
   /* Poll CLC.DISS until the module clock is running */
 
@@ -754,21 +861,15 @@ static int qspi_hw_init(struct tc4x_qspi_priv_s *priv)
 
   /* Unlock ACCEN_WRA and ACCEN_RDA for full CPU access */
 
-  prote = cfg->base + TC4X_QSPI_PROTE_OFFSET;
-  pval  = getreg32(prote);
-
-  if ((pval & 0x07u) == 0u)
-    {
-      putreg32(0x09u, prote);      /* CONFIG state + SWEN              */
-    }
-
+  qspi_enter_config(cfg);
   qspi_putreg(cfg, TC4X_QSPI_ACCEN_WRA_OFFSET, 0xffffffffu);
   qspi_putreg(cfg, TC4X_QSPI_ACCEN_RDA_OFFSET, 0xffffffffu);
-  putreg32(0x08u, prote);          /* RUN state + SWEN                 */
+  putreg32(0x0cu, cfg->base + TC4X_QSPI_PROTE_OFFSET); /* RUN state + SWEN */
 
   /* GLOBALCON: set CLKSEL first (required before RESETS), EN=0 (PAUSE) */
 
   globalcon_base = TC4X_QSPI_GLOBALCON_TQ(0u)
+                 | TC4X_QSPI_GLOBALCON_EXPECT(15u)
                  | TC4X_QSPI_GLOBALCON_CLKSEL;
 
 #ifdef CONFIG_TC4X_QSPI4_LOOPBACK
@@ -805,7 +906,7 @@ static int qspi_hw_init(struct tc4x_qspi_priv_s *priv)
 
   qspi_putreg(cfg, TC4X_QSPI_GLOBALCON_OFFSET, globalcon_base);
 
-  /* GLOBALCON1 = 0: polled mode, no IRQs, combined FIFO */
+  /* GLOBALCON1: cleared at init; all fields programmed per-transfer. */
 
   qspi_putreg(cfg, TC4X_QSPI_GLOBALCON1_OFFSET, 0u);
 
@@ -835,187 +936,23 @@ static int qspi_hw_init(struct tc4x_qspi_priv_s *priv)
 
   priv->initialized = true;
 
-  spiinfo("QSPI%u init done: globalcon=0x%08lx clc=0x%08lx "
-          "accen_wra=0x%08lx pisel=0x%08lx ssoc=0x%08lx\n",
-          cfg->bus,
-          (unsigned long)qspi_getreg(cfg, TC4X_QSPI_GLOBALCON_OFFSET),
-          (unsigned long)qspi_getreg(cfg, TC4X_QSPI_CLC_OFFSET),
-          (unsigned long)qspi_getreg(cfg, TC4X_QSPI_ACCEN_WRA_OFFSET),
-          (unsigned long)qspi_getreg(cfg, TC4X_QSPI_PISEL_OFFSET),
-          (unsigned long)qspi_getreg(cfg, TC4X_QSPI_SSOC_OFFSET));
+  /* Transfer semaphore (starts locked). */
+
+  nxsem_init(&priv->sem_transfer, 0, 0);
+
+  irq_attach(TC4X_QSPI_SRC_TX_NODE(cfg->bus), tc4x_qspi_isr, priv);
+  irq_attach(TC4X_QSPI_SRC_RX_NODE(cfg->bus), tc4x_qspi_isr, priv);
+  irq_attach(TC4X_QSPI_SRC_ER_NODE(cfg->bus), tc4x_qspi_isr, priv);
+
+  up_enable_irq(TC4X_QSPI_SRC_TX_NODE(cfg->bus));
+  up_enable_irq(TC4X_QSPI_SRC_RX_NODE(cfg->bus));
+  up_enable_irq(TC4X_QSPI_SRC_ER_NODE(cfg->bus));
 
   return OK;
 }
 
 /****************************************************************************
- * Name: qspi_xfer_word
- *
- * Description:
- *   Transfer a single word via QSPI short data mode (BACON.LAST=1).
- *   Drains stale RX, waits for TX space, writes BACONENTRY + DATAENTRY,
- *   polls RXFIFOLEVEL, and returns the received word from RXEXIT.
- *
- * Input Parameters:
- *   priv   - Pointer to the QSPI driver private state.
- *   txword - Word to transmit.
- *
- * Returned Value:
- *   Received word, or 0u on timeout or error.
- *
- ****************************************************************************/
-
-static uint32_t qspi_xfer_word(struct tc4x_qspi_priv_s *priv,
-                               uint32_t txword)
-{
-  const struct tc4x_qspi_config_s *cfg = priv->config;
-  uint32_t bacon;
-  uint32_t gc;
-  uint32_t status;
-  uint32_t timeout;
-  uint32_t rxfifo_level;
-  uint32_t txfifo_level;
-
-  /* Drain stale RX entries */
-
-  timeout = 16u;
-  while (timeout--)
-    {
-      status = qspi_getreg(cfg, TC4X_QSPI_STATUS_OFFSET);
-      rxfifo_level = (status & TC4X_QSPI_STATUS_RXFIFOLEVEL_MASK)
-                     >> TC4X_QSPI_STATUS_RXFIFOLEVEL_SHIFT;
-      if (rxfifo_level == 0u)
-        {
-          break;
-        }
-
-      (void)qspi_getreg(cfg, TC4X_QSPI_RXEXIT_OFFSET);
-    }
-
-  /* Wait for TX FIFO space */
-
-  timeout = TC4X_QSPI_POLL_TIMEOUT;
-  while (timeout > 0u)
-    {
-      status = qspi_getreg(cfg, TC4X_QSPI_STATUS_OFFSET);
-      txfifo_level = (status & TC4X_QSPI_STATUS_TXFIFOLEVEL_MASK)
-                     >> TC4X_QSPI_STATUS_TXFIFOLEVEL_SHIFT;
-      if (txfifo_level < 4u)
-        {
-          break;
-        }
-
-      timeout--;
-    }
-
-  if (timeout == 0u)
-    {
-      spierr("QSPI%u: TX FIFO never drained "
-             "(status=0x%08lx globalcon=0x%08lx) -- issuing RESETS\n",
-             cfg->bus, (unsigned long)status,
-             (unsigned long)qspi_getreg(cfg,
-                             TC4X_QSPI_GLOBALCON_OFFSET));
-
-      /* RESETS=01b: flush SM + FIFOs, then re-enable */
-
-      gc = qspi_getreg(cfg, TC4X_QSPI_GLOBALCON_OFFSET);
-      qspi_putreg(cfg, TC4X_QSPI_GLOBALCON_OFFSET,
-                  (gc & ~(TC4X_QSPI_GLOBALCON_EN |
-                          TC4X_QSPI_GLOBALCON_RESETS_MASK)) |
-                  TC4X_QSPI_GLOBALCON_RESETS_SM);
-
-      timeout = TC4X_QSPI_POLL_TIMEOUT;
-      while (timeout > 0u &&
-             (qspi_getreg(cfg, TC4X_QSPI_STATUS_OFFSET) &
-              TC4X_QSPI_STATUS_PHASE_MASK) != TC4X_QSPI_STATUS_PHASE_WAIT)
-        {
-          timeout--;
-        }
-
-      qspi_putreg(cfg, TC4X_QSPI_GLOBALCON_OFFSET,
-                  (gc & ~TC4X_QSPI_GLOBALCON_RESETS_MASK) |
-                  TC4X_QSPI_GLOBALCON_EN);
-
-      qspi_putreg(cfg, TC4X_QSPI_FLAGSCLEAR_OFFSET,
-                  TC4X_QSPI_FLAGSCLEAR_ERRORCLEAR_MASK |
-                  TC4X_QSPI_FLAGSCLEAR_TXC |
-                  TC4X_QSPI_FLAGSCLEAR_RXC);
-
-      return 0u;
-    }
-
-  /* Write BACONENTRY: CS, DL=nbits-1, MSB first, LAST=1 */
-
-  bacon = TC4X_QSPI_BACON_CS(priv->cs)
-        | TC4X_QSPI_BACON_DL(priv->nbits)
-        | TC4X_QSPI_BACON_MSB
-        | TC4X_QSPI_BACON_LAST
-        | (1u << TC4X_QSPI_BACON_LPRE_SHIFT)
-        | TC4X_QSPI_BACON_LEAD(4u)
-        | (1u << TC4X_QSPI_BACON_TPRE_SHIFT)
-        | TC4X_QSPI_BACON_TRAIL(4u)
-        | (2u << TC4X_QSPI_BACON_IPRE_SHIFT)
-        | TC4X_QSPI_BACON_IDLE(4u);
-
-  qspi_putreg(cfg, TC4X_QSPI_BACONENTRY_OFFSET, bacon);
-
-  /* Write TX data */
-
-  qspi_putreg(cfg, TC4X_QSPI_DATAENTRY_OFFSET(0), txword);
-
-  /* Poll until RX FIFO has an entry */
-
-  timeout = TC4X_QSPI_POLL_TIMEOUT;
-  while (timeout > 0u)
-    {
-      status = qspi_getreg(cfg, TC4X_QSPI_STATUS_OFFSET);
-      rxfifo_level = (status & TC4X_QSPI_STATUS_RXFIFOLEVEL_MASK)
-                     >> TC4X_QSPI_STATUS_RXFIFOLEVEL_SHIFT;
-      if (rxfifo_level > 0u)
-        {
-          break;
-        }
-
-      if (status & TC4X_QSPI_STATUS_ERRORFLAGS_MASK)
-        {
-          spierr("QSPI%u: error flags=0x%03lx\n", cfg->bus,
-                 (unsigned long)(status &
-                                 TC4X_QSPI_STATUS_ERRORFLAGS_MASK));
-          qspi_putreg(cfg, TC4X_QSPI_FLAGSCLEAR_OFFSET,
-                      TC4X_QSPI_FLAGSCLEAR_ERRORCLEAR_MASK);
-          return 0u;
-        }
-
-      timeout--;
-    }
-
-  if (timeout == 0u)
-    {
-      spierr("QSPI%u: RX FIFO never filled "
-             "(status=0x%08lx globalcon=0x%08lx)\n",
-             cfg->bus, (unsigned long)status,
-             (unsigned long)qspi_getreg(cfg,
-                             TC4X_QSPI_GLOBALCON_OFFSET));
-      return 0u;
-    }
-
-  /* Read received word */
-
-  return qspi_getreg(cfg, TC4X_QSPI_RXEXIT_OFFSET);
-}
-
-/****************************************************************************
- * Name: tc4x_qspi_lock
- *
- * Description:
- *   Acquire or release the SPI bus mutex.
- *
- * Input Parameters:
- *   dev  - SPI device handle.
- *   lock - true to acquire, false to release.
- *
- * Returned Value:
- *   Zero (OK) on success; a negated errno value on failure.
- *
+ * NuttX SPI lower-half ops
  ****************************************************************************/
 
 static int tc4x_qspi_lock(FAR struct spi_dev_s *dev, bool lock)
@@ -1055,8 +992,6 @@ static void tc4x_qspi_select(FAR struct spi_dev_s *dev,
   uint32_t ssoc;
   uint8_t cs;
 
-  /* SPIDEV_USER(0) maps to default_cs; other indices used as SLSO directly */
-
   if (SPIDEVID_INDEX(devid) == 0)
     {
       cs = priv->config->default_cs;
@@ -1068,7 +1003,7 @@ static void tc4x_qspi_select(FAR struct spi_dev_s *dev,
 
   if (cs != priv->cs)
     {
-      /* Disable old CS, switch to new, reprogram ECONz/SSOC. */
+      /* Disable old OEN, switch CS, reprogram ECONz and SSOC. */
 
       ssoc = qspi_getreg(priv->config, TC4X_QSPI_SSOC_OFFSET);
       ssoc &= ~TC4X_QSPI_SSOC_OEN_BIT(priv->cs);
@@ -1213,7 +1148,17 @@ static uint8_t tc4x_qspi_status(FAR struct spi_dev_s *dev, uint32_t devid)
 static uint32_t tc4x_qspi_send(FAR struct spi_dev_s *dev, uint32_t wd)
 {
   struct tc4x_qspi_priv_s *priv = (struct tc4x_qspi_priv_s *)dev;
-  return qspi_xfer_word(priv, wd);
+  uint32_t rx = 0u;
+
+  tc4x_qspi_exchange(dev,
+                     (priv->nbits <= 8)  ? (const void *)((uint8_t  *)&wd) :
+                     (priv->nbits <= 16) ? (const void *)((uint16_t *)&wd) :
+                                           (const void *)((uint32_t *)&wd),
+                     (priv->nbits <= 8)  ? (void *)((uint8_t  *)&rx) :
+                     (priv->nbits <= 16) ? (void *)((uint16_t *)&rx) :
+                                           (void *)((uint32_t *)&rx),
+                     1u);
+  return rx;
 }
 
 /****************************************************************************
@@ -1242,99 +1187,71 @@ static void tc4x_qspi_exchange(FAR struct spi_dev_s *dev,
 {
   struct tc4x_qspi_priv_s *priv = (struct tc4x_qspi_priv_s *)dev;
   const struct tc4x_qspi_config_s *cfg = priv->config;
-  uint32_t bacon_base;
-  uint32_t status;
-  uint32_t fifo_level;
-  uint32_t timeout;
-  uint32_t tx;
-  uint32_t rx;
-  bool last;
-  size_t i;
+  irqstate_t irqflags;
+  uint32_t   gc1;
 
   if (nwords == 0u)
     {
       return;
     }
 
-  /* Drain any stale RX entries from a previous transfer */
+  /* Arm transfer in critical section to prevent race with TX ISR. */
+
+  irqflags = enter_critical_section();
+
+  /* Drain any stale RX entries left from a previous transfer. */
 
   qspi_drain_rx(cfg);
 
-  bacon_base = qspi_bacon_base(priv);
+  /* Clear all stale event flags. */
 
-  /* Pipeline: TX[i]'s RX is committed when TX[i+1] is written;
-   * the final word (LAST=1) commits its own RX and ends the frame.
-   */
+  qspi_putreg(cfg, TC4X_QSPI_FLAGSCLEAR_OFFSET,
+              TC4X_QSPI_FLAGSCLEAR_TXC  |
+              TC4X_QSPI_FLAGSCLEAR_RXC  |
+              TC4X_QSPI_FLAGSCLEAR_PT1C |
+              TC4X_QSPI_FLAGSCLEAR_PT2C |
+              TC4X_QSPI_FLAGSCLEAR_USRC |
+              TC4X_QSPI_FLAGSCLEAR_ERRORCLEAR_MASK);
 
-  for (i = 0u; i < nwords; i++)
-    {
-      last = (i == nwords - 1u);
+  /* Initialise per-transfer state. */
 
-      if (txbuffer == NULL)
-        {
-          tx = 0xffffffffu;
-        }
-      else if (priv->nbits <= 8)
-        {
-          tx = ((const uint8_t *)txbuffer)[i];
-        }
-      else if (priv->nbits <= 16)
-        {
-          tx = ((const uint16_t *)txbuffer)[i];
-        }
-      else
-        {
-          tx = ((const uint32_t *)txbuffer)[i];
-        }
+  priv->tx_buf       = txbuffer;
+  priv->rx_buf       = rxbuffer;
+  priv->tx_remaining = nwords;
+  priv->rx_remaining = nwords;
+  priv->tx_idx       = 0u;
+  priv->rx_idx       = 0u;
+  priv->isr_tx_count = 0u;
+  priv->isr_rx_count = 0u;
 
-      /* Wait for TX FIFO space */
+  /* Configure GLOBALCON1 and load first BACON+DATA pair. */
 
-      timeout = TC4X_QSPI_POLL_TIMEOUT;
-      while (timeout > 0u)
-        {
-          status = qspi_getreg(cfg, TC4X_QSPI_STATUS_OFFSET);
-          fifo_level = (status & TC4X_QSPI_STATUS_TXFIFOLEVEL_MASK)
-                       >> TC4X_QSPI_STATUS_TXFIFOLEVEL_SHIFT;
-          if (fifo_level < 4u)
-            {
-              break;
-            }
+  gc1  = TC4X_QSPI_GLOBALCON1_RXEN;
+  gc1 |= TC4X_QSPI_FIFO_SINGLE_MOVE_MODE << TC4X_QSPI_GLOBALCON1_RXFM_SHIFT;
+  gc1 |= TC4X_QSPI_FIFO_COMBINED_MODE    << TC4X_QSPI_GLOBALCON1_TXFM_SHIFT;
+  qspi_putreg(cfg, TC4X_QSPI_GLOBALCON1_OFFSET, gc1);
 
-          timeout--;
-        }
+  qspi_isr_txload(priv);
 
-      if (timeout == 0u)
-        {
-          return;
-        }
+  /* Mark active before leaving critical section. */
 
-      /* LAST=1 only on the final word — CS stays LOW across all words */
+  priv->transfer_active = true;
 
-      qspi_putreg(cfg, TC4X_QSPI_BACONENTRY_OFFSET,
-                  bacon_base | (last ? TC4X_QSPI_BACON_LAST : 0u));
-      qspi_putreg(cfg, TC4X_QSPI_DATAENTRY_OFFSET(0), tx);
+  /* Enable TXEN to start transfer. */
 
-      /* Writing the next BACON commits RX[i-1] to the FIFO (i > 0) */
+  qspi_modreg(cfg, TC4X_QSPI_GLOBALCON1_OFFSET,
+              TC4X_QSPI_GLOBALCON1_TXEN, 0u);
 
-      if (i > 0u)
-        {
-          if (!qspi_poll_rx(cfg, &rx))
-            {
-              return;
-            }
+  leave_critical_section(irqflags);
 
-          qspi_store_rx(priv, rxbuffer, i - 1u, rx);
-        }
-    }
+  nxsem_tickwait_uninterruptible(&priv->sem_transfer,
+                                 SEC2TICK(2));
 
-  /* Read the final RX word — committed after LAST=1 transfer completes */
+  priv->transfer_active = false;
 
-  if (!qspi_poll_rx(cfg, &rx))
-    {
-      return;
-    }
+  /* Disable FIFO interrupts until next transfer. */
 
-  qspi_store_rx(priv, rxbuffer, nwords - 1u, rx);
+  qspi_putreg(cfg, TC4X_QSPI_GLOBALCON1_OFFSET, 0u);
 }
 
 #ifndef CONFIG_SPI_EXCHANGE
