@@ -124,7 +124,7 @@ static void tc4d7_qspi1_pinmux(void)
 
   /* MISO: P10.6 -> QSPI1_MRSTC_F (input, no pull, MRIS=2 in PISEL) */
 
-  aurix_config_gpio(AURIX_GPIO(10, 6, GPIO_INPUT, GPIO_PULL_NONE));
+  aurix_config_gpio(AURIX_GPIO(10, 6, GPIO_INPUT, GPIO_PULL_UP));
 
   /* SCLK: P10.2 -> QSPI1_SCLK_F  (ALT3, peripheral drives the pad) */
 
@@ -160,7 +160,7 @@ static void tc4d7_qspi2_pinmux(void)
 
   /* MISO: P15.7 -> QSPI2_MRSTB (input, no pull, MRIS=1 in PISEL) */
 
-  aurix_config_gpio(AURIX_GPIO(15, 7, GPIO_INPUT, GPIO_PULL_NONE));
+  aurix_config_gpio(AURIX_GPIO(15, 7, GPIO_INPUT, GPIO_PULL_UP));
 
   /* SCLK: P15.8 -> QSPI2_SCLK  (ALT3, peripheral drives the pad) */
 
@@ -196,7 +196,7 @@ static void tc4d7_qspi3_pinmux(void)
 
   /* MISO: P02.5 -> QSPI3_MRSTA_F (input, no pull, MRIS=0 in PISEL) */
 
-  aurix_config_gpio(AURIX_GPIO(2, 5, GPIO_INPUT, GPIO_PULL_NONE));
+  aurix_config_gpio(AURIX_GPIO(2, 5, GPIO_INPUT, GPIO_PULL_UP));
 
   /* SCLK: P02.7 -> QSPI3_SCLK_F  (ALT3, peripheral drives the pad) */
 
@@ -271,7 +271,7 @@ static void tc4d7_qspi5_pinmux(void)
    * NOTE: P22.0 is also QSPI4_MTSR_F (ALT3) -- mutually exclusive.
    */
 
-  aurix_config_gpio(AURIX_GPIO(22, 0, GPIO_INPUT, GPIO_PULL_NONE));
+  aurix_config_gpio(AURIX_GPIO(22, 0, GPIO_INPUT, GPIO_PULL_UP));
 
   /* SCLK: P22.3 -> QSPI5_SCLK  (ALT2, peripheral drives the pad)
    * NOTE: P22.3 is also QSPI4_SCLK_F (ALT3) -- mutually exclusive.
@@ -307,7 +307,7 @@ static void tc4d7_qspi6_pinmux(void)
 
   /* MISO: P23.4 -> QSPI6_MRSTD_F (input, no pull, MRIS=3 in PISEL) */
 
-  aurix_config_gpio(AURIX_GPIO(23, 4, GPIO_INPUT, GPIO_PULL_NONE));
+  aurix_config_gpio(AURIX_GPIO(23, 4, GPIO_INPUT, GPIO_PULL_UP));
 }
 #endif /* CONFIG_TC4XX_QSPI6 */
 
@@ -338,7 +338,7 @@ static void tc4d7_qspi7_pinmux(void)
    * NOTE: P15.7 is also QSPI2_MRSTB (input) -- mutually exclusive.
    */
 
-  aurix_config_gpio(AURIX_GPIO(15, 7, GPIO_INPUT, GPIO_PULL_NONE));
+  aurix_config_gpio(AURIX_GPIO(15, 7, GPIO_INPUT, GPIO_PULL_UP));
 
   /* SCLK: P15.2 -> QSPI7_SCLK_F  (ALT7, peripheral drives the pad)
    * NOTE: P15.2 is also QSPI2_SLSO0 (ALT3) -- mutually exclusive.

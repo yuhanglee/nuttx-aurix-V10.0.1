@@ -45,6 +45,7 @@ CONFIG_SPI_DRIVER=y
 CONFIG_TC4XX_QSPI=y
 CONFIG_TC4XX_QSPI4=y
 CONFIG_TESTING_SPI_TEST=y
+# CONFIG_TC4XX_QSPI4_LOOPBACK is not set
 CONFIG_SYSLOG_CONSOLE=y
 CONFIG_DEBUG_FEATURES=y
 CONFIG_DEBUG_CUSTOMOPT=y
@@ -99,11 +100,6 @@ CONFIG_EXTERNAL_MTD_TEST_RWV_AUTO=y
 # all enabled tricore-apps samples in sequence)
 CONFIG_EXTERNAL_TEST_RUNNER=y
 CONFIG_TC4XX_QSPI4_DEFAULT_CS=6
-
-
-
-# Auto-ping at boot to validate the GETH RX path without needing a
-# working console-input channel.
 
 # NSH netinit: auto-bring eth0 up at 192.168.1.100/24, gw 192.168.1.1
 CONFIG_NET=y
