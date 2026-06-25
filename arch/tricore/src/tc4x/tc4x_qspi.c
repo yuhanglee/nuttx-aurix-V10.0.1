@@ -93,11 +93,10 @@ static void     tc4x_qspi_setmode(FAR struct spi_dev_s *dev,
 static void     tc4x_qspi_setbits(FAR struct spi_dev_s *dev, int nbits);
 static uint8_t  tc4x_qspi_status(FAR struct spi_dev_s *dev, uint32_t devid);
 static uint32_t tc4x_qspi_send(FAR struct spi_dev_s *dev, uint32_t wd);
-#ifdef CONFIG_SPI_EXCHANGE
 static void     tc4x_qspi_exchange(FAR struct spi_dev_s *dev,
                                    FAR const void *txbuffer,
                                    FAR void *rxbuffer, size_t nwords);
-#else
+#ifndef CONFIG_SPI_EXCHANGE
 static void     tc4x_qspi_sndblock(FAR struct spi_dev_s *dev,
                                    FAR const void *buffer, size_t nwords);
 static void     tc4x_qspi_recvblock(FAR struct spi_dev_s *dev,
@@ -360,17 +359,66 @@ static struct tc4x_qspi_priv_s g_qspi7_priv =
  * Private Functions
  ****************************************************************************/
 
+/****************************************************************************
+ * Name: qspi_getreg
+ *
+ * Description:
+ *   Read a 32-bit QSPI module register.
+ *
+ * Input Parameters:
+ *   cfg - Pointer to the QSPI bus configuration.
+ *   off - Register byte offset from the module base address.
+ *
+ * Returned Value:
+ *   The 32-bit register value.
+ *
+ ****************************************************************************/
+
 static inline uint32_t qspi_getreg(const struct tc4x_qspi_config_s *cfg,
                                    uint32_t off)
 {
   return getreg32(cfg->base + off);
 }
 
+/****************************************************************************
+ * Name: qspi_putreg
+ *
+ * Description:
+ *   Write a 32-bit value to a QSPI module register.
+ *
+ * Input Parameters:
+ *   cfg - Pointer to the QSPI bus configuration.
+ *   off - Register byte offset from the module base address.
+ *   v   - Value to write.
+ *
+ * Returned Value:
+ *   None.
+ *
+ ****************************************************************************/
+
 static inline void qspi_putreg(const struct tc4x_qspi_config_s *cfg,
                                uint32_t off, uint32_t v)
 {
   putreg32(v, cfg->base + off);
 }
+
+/****************************************************************************
+ * Name: qspi_modreg
+ *
+ * Description:
+ *   Read-modify-write a QSPI register: set the bits in setbits and clear
+ *   the bits in clrbits without disturbing any other bit positions.
+ *
+ * Input Parameters:
+ *   cfg     - Pointer to the QSPI bus configuration.
+ *   off     - Register byte offset from the module base address.
+ *   setbits - Mask of bits to set.
+ *   clrbits - Mask of bits to clear.
+ *
+ * Returned Value:
+ *   None.
+ *
+ ****************************************************************************/
 
 static inline void qspi_modreg(const struct tc4x_qspi_config_s *cfg,
                                uint32_t off, uint32_t setbits,
@@ -380,10 +428,167 @@ static inline void qspi_modreg(const struct tc4x_qspi_config_s *cfg,
 }
 
 /****************************************************************************
+ * Name: qspi_drain_rx
+ *
+ * Description:
+ *   Drain up to 16 stale entries from the QSPI RX FIFO.
+ *
+ * Input Parameters:
+ *   cfg - Pointer to the QSPI bus configuration.
+ *
+ * Returned Value:
+ *   None.
+ *
+ ****************************************************************************/
+
+static void qspi_drain_rx(const struct tc4x_qspi_config_s *cfg)
+{
+  uint32_t i;
+  uint32_t status;
+
+  for (i = 0u; i < 16u; i++)
+    {
+      status = qspi_getreg(cfg, TC4X_QSPI_STATUS_OFFSET);
+      if (((status & TC4X_QSPI_STATUS_RXFIFOLEVEL_MASK)
+           >> TC4X_QSPI_STATUS_RXFIFOLEVEL_SHIFT) == 0u)
+        {
+          break;
+        }
+
+      (void)qspi_getreg(cfg, TC4X_QSPI_RXEXIT_OFFSET);
+    }
+}
+
+/****************************************************************************
+ * Name: qspi_bacon_base
+ *
+ * Description:
+ *   Compute the fixed BACON register fields common to every transfer on
+ *   this device.  The LAST bit is not included; callers OR it in as needed.
+ *
+ * Input Parameters:
+ *   priv - Pointer to the QSPI driver private state.
+ *
+ * Returned Value:
+ *   The 32-bit BACON base value.
+ *
+ ****************************************************************************/
+
+static inline uint32_t qspi_bacon_base(const struct tc4x_qspi_priv_s *priv)
+{
+  return TC4X_QSPI_BACON_CS(priv->cs)
+       | TC4X_QSPI_BACON_DL(priv->nbits)
+       | TC4X_QSPI_BACON_MSB
+       | (1u << TC4X_QSPI_BACON_LPRE_SHIFT)
+       | TC4X_QSPI_BACON_LEAD(4u)
+       | (1u << TC4X_QSPI_BACON_TPRE_SHIFT)
+       | TC4X_QSPI_BACON_TRAIL(4u)
+       | (2u << TC4X_QSPI_BACON_IPRE_SHIFT)
+       | TC4X_QSPI_BACON_IDLE(4u);
+}
+
+/****************************************************************************
+ * Name: qspi_poll_rx
+ *
+ * Description:
+ *   Poll until one RX FIFO entry is available, then read it into *rx_out.
+ *
+ * Input Parameters:
+ *   cfg    - Pointer to the QSPI bus configuration.
+ *   rx_out - Location to store the received word on success.
+ *
+ * Returned Value:
+ *   true on success; false on error flag or timeout.
+ *
+ ****************************************************************************/
+
+static bool qspi_poll_rx(const struct tc4x_qspi_config_s *cfg,
+                         FAR uint32_t *rx_out)
+{
+  uint32_t status;
+  uint32_t fifo_level;
+  uint32_t timeout;
+
+  timeout = TC4X_QSPI_POLL_TIMEOUT;
+  while (timeout > 0u)
+    {
+      status     = qspi_getreg(cfg, TC4X_QSPI_STATUS_OFFSET);
+      fifo_level = (status & TC4X_QSPI_STATUS_RXFIFOLEVEL_MASK)
+                   >> TC4X_QSPI_STATUS_RXFIFOLEVEL_SHIFT;
+      if (fifo_level > 0u)
+        {
+          break;
+        }
+
+      if (status & TC4X_QSPI_STATUS_ERRORFLAGS_MASK)
+        {
+          qspi_putreg(cfg, TC4X_QSPI_FLAGSCLEAR_OFFSET,
+                      TC4X_QSPI_FLAGSCLEAR_ERRORCLEAR_MASK);
+          return false;
+        }
+
+      timeout--;
+    }
+
+  if (timeout == 0u)
+    {
+      return false;
+    }
+
+  *rx_out = qspi_getreg(cfg, TC4X_QSPI_RXEXIT_OFFSET);
+  return true;
+}
+
+/****************************************************************************
+ * Name: qspi_store_rx
+ *
+ * Description:
+ *   Store one received word into rxbuffer at the given index using the
+ *   correct element width for priv->nbits.  No-op when rxbuffer is NULL.
+ *
+ * Input Parameters:
+ *   priv     - Pointer to the QSPI driver private state.
+ *   rxbuffer - Destination buffer, or NULL to discard.
+ *   idx      - Element index into rxbuffer.
+ *   rx       - Raw 32-bit word read from RXEXIT.
+ *
+ * Returned Value:
+ *   None.
+ *
+ ****************************************************************************/
+
+static void qspi_store_rx(const struct tc4x_qspi_priv_s *priv,
+                          FAR void *rxbuffer, size_t idx, uint32_t rx)
+{
+  if (rxbuffer == NULL)
+    {
+      return;
+    }
+
+  if (priv->nbits <= 8)
+    {
+      ((uint8_t *)rxbuffer)[idx] = (uint8_t)rx;
+    }
+  else if (priv->nbits <= 16)
+    {
+      ((uint16_t *)rxbuffer)[idx] = (uint16_t)rx;
+    }
+  else
+    {
+      ((uint32_t *)rxbuffer)[idx] = rx;
+    }
+}
+
+/****************************************************************************
  * Name: qspi_compute_econ
  *
  * Description:
  *   Compute ECONz (baud rate, CPOL/CPH) for the requested frequency.
+ *
+ * Input Parameters:
+ *   priv     - Pointer to the QSPI driver private state (for mode/config).
+ *   freq     - Requested SPI clock frequency in Hz.
+ *   out_econ - Location to store the computed ECONz register value.
  *
  * Returned Value:
  *   Achieved frequency in Hz; writes *out_econ with the register value.
@@ -394,8 +599,8 @@ static uint32_t qspi_compute_econ(const struct tc4x_qspi_priv_s *priv,
                                   uint32_t freq, uint32_t *out_econ)
 {
   const struct tc4x_qspi_config_s *cfg = priv->config;
-  uint32_t a = 1u;          /* A=1 -> divide-by-(A+1) = divide-by-2       */
-  uint32_t div;             /* TC4Dx baud rate divisor per Q step          */
+  uint32_t a = 1u;          /* prescaler A (divide-by-2) */
+  uint32_t div;             /* combined baud rate divisor */
   uint32_t q;
   uint32_t actual;
   uint32_t econ;
@@ -416,7 +621,7 @@ static uint32_t qspi_compute_econ(const struct tc4x_qspi_priv_s *priv,
   q -= 1u;
   if (q > 63u)
     {
-      q = 63u;               /* ECONz.Q is a 6-bit field   */
+      q = 63u;               /* Q is a 6-bit field */
     }
 
   actual = cfg->fper / ((q + 1u) * div);
@@ -447,6 +652,12 @@ static uint32_t qspi_compute_econ(const struct tc4x_qspi_priv_s *priv,
  *   Enable the SLSO output driver for the current chip select (AOL=0,
  *   active-low).
  *
+ * Input Parameters:
+ *   priv - Pointer to the QSPI driver private state.
+ *
+ * Returned Value:
+ *   None.
+ *
  ****************************************************************************/
 
 static void qspi_apply_cs(const struct tc4x_qspi_priv_s *priv)
@@ -465,6 +676,12 @@ static void qspi_apply_cs(const struct tc4x_qspi_priv_s *priv)
  * Description:
  *   Recalculate and apply ECONz (baud rate + mode) and SSOC (CS enable)
  *   after any change to frequency, mode, nbits, or cs.
+ *
+ * Input Parameters:
+ *   priv - Pointer to the QSPI driver private state.
+ *
+ * Returned Value:
+ *   None.
  *
  ****************************************************************************/
 
@@ -490,6 +707,12 @@ static void qspi_reconfigure(struct tc4x_qspi_priv_s *priv)
  * Description:
  *   One-time hardware init: enable CLC, open ACCEN, configure GLOBALCON/
  *   GLOBALCON1/PISEL/ECONz/SSOC, then set GLOBALCON.EN to start the SM.
+ *
+ * Input Parameters:
+ *   priv - Pointer to the QSPI driver private state.
+ *
+ * Returned Value:
+ *   Zero (OK) on success; a negated errno value on failure.
  *
  ****************************************************************************/
 
@@ -529,7 +752,7 @@ static int qspi_hw_init(struct tc4x_qspi_priv_s *priv)
       return -ETIMEDOUT;
     }
 
-  /* Open ACCEN_WRA/RDA (reset default blocks CPU TAG-IDs >= 6) */
+  /* Unlock ACCEN_WRA and ACCEN_RDA for full CPU access */
 
   prote = cfg->base + TC4X_QSPI_PROTE_OFFSET;
   pval  = getreg32(prote);
@@ -632,6 +855,13 @@ static int qspi_hw_init(struct tc4x_qspi_priv_s *priv)
  *   Drains stale RX, waits for TX space, writes BACONENTRY + DATAENTRY,
  *   polls RXFIFOLEVEL, and returns the received word from RXEXIT.
  *
+ * Input Parameters:
+ *   priv   - Pointer to the QSPI driver private state.
+ *   txword - Word to transmit.
+ *
+ * Returned Value:
+ *   Received word, or 0u on timeout or error.
+ *
  ****************************************************************************/
 
 static uint32_t qspi_xfer_word(struct tc4x_qspi_priv_s *priv,
@@ -716,14 +946,14 @@ static uint32_t qspi_xfer_word(struct tc4x_qspi_priv_s *priv,
   /* Write BACONENTRY: CS, DL=nbits-1, MSB first, LAST=1 */
 
   bacon = TC4X_QSPI_BACON_CS(priv->cs)
-        | TC4X_QSPI_BACON_DL(priv->nbits)     /* DL = nbits - 1 (bits)   */
-        | TC4X_QSPI_BACON_MSB                  /* shift MSB first         */
+        | TC4X_QSPI_BACON_DL(priv->nbits)
+        | TC4X_QSPI_BACON_MSB
         | TC4X_QSPI_BACON_LAST
-        | (1u << TC4X_QSPI_BACON_LPRE_SHIFT)  /* lead prescaler = x4     */
+        | (1u << TC4X_QSPI_BACON_LPRE_SHIFT)
         | TC4X_QSPI_BACON_LEAD(4u)
-        | (1u << TC4X_QSPI_BACON_TPRE_SHIFT)  /* trail prescaler = x4    */
+        | (1u << TC4X_QSPI_BACON_TPRE_SHIFT)
         | TC4X_QSPI_BACON_TRAIL(4u)
-        | (2u << TC4X_QSPI_BACON_IPRE_SHIFT)  /* idle prescaler = x16    */
+        | (2u << TC4X_QSPI_BACON_IPRE_SHIFT)
         | TC4X_QSPI_BACON_IDLE(4u);
 
   qspi_putreg(cfg, TC4X_QSPI_BACONENTRY_OFFSET, bacon);
@@ -774,7 +1004,18 @@ static uint32_t qspi_xfer_word(struct tc4x_qspi_priv_s *priv,
 }
 
 /****************************************************************************
- * NuttX SPI lower-half ops
+ * Name: tc4x_qspi_lock
+ *
+ * Description:
+ *   Acquire or release the SPI bus mutex.
+ *
+ * Input Parameters:
+ *   dev  - SPI device handle.
+ *   lock - true to acquire, false to release.
+ *
+ * Returned Value:
+ *   Zero (OK) on success; a negated errno value on failure.
+ *
  ****************************************************************************/
 
 static int tc4x_qspi_lock(FAR struct spi_dev_s *dev, bool lock)
@@ -789,10 +1030,29 @@ static int tc4x_qspi_lock(FAR struct spi_dev_s *dev, bool lock)
   return nxmutex_unlock(&priv->lock);
 }
 
+/****************************************************************************
+ * Name: tc4x_qspi_select
+ *
+ * Description:
+ *   Select or deselect a SPI device.  Maps the NuttX devid to a hardware
+ *   SLSO index, switches SSOC and ECONz if the chip select changes.
+ *   Hardware assertion timing is managed via the BACON register fields.
+ *
+ * Input Parameters:
+ *   dev      - SPI device handle.
+ *   devid    - NuttX SPI device identifier (encodes bus and index).
+ *   selected - true to select, false to deselect (unused: hardware CS).
+ *
+ * Returned Value:
+ *   None.
+ *
+ ****************************************************************************/
+
 static void tc4x_qspi_select(FAR struct spi_dev_s *dev,
                              uint32_t devid, bool selected)
 {
   struct tc4x_qspi_priv_s *priv = (struct tc4x_qspi_priv_s *)dev;
+  uint32_t ssoc;
   uint8_t cs;
 
   /* SPIDEV_USER(0) maps to default_cs; other indices used as SLSO directly */
@@ -808,11 +1068,9 @@ static void tc4x_qspi_select(FAR struct spi_dev_s *dev,
 
   if (cs != priv->cs)
     {
-      /* Disable the old CS output, switch to the new CS, and reprogram
-       * the ECONz entry and SSOC for the new chip select.
-       */
+      /* Disable old CS, switch to new, reprogram ECONz/SSOC. */
 
-      uint32_t ssoc = qspi_getreg(priv->config, TC4X_QSPI_SSOC_OFFSET);
+      ssoc = qspi_getreg(priv->config, TC4X_QSPI_SSOC_OFFSET);
       ssoc &= ~TC4X_QSPI_SSOC_OEN_BIT(priv->cs);
       qspi_putreg(priv->config, TC4X_QSPI_SSOC_OFFSET, ssoc);
 
@@ -822,6 +1080,22 @@ static void tc4x_qspi_select(FAR struct spi_dev_s *dev,
 
   UNUSED(selected); /* Hardware manages assertion timing via BACON */
 }
+
+/****************************************************************************
+ * Name: tc4x_qspi_setfrequency
+ *
+ * Description:
+ *   Set the SPI clock frequency.  Reprograms ECONz if the frequency
+ *   differs from the current setting.
+ *
+ * Input Parameters:
+ *   dev       - SPI device handle.
+ *   frequency - Requested SPI clock frequency in Hz.
+ *
+ * Returned Value:
+ *   The achieved SPI clock frequency in Hz.
+ *
+ ****************************************************************************/
 
 static uint32_t tc4x_qspi_setfrequency(FAR struct spi_dev_s *dev,
                                        uint32_t frequency)
@@ -839,6 +1113,22 @@ static uint32_t tc4x_qspi_setfrequency(FAR struct spi_dev_s *dev,
   return priv->actual_freq;
 }
 
+/****************************************************************************
+ * Name: tc4x_qspi_setmode
+ *
+ * Description:
+ *   Set the SPI clock polarity and phase (CPOL/CPHA).  Reprograms ECONz
+ *   if the mode differs from the current setting.
+ *
+ * Input Parameters:
+ *   dev  - SPI device handle.
+ *   mode - SPIDEV_MODE0 .. SPIDEV_MODE3.
+ *
+ * Returned Value:
+ *   None.
+ *
+ ****************************************************************************/
+
 static void tc4x_qspi_setmode(FAR struct spi_dev_s *dev,
                               enum spi_mode_e mode)
 {
@@ -852,6 +1142,21 @@ static void tc4x_qspi_setmode(FAR struct spi_dev_s *dev,
   priv->mode = mode;
   qspi_reconfigure(priv);
 }
+
+/****************************************************************************
+ * Name: tc4x_qspi_setbits
+ *
+ * Description:
+ *   Set the number of bits per SPI word (2..32).
+ *
+ * Input Parameters:
+ *   dev   - SPI device handle.
+ *   nbits - Word width in bits (2 through 32 inclusive).
+ *
+ * Returned Value:
+ *   None.
+ *
+ ****************************************************************************/
 
 static void tc4x_qspi_setbits(FAR struct spi_dev_s *dev, int nbits)
 {
@@ -867,6 +1172,22 @@ static void tc4x_qspi_setbits(FAR struct spi_dev_s *dev, int nbits)
   priv->nbits = (uint8_t)nbits;
 }
 
+/****************************************************************************
+ * Name: tc4x_qspi_status
+ *
+ * Description:
+ *   Return the SPI device status bitmask.  Always reports the device as
+ *   present; hardware-level presence detection is not supported.
+ *
+ * Input Parameters:
+ *   dev   - SPI device handle (unused).
+ *   devid - NuttX SPI device identifier (unused).
+ *
+ * Returned Value:
+ *   SPI_STATUS_PRESENT
+ *
+ ****************************************************************************/
+
 static uint8_t tc4x_qspi_status(FAR struct spi_dev_s *dev, uint32_t devid)
 {
   UNUSED(dev);
@@ -874,73 +1195,193 @@ static uint8_t tc4x_qspi_status(FAR struct spi_dev_s *dev, uint32_t devid)
   return SPI_STATUS_PRESENT;
 }
 
+/****************************************************************************
+ * Name: tc4x_qspi_send
+ *
+ * Description:
+ *   Send one word on the SPI bus and return the received word.
+ *
+ * Input Parameters:
+ *   dev - SPI device handle.
+ *   wd  - Word to transmit.
+ *
+ * Returned Value:
+ *   Received word.
+ *
+ ****************************************************************************/
+
 static uint32_t tc4x_qspi_send(FAR struct spi_dev_s *dev, uint32_t wd)
 {
   struct tc4x_qspi_priv_s *priv = (struct tc4x_qspi_priv_s *)dev;
   return qspi_xfer_word(priv, wd);
 }
 
-#ifdef CONFIG_SPI_EXCHANGE
+/****************************************************************************
+ * Name: tc4x_qspi_exchange
+ *
+ * Description:
+ *   Exchange a block of data over the SPI bus.  Transmits from txbuffer
+ *   (or sends 0xFF bytes when NULL) and stores received data into rxbuffer
+ *   (or discards when NULL).  Uses BACON LAST=1 only on the final word to
+ *   keep CS asserted across the whole transaction.
+ *
+ * Input Parameters:
+ *   dev      - SPI device handle.
+ *   txbuffer - Buffer of words to transmit, or NULL to send 0xFF.
+ *   rxbuffer - Buffer to receive words into, or NULL to discard.
+ *   nwords   - Number of words to exchange.
+ *
+ * Returned Value:
+ *   None.
+ *
+ ****************************************************************************/
+
 static void tc4x_qspi_exchange(FAR struct spi_dev_s *dev,
                                FAR const void *txbuffer,
                                FAR void *rxbuffer, size_t nwords)
 {
   struct tc4x_qspi_priv_s *priv = (struct tc4x_qspi_priv_s *)dev;
+  const struct tc4x_qspi_config_s *cfg = priv->config;
+  uint32_t bacon_base;
+  uint32_t status;
+  uint32_t fifo_level;
+  uint32_t timeout;
+  uint32_t tx;
+  uint32_t rx;
+  bool last;
   size_t i;
 
-  for (i = 0; i < nwords; i++)
+  if (nwords == 0u)
     {
-      uint32_t tx = 0xffffffffu;
-      uint32_t rx;
+      return;
+    }
 
-      if (txbuffer != NULL)
+  /* Drain any stale RX entries from a previous transfer */
+
+  qspi_drain_rx(cfg);
+
+  bacon_base = qspi_bacon_base(priv);
+
+  /* Pipeline: TX[i]'s RX is committed when TX[i+1] is written;
+   * the final word (LAST=1) commits its own RX and ends the frame.
+   */
+
+  for (i = 0u; i < nwords; i++)
+    {
+      last = (i == nwords - 1u);
+
+      if (txbuffer == NULL)
         {
-          if (priv->nbits <= 8)
-            {
-              tx = ((const uint8_t *)txbuffer)[i];
-            }
-          else if (priv->nbits <= 16)
-            {
-              tx = ((const uint16_t *)txbuffer)[i];
-            }
-          else
-            {
-              tx = ((const uint32_t *)txbuffer)[i];
-            }
+          tx = 0xffffffffu;
+        }
+      else if (priv->nbits <= 8)
+        {
+          tx = ((const uint8_t *)txbuffer)[i];
+        }
+      else if (priv->nbits <= 16)
+        {
+          tx = ((const uint16_t *)txbuffer)[i];
+        }
+      else
+        {
+          tx = ((const uint32_t *)txbuffer)[i];
         }
 
-      rx = qspi_xfer_word(priv, tx);
+      /* Wait for TX FIFO space */
 
-      if (rxbuffer != NULL)
+      timeout = TC4X_QSPI_POLL_TIMEOUT;
+      while (timeout > 0u)
         {
-          if (priv->nbits <= 8)
+          status = qspi_getreg(cfg, TC4X_QSPI_STATUS_OFFSET);
+          fifo_level = (status & TC4X_QSPI_STATUS_TXFIFOLEVEL_MASK)
+                       >> TC4X_QSPI_STATUS_TXFIFOLEVEL_SHIFT;
+          if (fifo_level < 4u)
             {
-              ((uint8_t *)rxbuffer)[i]  = (uint8_t)rx;
+              break;
             }
-          else if (priv->nbits <= 16)
+
+          timeout--;
+        }
+
+      if (timeout == 0u)
+        {
+          return;
+        }
+
+      /* LAST=1 only on the final word — CS stays LOW across all words */
+
+      qspi_putreg(cfg, TC4X_QSPI_BACONENTRY_OFFSET,
+                  bacon_base | (last ? TC4X_QSPI_BACON_LAST : 0u));
+      qspi_putreg(cfg, TC4X_QSPI_DATAENTRY_OFFSET(0), tx);
+
+      /* Writing the next BACON commits RX[i-1] to the FIFO (i > 0) */
+
+      if (i > 0u)
+        {
+          if (!qspi_poll_rx(cfg, &rx))
             {
-              ((uint16_t *)rxbuffer)[i] = (uint16_t)rx;
+              return;
             }
-          else
-            {
-              ((uint32_t *)rxbuffer)[i] = rx;
-            }
+
+          qspi_store_rx(priv, rxbuffer, i - 1u, rx);
         }
     }
+
+  /* Read the final RX word — committed after LAST=1 transfer completes */
+
+  if (!qspi_poll_rx(cfg, &rx))
+    {
+      return;
+    }
+
+  qspi_store_rx(priv, rxbuffer, nwords - 1u, rx);
 }
-#else
+
+#ifndef CONFIG_SPI_EXCHANGE
+/****************************************************************************
+ * Name: tc4x_qspi_sndblock
+ *
+ * Description:
+ *   Send a block of data over the SPI bus without receiving.
+ *
+ * Input Parameters:
+ *   dev    - SPI device handle.
+ *   buffer - Buffer of words to transmit.
+ *   nwords - Number of words to send.
+ *
+ * Returned Value:
+ *   None.
+ *
+ ****************************************************************************/
+
 static void tc4x_qspi_sndblock(FAR struct spi_dev_s *dev,
                                FAR const void *buffer, size_t nwords)
 {
   tc4x_qspi_exchange(dev, buffer, NULL, nwords);
 }
 
+/****************************************************************************
+ * Name: tc4x_qspi_recvblock
+ *
+ * Description:
+ *   Receive a block of data from the SPI bus, transmitting 0xFF bytes.
+ *
+ * Input Parameters:
+ *   dev    - SPI device handle.
+ *   buffer - Buffer to store received words.
+ *   nwords - Number of words to receive.
+ *
+ * Returned Value:
+ *   None.
+ *
+ ****************************************************************************/
+
 static void tc4x_qspi_recvblock(FAR struct spi_dev_s *dev,
                                 FAR void *buffer, size_t nwords)
 {
   tc4x_qspi_exchange(dev, NULL, buffer, nwords);
 }
-#endif /* CONFIG_SPI_EXCHANGE */
+#endif /* !CONFIG_SPI_EXCHANGE */
 
 /****************************************************************************
  * Public Functions
@@ -948,6 +1389,19 @@ static void tc4x_qspi_recvblock(FAR struct spi_dev_s *dev,
 
 /****************************************************************************
  * Name: tc4x_qspibus_initialize
+ *
+ * Description:
+ *   Initialize the selected QSPI bus and return a handle that can be passed
+ *   directly to the SPI framework.  Subsequent calls with the same bus
+ *   number return the cached, already-initialized handle.
+ *
+ * Input Parameters:
+ *   bus - Zero-based QSPI bus number (0..7, subject to Kconfig).
+ *
+ * Returned Value:
+ *   A non-NULL pointer to the SPI device handle on success; NULL if the
+ *   bus number is not enabled or hardware initialization fails.
+ *
  ****************************************************************************/
 
 FAR struct spi_dev_s *tc4x_qspibus_initialize(int bus)
