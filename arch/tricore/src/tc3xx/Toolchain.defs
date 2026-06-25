@@ -23,6 +23,7 @@
 ifeq ($(CONFIG_TRICORE_TOOLCHAIN_LLVM),y)
 ARCHCPUFLAGS += -march=tc162 -Wno-error=implicit-function-declaration
 ARCHCPUFLAGS += -mcpu=tc3xx
+ARCHCPUFLAGS += -falign-globals -falign-locals -falign-const-strings
 else
 # FIXME GNU GCC options
 ARCHCPUFLAGS += -mtc162
@@ -33,3 +34,7 @@ ARCHINCLUDES += $(INCDIR_PREFIX)$(TOPDIR)$(DELIM)arch$(DELIM)tricore$(DELIM)src$
 CFLAGS += $(ARCHINCLUDES)
 
 include $(TOPDIR)/arch/tricore/src/common/Toolchain.defs
+
+ifeq ($(CONFIG_TRICORE_TOOLCHAIN_LLVM),y)
+ARCHOPTIMIZATION := $(filter-out -O0 -O1 -O2 -O3 -Os -Og -Oz,$(ARCHOPTIMIZATION)) -O0
+endif

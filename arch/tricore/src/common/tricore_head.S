@@ -190,13 +190,16 @@ skip_bss:
 	jl	tricore_safety_endinit_enable
 
 	/* Disable watchdog */
+	.p2align 5
 	call	tricore_wdt_disable
 
 	mfcr	%d4, IFX_CPU_CORE_ID
 	extr.u	%d4, %d4, 0, 3
 	jnz	%d4, skip_clockconfig
+	.p2align 5
 	call	up_clockconfig
 	mfcr	%d4, IFX_CPU_CORE_ID
 	extr.u	%d4, %d4, 0, 3
 skip_clockconfig:
+	.p2align 5
 	j	tricore_start
