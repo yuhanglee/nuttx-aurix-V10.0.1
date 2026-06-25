@@ -233,9 +233,9 @@ static void tc4x7_qspi4_pinmux(void)
   aurix_config_gpio(AURIX_GPIO(22, 0, GPIO_PERIPH, GPIO_ALT3)
                     | GPIO_PERIPH_OWN_PAD);
 
-  /* MISO: P22.1 -> QSPI4_MRSTB_F (input, no pull, MRIS=1 in PISEL) */
+  /* MISO: P22.1 -> QSPI4_MRSTB_F (input,  pull-up, MRIS=1 in PISEL) */
 
-  aurix_config_gpio(AURIX_GPIO(22, 1, GPIO_INPUT, GPIO_PULL_NONE));
+  aurix_config_gpio(AURIX_GPIO(22, 1, GPIO_INPUT, GPIO_PULL_UP));
 
   /* SCLK: P22.3 -> QSPI4_SCLK_F  (ALT3, peripheral drives the pad)
    *        R304-R312 must be present (default) for this pin to be free.
