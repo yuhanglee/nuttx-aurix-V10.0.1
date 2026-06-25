@@ -266,6 +266,15 @@ config TC4XX_QSPI0_MRIS
 	int "QSPI0 MRIS pin input select"
 	default 0
 	range 0 7
+config TC4XX_QSPI0_TXIRQ
+	int "QSPI0 TX interrupt node index (IRQ_QSPI0_TX)"
+	default 280
+config TC4XX_QSPI0_RXIRQ
+	int "QSPI0 RX interrupt node index (IRQ_QSPI0_RX)"
+	default 281
+config TC4XX_QSPI0_ERIRQ
+	int "QSPI0 Error interrupt node index (IRQ_QSPI0_ERR)"
+	default 282
 endif # TC4XX_QSPI0
 
 config TC4XX_QSPI1
@@ -281,6 +290,15 @@ config TC4XX_QSPI1_MRIS
 	int "QSPI1 MRIS pin input select"
 	default 0
 	range 0 7
+config TC4XX_QSPI1_TXIRQ
+	int "QSPI1 TX interrupt node index (IRQ_QSPI1_TX)"
+	default 285
+config TC4XX_QSPI1_RXIRQ
+	int "QSPI1 RX interrupt node index (IRQ_QSPI1_RX)"
+	default 286
+config TC4XX_QSPI1_ERIRQ
+	int "QSPI1 Error interrupt node index (IRQ_QSPI1_ERR)"
+	default 287
 endif # TC4XX_QSPI1
 
 config TC4XX_QSPI2
@@ -296,6 +314,15 @@ config TC4XX_QSPI2_MRIS
 	int "QSPI2 MRIS pin input select"
 	default 0
 	range 0 7
+config TC4XX_QSPI2_TXIRQ
+	int "QSPI2 TX interrupt node index (IRQ_QSPI2_TX)"
+	default 290
+config TC4XX_QSPI2_RXIRQ
+	int "QSPI2 RX interrupt node index (IRQ_QSPI2_RX)"
+	default 291
+config TC4XX_QSPI2_ERIRQ
+	int "QSPI2 Error interrupt node index (IRQ_QSPI2_ERR)"
+	default 292
 endif # TC4XX_QSPI2
 
 config TC4XX_QSPI3
@@ -311,6 +338,15 @@ config TC4XX_QSPI3_MRIS
 	int "QSPI3 MRIS pin input select"
 	default 0
 	range 0 7
+config TC4XX_QSPI3_TXIRQ
+	int "QSPI3 TX interrupt node index (IRQ_QSPI3_TX)"
+	default 295
+config TC4XX_QSPI3_RXIRQ
+	int "QSPI3 RX interrupt node index (IRQ_QSPI3_RX)"
+	default 296
+config TC4XX_QSPI3_ERIRQ
+	int "QSPI3 Error interrupt node index (IRQ_QSPI3_ERR)"
+	default 297
 endif # TC4XX_QSPI3
 
 config TC4XX_QSPI4
@@ -340,6 +376,15 @@ config TC4XX_QSPI4_LOOPBACK
                 Enable GLOBALCON.LB to internally connect MTSR to MRST.
                 Use this for spi_test /dev/spi1 without an external
                 MOSI->MISO jumper wire.
+config TC4XX_QSPI4_TXIRQ
+	int "QSPI4 TX interrupt node index (IRQ_QSPI4_TX)"
+	default 300
+config TC4XX_QSPI4_RXIRQ
+	int "QSPI4 RX interrupt node index (IRQ_QSPI4_RX)"
+	default 301
+config TC4XX_QSPI4_ERIRQ
+	int "QSPI4 Error interrupt node index (IRQ_QSPI4_ERR)"
+	default 302
 endif # TC4XX_QSPI4
 
 config TC4XX_QSPI5
@@ -355,6 +400,15 @@ config TC4XX_QSPI5_MRIS
 	int "QSPI5 MRIS pin input select"
 	default 0
 	range 0 7
+config TC4XX_QSPI5_TXIRQ
+	int "QSPI5 TX interrupt node index (IRQ_QSPI5_TX)"
+	default 305
+config TC4XX_QSPI5_RXIRQ
+	int "QSPI5 RX interrupt node index (IRQ_QSPI5_RX)"
+	default 306
+config TC4XX_QSPI5_ERIRQ
+	int "QSPI5 Error interrupt node index (IRQ_QSPI5_ERR)"
+	default 307
 endif # TC4XX_QSPI5
 
 config TC4XX_QSPI6
@@ -370,6 +424,15 @@ config TC4XX_QSPI6_MRIS
 	int "QSPI6 MRIS pin input select"
 	default 0
 	range 0 7
+config TC4XX_QSPI6_TXIRQ
+	int "QSPI6 TX interrupt node index (IRQ_QSPI6_TX)"
+	default 310
+config TC4XX_QSPI6_RXIRQ
+	int "QSPI6 RX interrupt node index (IRQ_QSPI6_RX)"
+	default 311
+config TC4XX_QSPI6_ERIRQ
+	int "QSPI6 Error interrupt node index (IRQ_QSPI6_ERR)"
+	default 312
 endif # TC4XX_QSPI6
 
 config TC4XX_QSPI7
@@ -385,6 +448,15 @@ config TC4XX_QSPI7_MRIS
 	int "QSPI7 MRIS pin input select"
 	default 0
 	range 0 7
+config TC4XX_QSPI7_TXIRQ
+	int "QSPI7 TX interrupt node index (IRQ_QSPI7_TX)"
+	default 315
+config TC4XX_QSPI7_RXIRQ
+	int "QSPI7 RX interrupt node index (IRQ_QSPI7_RX)"
+	default 316
+config TC4XX_QSPI7_ERIRQ
+	int "QSPI7 Error interrupt node index (IRQ_QSPI7_ERR)"
+	default 317
 endif # TC4XX_QSPI7
 
 endif # TC4XX_QSPI

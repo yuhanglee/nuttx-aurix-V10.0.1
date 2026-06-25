@@ -286,7 +286,9 @@
 #define TC4X_QSPI_STATUS_SLAVESEL_SHIFT   24
 #define TC4X_QSPI_STATUS_SLAVESEL_MASK    GENMASK(27, 24)
 #define TC4X_QSPI_STATUS_PHASE_MASK       GENMASK(31, 28)
-#define TC4X_QSPI_STATUS_PHASE_WAIT       (0u << 28)
+#define TC4X_QSPI_STATUS_PHASE_WAIT       (0u << 28)  /* SM idle, awaiting BACON   */
+#define TC4X_QSPI_STATUS_PHASE_IDLE       (1u << 28)  /* SM idle between frames    */
+#define TC4X_QSPI_STATUS_PHASE_RUN        (8u << 28)  /* SM actively transferring  */
 
 /* SSOC -- Slave Select Output Control Register
  * Offset 0x148, Kernel Reset value: 0x00000000H
@@ -309,5 +311,21 @@
 #define TC4X_QSPI_FLAGSCLEAR_PT1C             BIT(11)
 #define TC4X_QSPI_FLAGSCLEAR_PT2C             BIT(12)
 #define TC4X_QSPI_FLAGSCLEAR_USRC             BIT(15)
+
+/* TC4Dx QSPI SRC node indices: base 0x460, stride 0x14 per bus.
+ * Index = byte_offset / 4.  TX=280+bus*5, RX=281+bus*5, ERR=282+bus*5.
+ */
+
+#define TC4X_QSPI_SRC_TX_OFFSET  0x460u  /* SRC_QSPI0TX byte offset */
+#define TC4X_QSPI_SRC_RX_OFFSET  0x464u  /* SRC_QSPI0RX byte offset */
+#define TC4X_QSPI_SRC_ER_OFFSET  0x468u  /* SRC_QSPI0ERR byte offset */
+#define TC4X_QSPI_SRC_STRIDE     0x14u   /* Byte stride per module (5 nodes) */
+
+#define TC4X_QSPI_SRC_TX_NODE(w) \
+  (int)((TC4X_QSPI_SRC_TX_OFFSET + (unsigned)(w) * TC4X_QSPI_SRC_STRIDE) / 4u)
+#define TC4X_QSPI_SRC_RX_NODE(w) \
+  (int)((TC4X_QSPI_SRC_RX_OFFSET + (unsigned)(w) * TC4X_QSPI_SRC_STRIDE) / 4u)
+#define TC4X_QSPI_SRC_ER_NODE(w) \
+  (int)((TC4X_QSPI_SRC_ER_OFFSET + (unsigned)(w) * TC4X_QSPI_SRC_STRIDE) / 4u)
 
 #endif /* __ARCH_TRICORE_SRC_TC4XX_HARDWARE_TC4X_QSPI_H */
