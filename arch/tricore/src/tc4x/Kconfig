@@ -134,25 +134,28 @@ config TC4X_ASCLIN_SPI
 
 if TC4X_ASCLIN_SPI
 
-config TC4X_ASCLIN2_SPI
-	bool "ASCLIN2 as SPI bus 0"
+config TC4X_ASCLIN3_SPI
+	bool "ASCLIN3 as SPI bus 0 (mikroBUS pins)"
 	default y
 	---help---
-		Use ASCLIN2 for SPI bus 0.  Default pins:
-		  MOSI: P15.0 (ATX, ALT02)
-		  MISO: P15.1 (ARX, ALTI_A)
-		  SCLK: P15.2 (ASCLKO, ALT02)
-		  CS:   P14.7 (GPIO)
+		Use ASCLIN3 for SPI bus 0.  On a3g-tc4d7-lite this is wired to
+		the mikroBUS connector SPI pins (verified against iLLD
+		IfxAsclin_PinMap_TC4Dx_BGA292_COM):
 
-		Verify pin assignments against your board schematic and
-		pinmux.pdf before enabling.
+		  MOSI: P15.6 (ASCLIN3.TX, ALT2)   - mikroBUS pin 6
+		  MISO: P15.7 (ASCLIN3.RXA)        - mikroBUS pin 5
+		  SCLK: P15.8 (ASCLIN3.SCLK, ALT6) - mikroBUS pin 4
+		  CS:   P14.7 (GPIO)               - mikroBUS pin 3
 
-config TC4X_ASCLIN2_SPI_LOOPBACK
-	bool "Enable loopback on ASCLIN2 SPI"
-	default y
-	depends on TC4X_ASCLIN2_SPI
+		ASCLIN3 has no SLSO line on a header-accessible pin, so CS is
+		driven as a plain GPIO from the SPI driver's select callback.
+
+config TC4X_ASCLIN3_SPI_LOOPBACK
+	bool "Enable loopback on ASCLIN3 SPI"
+	default n
+	depends on TC4X_ASCLIN3_SPI
 	---help---
-		Enable internal loopback (IOCR.LB) for ASCLIN2 SPI.  TX is
+		Enable internal loopback (IOCR.LB) for ASCLIN3 SPI.  TX is
 		internally connected to RX.  Useful for driver validation
 		without external wiring.  Disable for real hardware use.
 
