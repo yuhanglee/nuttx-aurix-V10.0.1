@@ -48,6 +48,34 @@ config TRICORE_ASCLINF_FREQUENCY
 
 endif # TRICORE_UART0
 
+config TRICORE_UART1
+        bool "ASCLIN1 UART"
+        default n
+        select UART1_SERIALDRIVER
+        select SERIAL
+        ---help---
+                Enable the ASCLIN1 peripheral as a UART serial port.
+
+                On the a3g-tc4d7-lite board ASCLIN1 maps to P15.0 (TX,
+                ALT2) and P15.1 (RX, ALTI_A), exposed on the mikroBUS
+                connector pins 13/14.
+
+if TRICORE_UART1
+
+config TRICORE_UART1_RXIRQ
+        int "ASCLIN1 RX IRQ number"
+        default 175
+
+config TRICORE_UART1_TXIRQ
+        int "ASCLIN1 TX IRQ number"
+        default 176
+
+config TRICORE_UART1_ERIRQ
+        int "ASCLIN1 ERR IRQ number"
+        default 177
+
+endif # TRICORE_UART1
+
 # WTU
 config TC4X_WDT
 	bool "TC4x Watchdog Timer (WTU)"
@@ -167,6 +195,41 @@ config TRICORE_GETH_BRIDGE_IRQ
 
 endif # TC4XX_GETH
 
+config TC4XX_XSPI
+	bool "xSPI controller"
+	default n
+	select XSPI
+	select XSPI_DW_SSI
+	select XSPI_DW_SSI_HAS_DDR
+	select XSPI_DW_SSI_HAS_HYPERBUS
+	select XSPI_DW_SSI_HAS_DMA
+	select XSPI_DW_SSI_HAS_XIP
+	---help---
+		Enable the TC4xx xSPI controller. Provides SoC glue around
+		the Synopsys DWC_SSI IP core driver for the single xSPI
+		instance on TC4Dx devices.
+
+if TC4XX_XSPI
+
+config TC4XX_XSPI_SSI_CLK_HZ
+	int "xSPI SSI_clk rate (Hz)"
+	default 100000000
+	---help---
+		Input SSI_clk frequency feeding the xSPI controller. Used by
+		the IP driver to compute the BAUDR divider. The default is a
+		placeholder; set from the board clock tree.
+
+config TC4XX_XSPI_PORTSEL_GPIO
+	bool "Route via GPIO pads (port 20) instead of HSFAST (port 16)"
+	default n
+	---help---
+		Select GPIO pad routing for reduced functionality mode:
+		SDR only, quad max, 25 MHz max, 3 V devices only.
+		Useful for early bring-up on boards that expose port 20 pins
+		on headers. Clear this for production HSFAST routing.
+
+endif # TC4XX_XSPI
+
 endmenu
 
 # SPI
@@ -185,25 +248,28 @@ config TC4XX_ASCLIN_SPI
 
 if TC4XX_ASCLIN_SPI
 
-config TC4XX_ASCLIN2_SPI
-	bool "ASCLIN2 as SPI bus 0"
+config TC4XX_ASCLIN3_SPI
+	bool "ASCLIN3 as SPI bus 0 (mikroBUS pins)"
 	default y
 	---help---
-		Use ASCLIN2 for SPI bus 0.  Default pins:
-		  MOSI: P15.0 (ATX, ALT02)
-		  MISO: P15.1 (ARX, ALTI_A)
-		  SCLK: P15.2 (ASCLKO, ALT02)
-		  CS:   P14.7 (GPIO)
+		Use ASCLIN3 for SPI bus 0.  On a3g-tc4d7-lite this is wired to
+		the mikroBUS connector SPI pins (verified against iLLD
+		IfxAsclin_PinMap_TC4Dx_BGA292_COM):
 
-		Verify pin assignments against your board schematic and
-		pinmux.pdf before enabling.
+		  MOSI: P15.6 (ASCLIN3.TX, ALT2)   - mikroBUS pin 6
+		  MISO: P15.7 (ASCLIN3.RXA)        - mikroBUS pin 5
+		  SCLK: P15.8 (ASCLIN3.SCLK, ALT6) - mikroBUS pin 4
+		  CS:   P14.7 (GPIO)               - mikroBUS pin 3
 
-config TC4XX_ASCLIN2_SPI_LOOPBACK
-	bool "Enable loopback on ASCLIN2 SPI"
-	default y
-	depends on TC4XX_ASCLIN2_SPI
+		ASCLIN3 has no SLSO line on a header-accessible pin, so CS is
+		driven as a plain GPIO from the SPI driver's select callback.
+
+config TC4XX_ASCLIN3_SPI_LOOPBACK
+	bool "Enable loopback on ASCLIN3 SPI"
+	default n
+	depends on TC4XX_ASCLIN3_SPI
 	---help---
-		Enable internal loopback (IOCR.LB) for ASCLIN2 SPI.  TX is
+		Enable internal loopback (IOCR.LB) for ASCLIN3 SPI.  TX is
 		internally connected to RX.  Useful for driver validation
 		without external wiring.  Disable for real hardware use.
 
