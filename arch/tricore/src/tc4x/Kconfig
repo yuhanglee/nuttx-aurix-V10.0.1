@@ -166,3 +166,38 @@ config TC4X_ASCLIN_SPI_CHARDEV
 
 endif # TC4X_ASCLIN_SPI
 
+config TC4X_XSPI
+	bool "xSPI controller"
+	default n
+	select XSPI
+	select XSPI_DW_SSI
+	select XSPI_DW_SSI_HAS_DDR
+	select XSPI_DW_SSI_HAS_HYPERBUS
+	select XSPI_DW_SSI_HAS_DMA
+	select XSPI_DW_SSI_HAS_XIP
+	---help---
+		Enable the TC4xx xSPI controller. Provides SoC glue around
+		the Synopsys DWC_SSI IP core driver for the single xSPI
+		instance on TC4Dx devices.
+
+if TC4X_XSPI
+
+config TC4X_XSPI_SSI_CLK_HZ
+	int "xSPI SSI_clk rate (Hz)"
+	default 100000000
+	---help---
+		Input SSI_clk frequency feeding the xSPI controller. Used by
+		the IP driver to compute the BAUDR divider. The default is a
+		placeholder; set from the board clock tree.
+
+config TC4X_XSPI_PORTSEL_GPIO
+	bool "Route via GPIO pads (port 20) instead of HSFAST (port 16)"
+	default n
+	---help---
+		Select GPIO pad routing for reduced functionality mode:
+		SDR only, quad max, 25 MHz max, 3 V devices only.
+		Useful for early bring-up on boards that expose port 20 pins
+		on headers. Clear this for production HSFAST routing.
+
+endif # TC4X_XSPI
+

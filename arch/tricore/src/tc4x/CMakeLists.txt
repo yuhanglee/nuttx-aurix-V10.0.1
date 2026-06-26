@@ -26,6 +26,13 @@ if(CONFIG_TC4X_I2C)
   list(APPEND SRCS tc4x_i2c.c)
 endif()
 
+if(CONFIG_TC4X_XSPI)
+  list(APPEND SRCS tc4x_xspi.c)
+  if(NOT CONFIG_TC4X_XSPI_PORTSEL_GPIO)
+    list(APPEND SRCS tc4x_hsphy.c)
+  endif()
+endif()
+
 if(CONFIG_TC4X_ASCLIN_SPI)
   list(APPEND SRCS tc4x_asclin_spi.c)
 endif()

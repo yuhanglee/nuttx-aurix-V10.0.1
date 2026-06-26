@@ -314,7 +314,7 @@ enum tc4x_rootclk_domain
 #define TC4X_PERPLL_K2PREDIV    1u
 #define TC4X_PERPLL_K3DIV       2u
 #define TC4X_PERPLL_K3PREDIV    2u
-#define TC4X_PERPLL_K4DIV       1u
+#define TC4X_PERPLL_K4DIV       2u
 #define TC4X_PERPLL_K4PREDIV    2u
 
 #define TC4X_PERPLL_K2DIV_DEF       1u
