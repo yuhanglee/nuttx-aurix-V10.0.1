@@ -493,7 +493,8 @@ static int dw_ssi_transfer_hb(FAR struct xspi_dw_ssi_s *priv,
     }
 
   ret = dw_ssi_poll(priv, XSPI_DW_SSI_SR_OFFSET,
-                    XSPI_DW_SSI_SR_BUSY, 0, deadline);
+                    XSPI_DW_SSI_SR_TFE | XSPI_DW_SSI_SR_BUSY,
+                    XSPI_DW_SSI_SR_TFE, deadline);
 
 out:
   dw_ssi_write(priv, XSPI_DW_SSI_SER_OFFSET, 0);
