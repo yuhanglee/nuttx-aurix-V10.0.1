@@ -45,11 +45,20 @@ extern void     xspi_write(uint32_t value, uintptr_t reg);
 #define TC4X7_XSPI_BLK_PATH    "/dev/mtdblock0"
 #define TC4X7_XSPI_CHR_PATH    "/dev/mtd0"
 
-/* Triboard-TC4X7-COM xSPI <-> S26HS512 pinout (user manual Table 17). */
+/* 
+ *   PD = 2 for clock and chip-select (stronger drive)
+ *   PD = 1 for data + strobe lines
+ * Without these the IO drives are too weak and the first 16-bit word
+ * of every CA-issued burst gets sampled at the wrong phase.
+ */
 
-#define XSPI_PAD(pin) \
+#define XSPI_PAD_CLK(pin) \
   (AURIX_GPIO(GPIO_PORT16, (pin), GPIO_PERIPH, GPIO_ALT0) | \
-   GPIO_PERIPH_OWN_PAD)
+   GPIO_PERIPH_OWN_PAD | GPIO_PD(2) | GPIO_PL(3))
+
+#define XSPI_PAD_DQ(pin) \
+  (AURIX_GPIO(GPIO_PORT16, (pin), GPIO_PERIPH, GPIO_ALT0) | \
+   GPIO_PERIPH_OWN_PAD | GPIO_PD(1) | GPIO_PL(3))
 
 #define XSPI_RESET_PAD \
   (AURIX_GPIO(GPIO_PORT16, GPIO_PIN4, GPIO_OUTPUT, GPIO_ALT0) | \
@@ -59,18 +68,18 @@ static int tc4x7_xspi_pinmux(void)
 {
   static const gpio_pinset_t pads[] =
   {
-    XSPI_PAD(0),     /* CK_N        */
-    XSPI_PAD(1),     /* CK_P        */
-    XSPI_PAD(2),     /* RWDS / DS   */
-    XSPI_PAD(3),     /* DQ1         */
-    XSPI_PAD(5),     /* DQ2         */
-    XSPI_PAD(6),     /* DQ3         */
-    XSPI_PAD(7),     /* DQ0         */
-    XSPI_PAD(8),     /* DQ4         */
-    XSPI_PAD(9),     /* DQ5         */
-    XSPI_PAD(10),    /* DQ6         */
-    XSPI_PAD(12),    /* DQ7         */
-    XSPI_PAD(13),    /* CS0_N       */
+    XSPI_PAD_CLK(0),  /* CK_N        */
+    XSPI_PAD_CLK(1),  /* CK_P        */
+    XSPI_PAD_DQ(2),   /* RWDS / DS   */
+    XSPI_PAD_DQ(3),   /* DQ1         */
+    XSPI_PAD_DQ(5),   /* DQ2         */
+    XSPI_PAD_DQ(6),   /* DQ3         */
+    XSPI_PAD_DQ(7),   /* DQ0         */
+    XSPI_PAD_DQ(8),   /* DQ4         */
+    XSPI_PAD_DQ(9),   /* DQ5         */
+    XSPI_PAD_DQ(10),  /* DQ6         */
+    XSPI_PAD_DQ(12),  /* DQ7         */
+    XSPI_PAD_CLK(13), /* CS0_N       */
     XSPI_RESET_PAD,
   };
 
@@ -89,10 +98,6 @@ static int tc4x7_xspi_pinmux(void)
 
   return OK;
 }
-
-/* RESET_N is wired to P16.4.  Drive low 1 ms, then high, then 10 ms wait
- * to cover S26HS POR plus any stale state from prior probes.
- */
 
 static void tc4x7_xspi_flash_reset(void)
 {
