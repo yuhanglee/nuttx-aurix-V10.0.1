@@ -37,9 +37,22 @@
 
 #include "tricore_internal.h"
 
+#define TC4X_PMS_VMONP_VDDPHPHY0CON 0xF024909Cu
+#define TC4X_PMS_VMONP_VDDPHPHY0RST 0xF02490A0u
+#define TC4X_PMS_VMONP_VDDPHPHY0STAT 0xF02490A4u
+#define TC4X_PMS_VMONP_VDDPHPHY1CON 0xF02490A8u
+#define TC4X_PMS_VMONP_VDDPHPHY1RST 0xF02490ACu
+#define TC4X_PMS_VMONP_VDDPHPHY1STAT 0xF02490B0u
+#define TC4X_PMS_VMONP_VDDPHPHY2CON 0xF02490B4u
+#define TC4X_PMS_VMONP_VDDPHPHY2RST 0xF02490B8u
+#define TC4X_PMS_VMONP_VDDPHPHY2STAT 0xF02490BCu
 #define TC4X_PMS_VMONP_VDDHSIFCON   0xF02490C0u
 #define TC4X_PMS_VMONP_VDDHSIFRST   0xF02490C4u
 #define TC4X_PMS_VMONP_VDDHSIFSTAT  0xF02490C8u
+#define TC4X_PMS_VMONP_VDDPHY0CON   0xF0249114u
+#define TC4X_PMS_VMONP_VDDPHY0STAT  0xF024911Cu
+#define TC4X_PMS_VMONP_VDDPHY1CON   0xF0249120u
+#define TC4X_PMS_VMONP_VDDPHY2CON   0xF024912Cu
 #define TC4X_PMS_VMONP_OVE          (1u << 28)
 #define TC4X_PMS_VMONP_RESETOFF     (1u << 24)
 #define TC4X_PMS_VMONP_RESETOFF_P   (1u << 25)
@@ -91,29 +104,54 @@ static void tc4x_xspi_ccu_enable(void)
 }
 
 
-static void tc4x_xspi_pms_enable_vddhsif(void)
+static void tc4x_xspi_pms_enable_one(uintptr_t con, uintptr_t rst,
+                                     uintptr_t stat)
 {
-  uint32_t stat;
+  uint32_t s;
   int      i;
 
-  modreg32(TC4X_PMS_VMONP_OVE, TC4X_PMS_VMONP_OVE,
-           TC4X_PMS_VMONP_VDDHSIFCON);
+  modreg32(TC4X_PMS_VMONP_OVE, TC4X_PMS_VMONP_OVE, con);
 
-  for (i = 0; i < 100; i++)
+  if (stat != 0u)
     {
-      tc4x_xspi_busy_us(1000);
-      stat = getreg32(TC4X_PMS_VMONP_VDDHSIFSTAT);
-      if (((stat >> 8) & 0xFFu) > (stat & 0xFFu))
+      for (i = 0; i < 100; i++)
         {
-          break;
+          tc4x_xspi_busy_us(100);
+          s = getreg32(stat);
+          if (((s >> 8) & 0xFFu) > (s & 0xFFu))
+            {
+              break;
+            }
         }
     }
 
-  modreg32(TC4X_PMS_VMONP_RESETOFF_P,
-           TC4X_PMS_VMONP_RESETOFF | TC4X_PMS_VMONP_RESETOFF_P,
-           TC4X_PMS_VMONP_VDDHSIFRST);
+  if (rst != 0u)
+    {
+      modreg32(TC4X_PMS_VMONP_RESETOFF_P,
+               TC4X_PMS_VMONP_RESETOFF | TC4X_PMS_VMONP_RESETOFF_P,
+               rst);
+    }
 }
 
+static void tc4x_xspi_pms_enable_vddhsif(void)
+{
+  tc4x_xspi_pms_enable_one(TC4X_PMS_VMONP_VDDHSIFCON,
+                           TC4X_PMS_VMONP_VDDHSIFRST,
+                           TC4X_PMS_VMONP_VDDHSIFSTAT);
+  tc4x_xspi_pms_enable_one(TC4X_PMS_VMONP_VDDPHY0CON, 0,
+                           TC4X_PMS_VMONP_VDDPHY0STAT);
+  tc4x_xspi_pms_enable_one(TC4X_PMS_VMONP_VDDPHY1CON, 0, 0);
+  tc4x_xspi_pms_enable_one(TC4X_PMS_VMONP_VDDPHY2CON, 0, 0);
+  tc4x_xspi_pms_enable_one(TC4X_PMS_VMONP_VDDPHPHY0CON,
+                           TC4X_PMS_VMONP_VDDPHPHY0RST,
+                           TC4X_PMS_VMONP_VDDPHPHY0STAT);
+  tc4x_xspi_pms_enable_one(TC4X_PMS_VMONP_VDDPHPHY1CON,
+                           TC4X_PMS_VMONP_VDDPHPHY1RST,
+                           TC4X_PMS_VMONP_VDDPHPHY1STAT);
+  tc4x_xspi_pms_enable_one(TC4X_PMS_VMONP_VDDPHPHY2CON,
+                           TC4X_PMS_VMONP_VDDPHPHY2RST,
+                           TC4X_PMS_VMONP_VDDPHPHY2STAT);
+}
 
 static int tc4x_xspi_module_clc_enable(uint32_t timeout_us)
 {

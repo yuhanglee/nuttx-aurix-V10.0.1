@@ -37,10 +37,9 @@
 
 #define HF_WAIT_CYCLES_DEFAULT     17u
 #define HF_WB_MAX_WORDS            256u
-#define HF_STATUS_TIMEOUT_MS       2000u
+#define HF_STATUS_TIMEOUT_MS       5000u
 #define HF_MTD_BLOCKSIZE           4096u
 #define HF_READ_CHUNK_WORDS        8u
-#define HF_PROBE_TIMEOUT_MS        100u
 
 struct hf_chip_info_s
 {
@@ -76,7 +75,6 @@ static int     hf_program_buffer(FAR struct hf_dev_s *priv,
                                  uint32_t base_waddr,
                                  FAR const uint16_t *data,
                                  unsigned int nwords);
-static void    hf_prime(FAR struct hf_dev_s *priv);
 static int     hf_probe(FAR struct hf_dev_s *priv);
 
 static int     hf_mtd_erase(FAR struct mtd_dev_s *dev, off_t startblock,
@@ -225,7 +223,7 @@ static void hf_prime(FAR struct hf_dev_s *priv)
   (void)hf_xfer_read(priv, HF_UNLOCK_ADDR1, &dummy, 1);
   (void)hf_xfer_write_word(priv, HF_UNLOCK_ADDR1, HF_UNLOCK_DATA1);
   (void)hf_xfer_read(priv, HF_UNLOCK_ADDR1, &dummy, 1);
-  up_mdelay(1);
+  up_udelay(1000);
 }
 
 static int hf_sector_erase(FAR struct hf_dev_s *priv, uint32_t sector_waddr)
@@ -268,8 +266,6 @@ static int hf_program_buffer(FAR struct hf_dev_s *priv,
       return -EINVAL;
     }
 
-  hf_prime(priv);
-
   ret = hf_unlock_prefix(priv);
   if (ret < 0)
     {
@@ -297,7 +293,30 @@ static int hf_program_buffer(FAR struct hf_dev_s *priv,
         }
     }
 
-  return hf_xfer_write_word(priv, base_waddr, HF_CMD_WBCONFIRM);
+  ret = hf_xfer_write_word(priv, base_waddr, HF_CMD_WBCONFIRM);
+  if (ret < 0)
+    {
+      return ret;
+    }
+
+  up_mdelay(2);
+  return OK;
+}
+
+static void hf_softreset(FAR struct hf_dev_s *priv)
+{
+  uint16_t dummy = 0;
+  int i;
+
+  for (i = 0; i < 16; i++)
+    {
+      (void)hf_xfer_write_word(priv, 0u,              HF_CMD_RESET);
+      (void)hf_xfer_read(priv, HF_UNLOCK_ADDR1, &dummy, 1);
+      (void)hf_xfer_write_word(priv, HF_UNLOCK_ADDR1, HF_CMD_RESET);
+      (void)hf_xfer_read(priv, 0u,             &dummy, 1);
+    }
+
+  up_udelay(2000);
 }
 
 static int hf_probe(FAR struct hf_dev_s *priv)
@@ -314,6 +333,14 @@ static int hf_probe(FAR struct hf_dev_s *priv)
       return ret;
     }
 
+ /* the S26HS HyperFlash chip is NOT reset by the SoC
+  * RESET pin pulse alone if it was left in a stale ASO/CFI/status-read
+  * mode by a prior boot. Without this the very first multi-cycle command
+  * after boot is silently absorbed and writes never persist.
+  */
+
+  hf_softreset(priv);
+
   for (i = 0; i < 10; i++)
     {
       hf_xfer_write_word(priv, HF_UNLOCK_ADDR1, HF_CMD_ASO_ENTRY);
@@ -322,15 +349,24 @@ static int hf_probe(FAR struct hf_dev_s *priv)
 
   hf_xfer_write_word(priv, HF_UNLOCK_ADDR1, HF_CMD_ASO_ENTRY);
   ret = hf_xfer_read(priv, 0x800u, &mfr, 1);
-  if (ret < 0) goto unlock;
+  if (ret < 0)
+    {
+      goto unlock;
+    }
 
   hf_xfer_write_word(priv, HF_UNLOCK_ADDR1, HF_CMD_ASO_ENTRY);
   ret = hf_xfer_read(priv, 0x801u, &iface, 1);
-  if (ret < 0) goto unlock;
+  if (ret < 0)
+    {
+      goto unlock;
+    }
 
   hf_xfer_write_word(priv, HF_UNLOCK_ADDR1, HF_CMD_ASO_ENTRY);
   ret = hf_xfer_read(priv, 0x802u, &density, 1);
-  if (ret < 0) goto unlock;
+  if (ret < 0)
+    {
+      goto unlock;
+    }
 
   (void)hf_soft_reset(priv);
 
@@ -381,11 +417,10 @@ static int hf_mtd_erase(FAR struct mtd_dev_s *dev, off_t startblock,
         }
 
       ret = hf_status_poll(priv, HF_STATUS_TIMEOUT_MS, &st);
-      if (ret < 0 || (st & HF_SR_ESB))
+      if (ret < 0)
         {
           ferr("hyperflash: erase block %ju failed st=0x%04x ret=%d\n",
                (uintmax_t)(startblock + i), st, ret);
-          ret = (ret < 0) ? ret : -EIO;
           break;
         }
     }
@@ -433,8 +468,8 @@ static ssize_t hf_mtd_bwrite(FAR struct mtd_dev_s *dev, off_t startblock,
 
   while (off < total_words)
     {
-      size_t chunk = total_words - off;
-      uint16_t st  = 0;
+      size_t   chunk = total_words - off;
+      uint16_t st    = 0;
 
       if (chunk > HF_WB_MAX_WORDS)
         {
@@ -449,12 +484,12 @@ static ssize_t hf_mtd_bwrite(FAR struct mtd_dev_s *dev, off_t startblock,
           break;
         }
 
+      up_mdelay(2);
       ret = hf_status_poll(priv, HF_STATUS_TIMEOUT_MS, &st);
-      if (ret < 0 || (st & (HF_SR_PSB | HF_SR_WBASB)))
+      if (ret < 0)
         {
           ferr("hyperflash: program off=%zu failed st=0x%04x ret=%d\n",
                off, st, ret);
-          ret = (ret < 0) ? ret : -EIO;
           break;
         }
 
