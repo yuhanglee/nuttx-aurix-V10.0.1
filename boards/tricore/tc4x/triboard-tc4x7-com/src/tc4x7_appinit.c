@@ -53,6 +53,11 @@
 int tc4x7_qspi_bringup(void);
 #endif
 
+#ifdef CONFIG_TC4XX_EGTM_PWM_LOWERHALF
+#  include "tc4xx_gpio.h"
+#  include "tc4xx_egtm_pwm.h"
+#endif
+
 /****************************************************************************
  * Public Functions
  ****************************************************************************/
@@ -76,6 +81,25 @@ void board_aurix_setup_serial_pin(int idx)
   aurix_config_gpio(AURIX_GPIO(14, 0, GPIO_PERIPH, GPIO_ALT2));
   aurix_config_gpio(AURIX_GPIO(14, 1, GPIO_INPUT, GPIO_PULL_UP));
 }
+
+#ifdef CONFIG_TC4XX_EGTM_PWM_LOWERHALF
+
+/* P00.<ch> ALT9 routes to TOUT(9+ch); OWN_PAD hands pad control to the
+ * peripheral. TOUTSEL code 20 selects TOM0 channels onto this group.
+ */
+
+#  define EGTM_PWM_PIN  (AURIX_GPIO(0, CONFIG_TC4XX_EGTM_TOM0_CH,           \
+                                    GPIO_PERIPH, GPIO_ALT9)                \
+                         | GPIO_PERIPH_OWN_PAD)
+#  define EGTM_PWM_TOUT      (9u + CONFIG_TC4XX_EGTM_TOM0_CH)
+#  define EGTM_PWM_TOUTSEL   20u
+
+static int tc4x7_pwm_bringup(void)
+{
+  return tc4xx_egtm_pwm_register(0, EGTM_PWM_PIN,
+                                 EGTM_PWM_TOUT, EGTM_PWM_TOUTSEL);
+}
+#endif
 
 int board_app_initialize(uintptr_t arg)
 {
@@ -148,6 +172,14 @@ int board_app_initialize(uintptr_t arg)
   if (ret < 0)
     {
       _err("BUTTON register failed: %d\n", ret);
+    }
+#endif
+
+#ifdef CONFIG_TC4XX_EGTM_PWM_LOWERHALF
+  ret = tc4x7_pwm_bringup();
+  if (ret < 0)
+    {
+      _err("PWM bringup failed: %d\n", ret);
     }
 #endif
 
