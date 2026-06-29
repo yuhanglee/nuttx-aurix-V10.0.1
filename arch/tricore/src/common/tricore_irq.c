@@ -78,9 +78,15 @@ void up_enable_irq(int irq)
   regval &= ~SRCR_SRPN_MASK;
   regval |= ((uint32_t)irq << SRCR_SRPN_SHIFT) & SRCR_SRPN_MASK;
 
-
-  regval &= ~SRCR_TOS_MASK;
-  regval |= (TRICORE_DEFAULT_IR_TOS << SRCR_TOS_SHIFT) & SRCR_TOS_MASK;
+#if defined(CONFIG_ARCH_CHIP_FAMILY_TC4XX)
+  if (((regval & SRCR_TOS_MASK) >> SRCR_TOS_SHIFT) == 0xf)
+#elif defined(CONFIG_ARCH_CHIP_FAMILY_TC3XX)
+  if (((regval & SRCR_TOS_MASK) >> SRCR_TOS_SHIFT) == 0x7)
+#endif
+    {
+      regval &= ~SRCR_TOS_MASK;
+      regval |= (TRICORE_DEFAULT_IR_TOS << SRCR_TOS_SHIFT) & SRCR_TOS_MASK;
+    }
 
   regval |= SRCR_SRE;
   tricore_srcr_write(irq, regval);

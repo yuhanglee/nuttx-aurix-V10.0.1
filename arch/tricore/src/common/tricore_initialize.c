@@ -152,6 +152,12 @@ void tricore_start(int current_cpu)
 	uintptr_t hreg;
 	uintptr_t pcreg;
 
+	if (current_cpu == 0) {
+		tricore_enable_sfr_access(0);
+		for (int i = 1; i < CONFIG_ARCH_TRICORE_CPU_COUNT; i++) {
+			tricore_enable_sfr_access(i);
+		}
+	}
 
 #if defined(CPU) && (CPU == 0) && defined(CONFIG_ARCH_CHIP_FAMILY_TC4XX)
 	if (current_cpu == 0) {
