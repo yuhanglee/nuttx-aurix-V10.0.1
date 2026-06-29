@@ -41,4 +41,12 @@ if(CONFIG_TC4X_ASCLIN_SPI)
   list(APPEND SRCS tc4x_asclin_spi.c)
 endif()
 
+if(CONFIG_TC4X_EGTM_PWM)
+  list(APPEND SRCS tc4x_egtm.c)
+endif()
+
+if(CONFIG_TC4X_EGTM_PWM_LOWERHALF)
+  list(APPEND SRCS tc4x_egtm_pwm.c)
+endif()
+
 target_sources(arch PRIVATE ${SRCS})
