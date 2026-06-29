@@ -26,6 +26,7 @@
 
 #include <sys/types.h>
 #include <debug.h>
+#include <errno.h>
 #include <sys/sysinfo.h>
 
 #include <nuttx/config.h>
@@ -56,6 +57,10 @@
 
 #ifdef CONFIG_TC4XX_QSPI
 #  include "tc4x_qspi.h"
+#endif
+
+#ifdef CONFIG_TC4XX_EGTM_PWM_LOWERHALF
+#  include "tc4xx_egtm_pwm.h"
 #endif
 
 #ifdef CONFIG_TC4XX_QSPI
@@ -123,6 +128,25 @@ static const gpio_pinset_t g_test_gpio_pins[] =
 
 static const gpio_pinset_t g_user_led_pin =
   AURIX_GPIO(3, 9, GPIO_OUTPUT, GPIO_ALT0) | GPIO_OUTPUT_HIGH;
+#endif
+
+#ifdef CONFIG_TC4XX_EGTM_PWM_LOWERHALF
+
+/* P00.<ch> ALT9 routes to TOUT(9+ch); OWN_PAD hands pad control to the
+ * peripheral. TOUTSEL code 20 selects TOM0 channels onto this group.
+ */
+
+#  define EGTM_PWM_PIN  (AURIX_GPIO(0, CONFIG_TC4XX_EGTM_TOM0_CH,           \
+                                    GPIO_PERIPH, GPIO_ALT9)                \
+                         | GPIO_PERIPH_OWN_PAD)
+#  define EGTM_PWM_TOUT      (9u + CONFIG_TC4XX_EGTM_TOM0_CH)
+#  define EGTM_PWM_TOUTSEL   20u
+
+static int tc4d7_pwm_bringup(void)
+{
+  return tc4xx_egtm_pwm_register(0, EGTM_PWM_PIN,
+                                 EGTM_PWM_TOUT, EGTM_PWM_TOUTSEL);
+}
 #endif
 
 int board_app_initialize(uintptr_t arg)
@@ -247,6 +271,14 @@ int board_app_initialize(uintptr_t arg)
   if (ret < 0)
     {
       _err("BUTTON register failed: %d\n", ret);
+    }
+#endif
+
+#ifdef CONFIG_TC4XX_EGTM_PWM_LOWERHALF
+  ret = tc4d7_pwm_bringup();
+  if (ret < 0)
+    {
+      _err("PWM bringup failed: %d\n", ret);
     }
 #endif
 
