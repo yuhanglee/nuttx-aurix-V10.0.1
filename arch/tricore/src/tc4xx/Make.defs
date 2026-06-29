@@ -30,3 +30,12 @@ ifneq ($(CONFIG_TC4XX_XSPI_PORTSEL_GPIO),y)
 CHIP_CSRCS += tc4x_hsphy.c
 endif
 endif
+
+# eGTM
+ifeq ($(CONFIG_TC4XX_EGTM_PWM),y)
+CHIP_CSRCS += tc4xx_egtm.c
+endif
+
+ifeq ($(CONFIG_TC4XX_EGTM_PWM_LOWERHALF),y)
+CHIP_CSRCS += tc4xx_egtm_pwm.c
+endif
