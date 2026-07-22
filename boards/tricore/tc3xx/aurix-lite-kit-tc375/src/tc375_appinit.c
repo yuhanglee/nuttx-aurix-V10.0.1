@@ -58,6 +58,19 @@ int mcmcan_board_initialize(void);
 #ifdef CONFIG_TC3XX_GETH
 int tc375_ethernet_initialize(void);
 #endif
+#ifdef CONFIG_TC3XX_WDT
+int tc3x_wdt_initialize(const char *devpath, int wdtid);
+#endif
+
+#ifdef CONFIG_TC3XX_SMU
+int tc3x_smu_initialize(void);
+#endif
+
+#ifdef CONFIG_AURIX_SMU
+FAR struct aurix_smu_lowerhalf_s *tc3x_smu_lowerhalf(void);
+int aurix_smu_register(const char *path,
+                       FAR struct aurix_smu_lowerhalf_s *lower);
+#endif
 
 /****************************************************************************
  * Public Functions
@@ -100,6 +113,36 @@ int board_app_initialize(uintptr_t arg)
   if (ret < 0)
     {
       _err("eth init failed: %d\n", ret);
+    }
+#endif
+
+#ifdef CONFIG_TC3XX_SMU
+  ret = tc3x_smu_initialize();
+  if (ret < 0)
+    {
+      _err("ERROR: tc3x_smu_initialize failed: %d\n", ret);
+    }
+#endif
+
+#ifdef CONFIG_TC3XX_WDT
+  ret = tc3x_wdt_initialize("/dev/watchdog0", 0);
+  if (ret < 0)
+    {
+      _err("ERROR: tc3x_wdt_initialize failed: %d\n", ret);
+    }
+#endif
+
+#ifdef CONFIG_AURIX_SMU
+  /* Register /dev/smu0 after hardware and WDT are fully initialised.
+   * Keeping VFS registration separate from hardware init avoids any
+   * heap/mutex work in the critical window right after the SMU IRQ
+   * is enabled and WDT alarms are armed.
+   */
+
+  ret = aurix_smu_register("/dev/smu0", tc3x_smu_lowerhalf());
+  if (ret < 0)
+    {
+      _err("ERROR: aurix_smu_register failed: %d\n", ret);
     }
 #endif
 
@@ -156,3 +199,10 @@ int board_app_initialize(uintptr_t arg)
 
   return ret;
 }
+
+#ifdef CONFIG_BOARD_LATE_INITIALIZE
+void board_late_initialize(void)
+{
+  board_app_initialize(0);
+}
+#endif
