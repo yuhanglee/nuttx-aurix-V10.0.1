@@ -235,10 +235,9 @@ config TC3XX_WDT
 		Enable the TC3xx CPU watchdog timer driver.  Registers
 		/dev/watchdog0 backed by SCU.WDTCPU0_CON0/CON1/SR.
 
-		WDT overflow generates an alarm to the SMU.  Until the
-		TC3xx SMU integration is in place, an overflow will not
-		automatically issue a chip reset; feed/start/stop/status
-		paths still work for development use.
+		WDT overflow generates an alarm to the SMU.  Enable
+		CONFIG_TC3XX_SMU to wire the overflow alarm to an
+		application reset via tc3x_smu_initialize().
 
 config TC3XX_WDT_FSPB
 	int "SPB clock frequency (Hz) feeding the TC3xx WDT"
@@ -360,5 +359,70 @@ config TC3XX_GPT12_CAP_CAPIN_SEL
                 before changing this value.
 
 endif # TC3XX_GPT12_CAP
+
+config TC3XX_SMU
+	bool "TC3xx Safety Management Unit (SMU_core) driver"
+	default n
+	---help---
+		Enable the SMU_core driver for the Infineon AURIX TC3xx family.
+
+		When CONFIG_TC3XX_WDT is also enabled, the WDT timeout alarms
+		(AG0 bits 0 and 6) are wired during tc3x_smu_initialize().
+		The reaction depends on CONFIG_TC3XX_SMU_IRQ:
+		  IRQ mode:  IGCS0 + SRC_SMU0 ISR + RT escalation to RESET.
+		  Fallback:  SMU_REACT_RESET (hardware-autonomous, no ISR).
+
+if TC3XX_SMU
+
+config TC3XX_SMU_IRQ
+	bool "SMU interrupt handler via SRC_SMU0 (IRQ 564)"
+	default n
+	---help---
+		Route IGCS0 alarm reactions to SRC_SMU0 and attach an ISR.
+		The ISR logs the alarm, clears the sticky bit, and calls
+		SMU_RTStop to acknowledge within the Recovery Timer window.
+		Matches the Zephyr smu_aurix driver pattern for TC3X
+		(base->AGC.B.IGCS0 = 0x1 in smu_aurix_init).
+
+		If the ISR misses the Recovery Timer deadline, the SMU fires
+		the escalation reaction as a hardware safety net.
+
+		When disabled, WDT alarms use SMU_REACT_RESET directly
+		(hardware-autonomous - safe even if OS has crashed).
+
+
+config TC3XX_SMU_DISABLE_DOUBLE_RESET_GUARD
+	bool "Disable SMU double reset guard (development only)"
+	default n
+	---help---
+		The TC3xx hardware holds the chip in permanent Application
+		Reset if an SMU-induced reset occurs twice consecutively,
+		preventing runaway watchdog reset loops.
+
+		Enable this to clear the internal reset flag at every boot
+		(WDTSCON1.CLRIRF) so repeated WDT resets do not lock up
+		the board during development and testing.
+		Do NOT enable this in production firmware.
+
+config TC3XX_SMU_WDT_REACTION
+	int "WDT alarm default reaction code"
+	default 2 if TC3XX_SMU_IRQ
+	default 6
+	range 0 7
+	---help---
+		Reaction code written to all WDT alarm bits (AG8) during
+		tc3x_smu_initialize().  This is the boot-time default;
+		individual alarms can be reconfigured at runtime via the
+		SMUIOC_CONFIGALARM ioctl.
+
+		  0 = NONE    (no reaction -- WDT overflow silently ignored)
+		  2 = IGCS0   (interrupt via SRC_SMU0, requires TC3XX_SMU_IRQ)
+		  3 = IGCS1   (interrupt via SRC_SMU1, requires TC3XX_SMU_IRQ)
+		  4 = IGCS2   (interrupt via SRC_SMU2, requires TC3XX_SMU_IRQ)
+		  6 = RESET   (hardware-autonomous Application Reset, default
+		               when TC3XX_SMU_IRQ is not set)
+		  7 = CPURST  (CPU reset only)
+
+endif # TC3XX_SMU
 
 endmenu
