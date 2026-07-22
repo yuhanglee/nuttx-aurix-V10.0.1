@@ -92,6 +92,10 @@ ifeq ($(CONFIG_GOLDFISH_PIPE),y)
   CSRCS += goldfish_pipe.c
 endif
 
+ifeq ($(CONFIG_AURIX_SMU),y)
+  CSRCS += aurix_smu.c
+endif
+
 # Include build support
 
 DEPPATH += --dep-path misc
