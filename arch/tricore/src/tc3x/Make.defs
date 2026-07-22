@@ -40,4 +40,9 @@ ifeq ($(CONFIG_TC3X_GPT12_CAP),y)
   CHIP_CSRCS += tc3x_gpt12_cap.c
 endif
 
+ifeq ($(CONFIG_TC3X_SMU),y)
+CHIP_CSRCS += tc3x_smu.c
+CFLAGS += -I$(TOPDIR)/drivers/misc
+endif
+
 VPATH += tc3x

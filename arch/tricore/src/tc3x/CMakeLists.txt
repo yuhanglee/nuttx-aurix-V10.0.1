@@ -38,4 +38,9 @@ if(CONFIG_TC3X_GPT2_CAP OR CONFIG_TC3X_GPT1_CAP)
   list(APPEND SRCS tc3x_gpt12_cap.c)
 endif()
 
+if(CONFIG_TC3X_SMU)
+  list(APPEND SRCS tc3x_smu.c)
+  target_include_directories(arch PRIVATE ${CMAKE_SOURCE_DIR}/drivers/misc)
+endif()
+
 target_sources(arch PRIVATE ${SRCS})
