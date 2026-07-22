@@ -35,4 +35,13 @@
 
 #define NR_IRQS 2048
 
+/* SMU Service Request nodes (TC3xx UM Part 2 Interrupt Router chapter).
+ * SRC_SMUy (y=0..2) base offset = 0x008D0H from IFX_IR_SRC_BASE.
+ * IRQ number = offset / 4.
+ */
+
+#define TC3X_IRQ_SMU0  564   /* SRC_SMU0: IGCS0 alarm reactions */
+#define TC3X_IRQ_SMU1  565   /* SRC_SMU1: IGCS1 alarm reactions */
+#define TC3X_IRQ_SMU2  566   /* SRC_SMU2: IGCS2 alarm reactions */
+
 #endif /* __ARCH_TRICORE_INCLUDE_TC3X_IRQ_H */

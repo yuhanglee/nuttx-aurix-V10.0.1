@@ -36,6 +36,10 @@
 
 #include <sys/types.h>
 #include "tricore_irq.h"
+
+#if defined(CONFIG_ARCH_CHIP_FAMILY_TC3X) && defined(CONFIG_TC3X_SMU_IRQ)
+#  include <arch/irq.h>
+#endif
 #include "tricore_internal.h"
 
 /****************************************************************************
@@ -59,6 +63,17 @@ void up_irq_enable(void)
 
 void up_irqinitialize(void)
 {
+  /* TC3xx Application Reset does not reset SRC registers.
+   * Disable SMU IRQs before TRICORE_IRQ_ENABLE() to prevent a spurious
+   * interrupt firing before irq_attach() registers the handler.
+   */
+
+#if defined(CONFIG_ARCH_CHIP_FAMILY_TC3X) && defined(CONFIG_TC3X_SMU_IRQ)
+  up_disable_irq(TC3X_IRQ_SMU0);
+  up_disable_irq(TC3X_IRQ_SMU1);
+  up_disable_irq(TC3X_IRQ_SMU2);
+#endif
+
   TRICORE_IRQ_ENABLE();
 }
 
