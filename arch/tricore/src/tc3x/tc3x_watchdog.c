@@ -121,7 +121,9 @@ void tricore_wdt_disable(void)
   if (core_id == 0)
     {
       aurix_safety_endinit_enable(false);
-      putreg32(WDT_CON1_DR, TC3X_WDTS_CON1);
+      /* Clear pending Safety WDT interrupt request flag and disable. */
+
+      putreg32(WDT_CON1_CLRIRF | WDT_CON1_DR, TC3X_WDTS_CON1);
       aurix_safety_endinit_enable(true);
     }
 
