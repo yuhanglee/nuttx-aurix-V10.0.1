@@ -377,6 +377,18 @@ static void tc3x_syspll_k2_step(void)
 
 void up_clockconfig(void)
 {
+  /* WDT Application Reset does not reset the SCU/PLL domain.
+   * Skip re-init if PLLs are already locked to avoid UART corruption.
+   */
+
+  if ((getreg32(REGADDR(TC3X_CLOCK_SYSPLLSTAT_OFFSET)) &
+       TC3X_SYSPLLSTAT_LOCK) &&
+      (getreg32(REGADDR(TC3X_CLOCK_PERPLLSTAT_OFFSET)) &
+       TC3X_PERPLLSTAT_LOCK))
+    {
+      return;
+    }
+
   tc3x_osc_init();
   tc3x_syspll_init();
   tc3x_perpll_init();
