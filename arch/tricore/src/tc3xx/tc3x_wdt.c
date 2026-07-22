@@ -39,6 +39,7 @@
 #include "hardware/tc3x_wdt.h"
 
 #define CON1_DR_LEGACY  (1u << 3)
+#define CON1_CLRIRF     (1u << 0)  /* Clear interrupt request flag */
 
 #define SCU_BASE_LEGACY 0xF0036000
 #define WDTCPU0_CON1    (SCU_BASE_LEGACY + 0x0250)
@@ -59,13 +60,15 @@ void tricore_wdt_disable(void)
 
   if (core_id == 0)
     {
+      /* Clear pending Safety WDT interrupt request flag and disable. */
       aurix_safety_endinit_enable(false);
-      putreg32(CON1_DR_LEGACY, WDTS_CON1);
+      putreg32(CON1_CLRIRF | CON1_DR_LEGACY, WDTS_CON1);
       aurix_safety_endinit_enable(true);
     }
 
+  /* Clear pending CPU WDT interrupt request flag and disable. */
   aurix_cpu_endinit_enable(false);
-  putreg32(CON1_DR_LEGACY, WDTCPU0_CON1 + (core_id * 12));
+  putreg32(CON1_CLRIRF | CON1_DR_LEGACY, WDTCPU0_CON1 + (core_id * 12));
   aurix_cpu_endinit_enable(true);
 }
 
@@ -337,6 +340,7 @@ int tc3x_wdt_initialize(const char *devpath, int wdtid)
 
   flags = enter_critical_section();
   tc3x_wdt_reconfigure(priv, false);
+
   leave_critical_section(flags);
 
   if (watchdog_register(devpath,

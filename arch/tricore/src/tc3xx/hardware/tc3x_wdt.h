@@ -30,6 +30,8 @@
 #define WDT_CON0_REL_SHIFT         16
 #define WDT_CON0_REL_MASK          GENMASK(31, 16)
 
+#define WDT_CON1_CLRIRF            BIT(0)
+
 #define WDT_CON1_IR0               BIT(2)
 #define WDT_CON1_DR                BIT(3)
 #define WDT_CON1_IR1               BIT(5)
