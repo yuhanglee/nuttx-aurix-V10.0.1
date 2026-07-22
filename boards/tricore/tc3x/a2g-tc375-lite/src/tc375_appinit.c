@@ -50,6 +50,16 @@ struct mtd_dev_s *tricore_flash_initialize(void);
 int tc3x_wdt_initialize(const char *devpath, int wdtid);
 #endif
 
+#ifdef CONFIG_TC3X_SMU
+int tc3x_smu_initialize(void);
+#endif
+
+#ifdef CONFIG_AURIX_SMU
+FAR struct aurix_smu_lowerhalf_s *tc3x_smu_lowerhalf(void);
+int aurix_smu_register(const char *path,
+                       FAR struct aurix_smu_lowerhalf_s *lower);
+#endif
+
 #ifdef CONFIG_TC3X_QSPI3
 int tc375_qspi_initialize(void);
 #endif
@@ -127,8 +137,43 @@ void board_late_initialize(void)
                             GPIO_OUTPUT_HIGH, 0);
 #endif
 
+#ifdef CONFIG_TC3X_SMU
+  {
+    int ret = tc3x_smu_initialize();
+
+    if (ret < 0)
+      {
+        _err("ERROR: tc3x_smu_initialize failed: %d\n", ret);
+      }
+  }
+#endif
+
 #ifdef CONFIG_TC3X_WDT
-  tc3x_wdt_initialize("/dev/watchdog0", 0);
+  {
+    int ret = tc3x_wdt_initialize("/dev/watchdog0", 0);
+
+    if (ret < 0)
+      {
+        _err("ERROR: tc3x_wdt_initialize failed: %d\n", ret);
+      }
+  }
+#endif
+
+#ifdef CONFIG_AURIX_SMU
+  /* Register /dev/smu0 after hardware and WDT are fully initialised.
+   * Keeping VFS registration separate from hardware init avoids any
+   * heap/mutex work in the critical window right after the SMU IRQ
+   * is enabled and WDT alarms are armed.
+   */
+
+  {
+    int ret = aurix_smu_register("/dev/smu0", tc3x_smu_lowerhalf());
+
+    if (ret < 0)
+      {
+        _err("ERROR: aurix_smu_register failed: %d\n", ret);
+      }
+  }
 #endif
 
 #ifdef CONFIG_TRICORE_FLASH_MTD
