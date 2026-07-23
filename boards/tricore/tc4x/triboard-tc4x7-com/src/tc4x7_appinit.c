@@ -91,22 +91,114 @@ void board_aurix_setup_serial_pin(int idx)
   aurix_config_gpio(AURIX_GPIO(14, 1, GPIO_INPUT, GPIO_PULL_UP));
 }
 
-#ifdef CONFIG_TC4X_EGTM_PWM_LOWERHALF
+#ifdef CONFIG_TC4X7_PWM_ANY
 
-/* P00.<ch> ALT9 routes to TOUT(9+ch); OWN_PAD hands pad control to the
- * peripheral. TOUTSEL code 20 selects TOM0 channels onto this group.
+/* Board PWM map: minor -> (cluster, TOM channel, pad, TOUT, TOUTSEL).
+ * Rows are gated by per-channel CONFIG_TC4X7_PWM_CH<N>; the whole
+ * block is elided when no channel is enabled (TC4X7_PWM_ANY is auto-
+ * selected by any TC4X7_PWM_CHx).
  */
 
-#  define EGTM_PWM_PIN  (AURIX_GPIO(0, CONFIG_TC4X_EGTM_TOM0_CH,            \
-                                    GPIO_PERIPH, GPIO_ALT9)                \
-                         | GPIO_PERIPH_OWN_PAD)
-#  define EGTM_PWM_TOUT      (9u + CONFIG_TC4X_EGTM_TOM0_CH)
-#  define EGTM_PWM_TOUTSEL   20u
+#define TC4X7_PAD(port, padx)                                           \
+  (AURIX_GPIO((port), (padx), GPIO_PERIPH, GPIO_ALT9) | GPIO_PERIPH_OWN_PAD)
+
+struct tc4x7_pwm_row_s
+{
+  int8_t        minor;
+  uint8_t       cluster;
+  uint8_t       ch;
+  gpio_pinset_t pin;
+  uint16_t      tout;
+  uint8_t       sel;
+};
+
+static const struct tc4x7_pwm_row_s g_tc4x7_pwm_map[] =
+{
+#ifdef CONFIG_TC4X7_PWM_CH0
+  { 0, 0,  0, TC4X7_PAD(0,  0),   9u, 0x14u},
+#endif
+#ifdef CONFIG_TC4X7_PWM_CH1
+  { 1, 0,  1, TC4X7_PAD(0,  1),  10u, 0x14u},
+#endif
+#ifdef CONFIG_TC4X7_PWM_CH2
+  { 2, 0,  2, TC4X7_PAD(0,  2),  11u, 0x14u},
+#endif
+#ifdef CONFIG_TC4X7_PWM_CH3
+  { 3, 0,  3, TC4X7_PAD(0,  3),  12u, 0x14u},
+#endif
+#ifdef CONFIG_TC4X7_PWM_CH4
+  { 4, 0, 11, TC4X7_PAD(0,  4),  13u, 0x10u},
+#endif
+#ifdef CONFIG_TC4X7_PWM_CH5
+  { 5, 0, 12, TC4X7_PAD(0,  5),  14u, 0x10u},
+#endif
+#ifdef CONFIG_TC4X7_PWM_CH6
+  { 6, 0, 13, TC4X7_PAD(0,  6),  15u, 0x10u},
+#endif
+#ifdef CONFIG_TC4X7_PWM_CH7
+  { 7, 0, 14, TC4X7_PAD(0,  7),  16u, 0x10u},
+#endif
+#ifdef CONFIG_TC4X7_PWM_CH8
+  { 8, 0, 15, TC4X7_PAD(0,  8),  17u, 0x10u},
+#endif
+#ifdef CONFIG_TC4X7_PWM_CH9
+  { 9, 0,  9, TC4X7_PAD(0,  9),  18u, 0x04u},
+#endif
+#ifdef CONFIG_TC4X7_PWM_CH10
+  {10, 0, 10, TC4X7_PAD(0, 11),  20u, 0x04u},
+#endif
+#ifdef CONFIG_TC4X7_PWM_CH11
+  {11, 1,  8, TC4X7_PAD(1,  4), 112u, 0x05u},
+#endif
+#ifdef CONFIG_TC4X7_PWM_CH12
+  {12, 1,  8, TC4X7_PAD(1,  5), 113u, 0x05u},
+#endif
+#ifdef CONFIG_TC4X7_PWM_CH13
+  {13, 1,  9, TC4X7_PAD(1,  6), 114u, 0x05u},
+#endif
+#ifdef CONFIG_TC4X7_PWM_CH14
+  {14, 1,  9, TC4X7_PAD(1,  7), 115u, 0x05u},
+#endif
+#ifdef CONFIG_TC4X7_PWM_CH15
+  {15, 2,  8, TC4X7_PAD(3,  0), 271u, 0x15u},
+#endif
+#ifdef CONFIG_TC4X7_PWM_CH16
+  {16, 2,  9, TC4X7_PAD(3,  2), 273u, 0x15u},
+#endif
+#ifdef CONFIG_TC4X7_PWM_CH17
+  {17, 2, 10, TC4X7_PAD(3,  4), 275u, 0x15u},
+#endif
+#ifdef CONFIG_TC4X7_PWM_CH18
+  {18, 2, 13, TC4X7_PAD(3, 11), 282u, 0x06u},
+#endif
+#ifdef CONFIG_TC4X7_PWM_CH19
+  {19, 2, 14, TC4X7_PAD(3, 12), 283u, 0x15u},
+#endif
+#ifdef CONFIG_TC4X7_PWM_CH20
+  {20, 2, 15, TC4X7_PAD(3, 14), 285u, 0x15u},
+#endif
+};
 
 static int tc4x7_pwm_bringup(void)
 {
-  return tc4x_egtm_pwm_register(0, EGTM_PWM_PIN,
-                                EGTM_PWM_TOUT, EGTM_PWM_TOUTSEL);
+  size_t i;
+  int ret;
+
+  for (i = 0; i < sizeof(g_tc4x7_pwm_map) / sizeof(g_tc4x7_pwm_map[0]); i++)
+    {
+      ret = tc4x_egtm_pwm_register(g_tc4x7_pwm_map[i].minor,
+                                    g_tc4x7_pwm_map[i].cluster,
+                                    g_tc4x7_pwm_map[i].ch,
+                                    g_tc4x7_pwm_map[i].pin,
+                                    g_tc4x7_pwm_map[i].tout,
+                                    g_tc4x7_pwm_map[i].sel);
+      if (ret < 0)
+        {
+          return ret;
+        }
+    }
+
+  return OK;
 }
 #endif
 
@@ -172,7 +264,7 @@ void board_late_initialize(void)
     }
 #endif
 
-#ifdef CONFIG_TC4X_EGTM_PWM_LOWERHALF
+#ifdef CONFIG_TC4X7_PWM_ANY
   ret = tc4x7_pwm_bringup();
   if (ret < 0)
     {

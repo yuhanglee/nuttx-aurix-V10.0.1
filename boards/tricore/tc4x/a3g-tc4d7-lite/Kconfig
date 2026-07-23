@@ -29,4 +29,67 @@ config BOARD_USER_LED_GPIO
 		boot (the kit drives LED1 active-low).  Run the led_blink
 		smoke test from tricore-apps to toggle it at 1 Hz.
 
+if TC4X_EGTM_PWM_LOWERHALF
+
+menu "TC4D7-Lite PWM channels to register"
+
+config TC4D7_PWM_ANY
+	bool
+
+config TC4D7_PWM_CH0
+	bool "/dev/pwm0  = P00.0  -> TOM0_0  (TOUT9,  sel 0x14)"
+	select TC4D7_PWM_ANY
+
+config TC4D7_PWM_CH1
+	bool "/dev/pwm1  = P00.1  -> TOM0_1  (TOUT10, sel 0x14)"
+	select TC4D7_PWM_ANY
+
+config TC4D7_PWM_CH2
+	bool "/dev/pwm2  = P00.2  -> TOM0_2  (TOUT11, sel 0x14)"
+	select TC4D7_PWM_ANY
+
+config TC4D7_PWM_CH3
+	bool "/dev/pwm3  = P00.3  -> TOM0_3  (TOUT12, sel 0x14)"
+	select TC4D7_PWM_ANY
+
+config TC4D7_PWM_CH4
+	bool "/dev/pwm4  = P00.4  -> TOM0_11 (TOUT13, sel 0x10)"
+	select TC4D7_PWM_ANY
+
+config TC4D7_PWM_CH5
+	bool "/dev/pwm5  = P00.5  -> TOM0_12 (TOUT14, sel 0x10)"
+	select TC4D7_PWM_ANY
+
+config TC4D7_PWM_CH6
+	bool "/dev/pwm6  = P00.6  -> TOM0_13 (TOUT15, sel 0x10)"
+	select TC4D7_PWM_ANY
+
+config TC4D7_PWM_CH7
+	bool "/dev/pwm7  = P00.7  -> TOM0_14 (TOUT16, sel 0x10)"
+	select TC4D7_PWM_ANY
+
+config TC4D7_PWM_CH8
+	bool "/dev/pwm8  = P00.8  -> TOM0_15 (TOUT17, sel 0x10)"
+	select TC4D7_PWM_ANY
+
+config TC4D7_PWM_CH9
+	bool "/dev/pwm9  = P00.9  -> TOM0_9  (TOUT18, sel 0x04)"
+	select TC4D7_PWM_ANY
+
+config TC4D7_PWM_CH10
+	bool "/dev/pwm10 = P00.11 -> TOM0_10 (TOUT20, sel 0x04)"
+	select TC4D7_PWM_ANY
+
+config TC4D7_PWM_CH11
+	bool "/dev/pwm11 = P03.3  -> TOM2_9  (TOUT274, sel 0x06) [CLS2]"
+	select TC4D7_PWM_ANY
+
+config TC4D7_PWM_CH12
+	bool "/dev/pwm12 = P03.4  -> TOM2_10 (TOUT275, sel 0x15) [CLS2]"
+	select TC4D7_PWM_ANY
+
+endmenu
+
+endif # TC4X_EGTM_PWM_LOWERHALF
+
 endif
