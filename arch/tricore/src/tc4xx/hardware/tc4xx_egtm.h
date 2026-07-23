@@ -17,19 +17,23 @@
 #ifndef __ARCH_TRICORE_SRC_TC4XX_HARDWARE_TC4XX_EGTM_H
 #define __ARCH_TRICORE_SRC_TC4XX_HARDWARE_TC4XX_EGTM_H
 
-/* TC4xx eGTM register map (UM Table 221/223). */
+/* TC4xx eGTM register map. Per-cluster macros take the cluster index
+ * `cl` (0..EGTM_NCLUSTERS-1) as their first argument.
+ */
 
 #include <nuttx/bits.h>
 
-#define EGTM_BASE         0xF9080000u
+#define EGTM_BASE               0xF9080000u
+#define EGTM_CLS_STRIDE         0x20000u
+#define EGTM_CLS_BASE(cl)       (EGTM_BASE + (cl) * EGTM_CLS_STRIDE)
 
-/* CLC (offset 0x60000, endinit-protected) */
+/* CLC (module-level, endinit-protected) */
 
 #define EGTM_CLC          (EGTM_BASE + 0x60000u)
 #define EGTM_CLC_DISR     BIT(0)
 #define EGTM_CLC_DISS     BIT(1)
 
-/* CFGCMU0 protection. CMU NUM/DEN are guarded. */
+/* CFGCMU0 protection (module-level) */
 
 #define EGTM_CFGCMU0_PROTSE  (EGTM_BASE + 0x6001Cu)
 #define EGTM_CFGCMU0_PROTE   (EGTM_BASE + 0x601D0u)
@@ -39,7 +43,7 @@
 #define PROT_UNLOCK       PROT_SWEN
 #define PROT_LOCK_RUN     (PROT_SWEN | PROT_STATE_RUN)
 
-/* CMU: GCLK = feGTM * GCLK_NUM / GCLK_DEN */
+/* CMU (cluster 0 only): GCLK = feGTM * GCLK_NUM / GCLK_DEN */
 
 #define EGTM_CMU_CLK_EN   (EGTM_BASE + 0x00080u)
 #define EGTM_CMU_GCLK_NUM (EGTM_BASE + 0x00084u)
@@ -49,20 +53,20 @@
 #define CMU_CLK_EN_FXCLK  (0x2u << 22u)
 #define CMU_CLK_EN_CFGCMU_FXCLK (CMU_CLK_EN_CFGCMU | CMU_CLK_EN_FXCLK)
 
-/* TOM channels 0-7 (base 0x01000, stride 0x40) */
+/* TOM channels 0-15 per cluster */
 
-#define EGTM_TOM_CH_BASE(ch)       (EGTM_BASE + 0x01000u + (ch) * 0x40u)
-#define EGTM_TOM_CH_CTRL(ch)       (EGTM_TOM_CH_BASE(ch) + 0x00u)
-#define EGTM_TOM_CH_SR0(ch)        (EGTM_TOM_CH_BASE(ch) + 0x04u)
-#define EGTM_TOM_CH_SR1(ch)        (EGTM_TOM_CH_BASE(ch) + 0x08u)
-#define EGTM_TOM_CH_CM0(ch)        (EGTM_TOM_CH_BASE(ch) + 0x0Cu)
-#define EGTM_TOM_CH_CM1(ch)        (EGTM_TOM_CH_BASE(ch) + 0x10u)
-#define EGTM_TOM_CH_CN0(ch)        (EGTM_TOM_CH_BASE(ch) + 0x14u)
-#define EGTM_TOM_CH_IRQ_NOTIFY(ch) (EGTM_TOM_CH_BASE(ch) + 0x1Cu)
-#define EGTM_TOM_CH_IRQ_EN(ch)     (EGTM_TOM_CH_BASE(ch) + 0x20u)
-#define EGTM_TOM_CH_IRQ_MODE(ch)   (EGTM_TOM_CH_BASE(ch) + 0x28u)
+#define EGTM_TOM_CH_BASE(cl, ch)   (EGTM_CLS_BASE(cl) + 0x01000u + (ch) * 0x40u)
+#define EGTM_TOM_CH_CTRL(cl, ch)       (EGTM_TOM_CH_BASE(cl, ch) + 0x00u)
+#define EGTM_TOM_CH_SR0(cl, ch)        (EGTM_TOM_CH_BASE(cl, ch) + 0x04u)
+#define EGTM_TOM_CH_SR1(cl, ch)        (EGTM_TOM_CH_BASE(cl, ch) + 0x08u)
+#define EGTM_TOM_CH_CM0(cl, ch)        (EGTM_TOM_CH_BASE(cl, ch) + 0x0Cu)
+#define EGTM_TOM_CH_CM1(cl, ch)        (EGTM_TOM_CH_BASE(cl, ch) + 0x10u)
+#define EGTM_TOM_CH_CN0(cl, ch)        (EGTM_TOM_CH_BASE(cl, ch) + 0x14u)
+#define EGTM_TOM_CH_IRQ_NOTIFY(cl, ch) (EGTM_TOM_CH_BASE(cl, ch) + 0x1Cu)
+#define EGTM_TOM_CH_IRQ_EN(cl, ch)     (EGTM_TOM_CH_BASE(cl, ch) + 0x20u)
+#define EGTM_TOM_CH_IRQ_MODE(cl, ch)   (EGTM_TOM_CH_BASE(cl, ch) + 0x28u)
 
-/* CTRL.CLK_SRC [15:12]: FXCLK_RES tap index (0..4). */
+/* CTRL.CLK_SRC: FXCLK_RES tap index (0..4) */
 
 #define TOM_CTRL_CLK_SRC_SHIFT  12u
 
@@ -72,29 +76,32 @@
 #define TOM_IRQ_MODE_LEVEL      0x0u
 #define TOM_IRQ_MODE_PULSE      0x1u
 
-/* TGC0 (channels 0-7) */
+/* TGC groups per cluster: g=0 covers CH0-7, g=1 covers CH8-15 */
 
-#define EGTM_TOM_TGC0_GLB_CTRL   (EGTM_BASE + 0x01430u)
-#define EGTM_TOM_TGC0_FUPD_CTRL  (EGTM_BASE + 0x01438u)
-#define EGTM_TOM_TGC0_ENDIS_CTRL (EGTM_BASE + 0x01470u)
-#define EGTM_TOM_TGC0_ENDIS_STAT (EGTM_BASE + 0x01474u)
-#define EGTM_TOM_TGC0_OUTEN_CTRL (EGTM_BASE + 0x01478u)
-#define EGTM_TOM_TGC0_OUTEN_STAT (EGTM_BASE + 0x0147Cu)
+#define EGTM_TOM_TGC_GLB_CTRL(cl, g)   (EGTM_CLS_BASE(cl) + 0x01430u + (g) * 0x80u)
+#define EGTM_TOM_TGC_FUPD_CTRL(cl, g)  (EGTM_CLS_BASE(cl) + 0x01438u + (g) * 0x80u)
+#define EGTM_TOM_TGC_ENDIS_CTRL(cl, g) (EGTM_CLS_BASE(cl) + 0x01470u + (g) * 0x80u)
+#define EGTM_TOM_TGC_ENDIS_STAT(cl, g) (EGTM_CLS_BASE(cl) + 0x01474u + (g) * 0x80u)
+#define EGTM_TOM_TGC_OUTEN_CTRL(cl, g) (EGTM_CLS_BASE(cl) + 0x01478u + (g) * 0x80u)
+#define EGTM_TOM_TGC_OUTEN_STAT(cl, g) (EGTM_CLS_BASE(cl) + 0x0147Cu + (g) * 0x80u)
+
+#define TGC_GROUP(ch)            ((ch) >> 3u)
 
 /* 2-bit per channel: 0b10 = enable, 0b01 = disable */
 
-#define TGC_CH_ENABLE(ch)        (0x2u << ((ch) * 2u))
-#define TGC_CH_DISABLE(ch)       (0x1u << ((ch) * 2u))
+#define TGC_CH_ENABLE(ch)        (0x2u << (((ch) & 0x7u) * 2u))
+#define TGC_CH_DISABLE(ch)       (0x1u << (((ch) & 0x7u) * 2u))
 #define TGC_GLB_CTRL_HOST_TRIG   BIT(0)
 
-/* ICM */
+/* Per-cluster ICM channel-interrupt group registers */
 
-#define EGTM_ICM_IRQG_TOM0_CI    (EGTM_BASE + 0x005A0u)
-#define EGTM_ICM_IRQG_TOM1_CI    (EGTM_BASE + 0x005A4u)
+#define EGTM_ICM_IRQG_TOM_CI(cl, g)  (EGTM_CLS_BASE(cl) + 0x005A0u + (g) * 4u)
 
-/* TOUTSEL[n] (base 0x61100, stride 4): 6 x 5-bit SEL fields per reg,
- * reserved bits at 15 and 31. SEL field x of TOUTSEL[n] drives pad
- * TOUT(n*6 + x).
+#define EGTM_NCLUSTERS      3u
+#define EGTM_TOM_NCHANNELS  16u
+
+/* TOUTSEL: 6 x 5-bit SEL fields per register. SEL field x of
+ * TOUTSEL[n] drives pad TOUT(n*6 + x).
  */
 
 #define EGTM_TOUTSEL(n)     (EGTM_BASE + 0x61100u + (n) * 4u)

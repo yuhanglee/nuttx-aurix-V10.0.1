@@ -29,23 +29,23 @@
 
 void tc4xx_egtm_init(uint32_t gclk_den);
 
-/* Configure TOM0 channel <ch> (0..7) for PWM.
- *   fxclk_sel    FXCLK_RES tap (0..4); tick = GCLK / 2^fxclk_sel
+/* Configure and start TOM channel <ch> in cluster <cl> as a PWM output.
+ *   fxclk_sel    FXCLK_RES tap (0..4)
  *   period/duty  in FXCLK ticks, active-high
  *   irq          SRC interrupt number; <0 skips IRQ setup
  *   cb           period-complete callback, may be NULL
- *   stop_after_n 0 = free-run; >0 disables channel after N periods (needs irq)
+ *   stop_after_n 0 = free-run; >0 disables channel after N periods
  */
 
-void tc4xx_egtm_pwm_setup(uint8_t ch, uint8_t fxclk_sel,
+void tc4xx_egtm_pwm_setup(uint8_t cl, uint8_t ch, uint8_t fxclk_sel,
                           uint32_t period_ticks, uint32_t duty_ticks,
                           int irq, xcpt_t cb, uint32_t stop_after_n);
 
-void tc4xx_egtm_pwm_update(uint8_t ch, uint32_t duty_ticks);
-void tc4xx_egtm_pwm_stop(uint8_t ch);
+void tc4xx_egtm_pwm_update(uint8_t cl, uint8_t ch, uint32_t duty_ticks);
+void tc4xx_egtm_pwm_stop(uint8_t cl, uint8_t ch);
 
-/* Route pad TOUT<tout_n> to source <sel_code> (UM TOUTSEL table). */
+/* Route pad TOUT<tout_n> to source <sel_code>. */
 
-void tc4xx_egtm_route_tout(uint8_t tout_n, uint8_t sel_code);
+void tc4xx_egtm_route_tout(uint16_t tout_n, uint8_t sel_code);
 
 #endif /* __ARCH_TRICORE_SRC_TC4XX_TC4XX_EGTM_H */

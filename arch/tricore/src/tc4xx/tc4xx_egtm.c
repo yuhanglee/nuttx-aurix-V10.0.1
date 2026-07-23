@@ -43,10 +43,26 @@ struct egtm_ch_s
  * Private Data
  ****************************************************************************/
 
-static struct egtm_ch_s g_ch[8];
+/* Per-(cluster, channel) state */
+
+static struct egtm_ch_s g_ch[EGTM_NCLUSTERS][EGTM_TOM_NCHANNELS];
+
+/* ISR context packs cluster (high byte) and channel (low byte) */
+
+#define EGTM_ISR_CTX_PACK(cl, ch)  ((uintptr_t)(((cl) << 8) | (ch)))
+#define EGTM_ISR_CTX_CL(x)         ((uint8_t)(((uintptr_t)(x) >> 8) & 0xFFu))
+#define EGTM_ISR_CTX_CH(x)         ((uint8_t)((uintptr_t)(x) & 0xFFu))
 
 /****************************************************************************
  * Private Functions
+ ****************************************************************************/
+
+/****************************************************************************
+ * Name: egtm_clc_enable
+ *
+ * Description:
+ *   Release the eGTM module from CLC disable and wait for CLC.DISS to clear.
+ *
  ****************************************************************************/
 
 static void egtm_clc_enable(void)
@@ -61,10 +77,16 @@ static void egtm_clc_enable(void)
     }
 }
 
+/****************************************************************************
+ * Name: egtm_cmu_init
+ *
+ * Description:
+ *   Program the CMU to output GCLK = feGTM / gclk_den under PROTE.
+ *
+ ****************************************************************************/
+
 static void egtm_cmu_init(uint32_t gclk_den)
 {
-  /* NUM/DEN are PROTE-guarded and writable only while CLK_EN == 0. */
-
   putreg32(PROT_UNLOCK, EGTM_CFGCMU0_PROTSE);
   putreg32(PROT_UNLOCK, EGTM_CFGCMU0_PROTE);
 
@@ -76,31 +98,50 @@ static void egtm_cmu_init(uint32_t gclk_den)
   putreg32(PROT_LOCK_RUN, EGTM_CFGCMU0_PROTSE);
 }
 
-static void egtm_ch_disable(uint8_t ch)
+/****************************************************************************
+ * Name: egtm_ch_disable
+ *
+ * Description:
+ *   Disable TOM channel <ch> in cluster <cl> at the TGC layer.
+ *
+ ****************************************************************************/
+
+static void egtm_ch_disable(uint8_t cl, uint8_t ch)
 {
-  putreg32(TGC_CH_DISABLE(ch), EGTM_TOM_TGC0_ENDIS_CTRL);
-  putreg32(TGC_CH_DISABLE(ch), EGTM_TOM_TGC0_OUTEN_CTRL);
-  putreg32(TGC_GLB_CTRL_HOST_TRIG, EGTM_TOM_TGC0_GLB_CTRL);
+  uint8_t g = TGC_GROUP(ch);
+
+  putreg32(TGC_CH_DISABLE(ch), EGTM_TOM_TGC_ENDIS_CTRL(cl, g));
+  putreg32(TGC_CH_DISABLE(ch), EGTM_TOM_TGC_OUTEN_CTRL(cl, g));
+  putreg32(TGC_GLB_CTRL_HOST_TRIG, EGTM_TOM_TGC_GLB_CTRL(cl, g));
 }
+
+/****************************************************************************
+ * Name: egtm_tom_isr
+ *
+ * Description:
+ *   TOM channel ISR: ack interrupts, run auto-stop, invoke user callback.
+ *
+ ****************************************************************************/
 
 static int egtm_tom_isr(int irq, void *context, void *arg)
 {
-  uint8_t  ch = (uint8_t)(uintptr_t)arg;
+  uint8_t  cl = EGTM_ISR_CTX_CL(arg);
+  uint8_t  ch = EGTM_ISR_CTX_CH(arg);
   uint32_t notify;
 
-  (void)getreg32(EGTM_ICM_IRQG_TOM0_CI);
+  (void)getreg32(EGTM_ICM_IRQG_TOM_CI(cl, TGC_GROUP(ch)));
 
-  notify = getreg32(EGTM_TOM_CH_IRQ_NOTIFY(ch));
-  putreg32(notify, EGTM_TOM_CH_IRQ_NOTIFY(ch));
+  notify = getreg32(EGTM_TOM_CH_IRQ_NOTIFY(cl, ch));
+  putreg32(notify, EGTM_TOM_CH_IRQ_NOTIFY(cl, ch));
 
-  if (g_ch[ch].remaining != 0 && --g_ch[ch].remaining == 0)
+  if (g_ch[cl][ch].remaining != 0 && --g_ch[cl][ch].remaining == 0)
     {
-      egtm_ch_disable(ch);
+      egtm_ch_disable(cl, ch);
     }
 
-  if (g_ch[ch].cb != NULL)
+  if (g_ch[cl][ch].cb != NULL)
     {
-      g_ch[ch].cb(irq, context, arg);
+      g_ch[cl][ch].cb(irq, context, arg);
     }
 
   return OK;
@@ -108,6 +149,14 @@ static int egtm_tom_isr(int irq, void *context, void *arg)
 
 /****************************************************************************
  * Public Functions
+ ****************************************************************************/
+
+/****************************************************************************
+ * Name: tc4xx_egtm_init
+ *
+ * Description:
+ *   Enable eGTM (CLC) and program the CMU. Idempotent: first call only.
+ *
  ****************************************************************************/
 
 void tc4xx_egtm_init(uint32_t gclk_den)
@@ -124,56 +173,94 @@ void tc4xx_egtm_init(uint32_t gclk_den)
   egtm_cmu_init(gclk_den);
 }
 
-void tc4xx_egtm_pwm_setup(uint8_t ch, uint8_t fxclk_sel,
+/****************************************************************************
+ * Name: tc4xx_egtm_pwm_setup
+ *
+ * Description:
+ *   Configure and start TOM channel <ch> of cluster <cl> as a PWM output.
+ *
+ ****************************************************************************/
+
+void tc4xx_egtm_pwm_setup(uint8_t cl, uint8_t ch, uint8_t fxclk_sel,
                           uint32_t period_ticks, uint32_t duty_ticks,
                           int irq, xcpt_t cb, uint32_t stop_after_n)
 {
-  DEBUGASSERT(ch < 8);
+  uint8_t g = TGC_GROUP(ch);
 
-  g_ch[ch].cb        = cb;
-  g_ch[ch].remaining = stop_after_n;
+  DEBUGASSERT(cl < EGTM_NCLUSTERS);
+  DEBUGASSERT(ch < EGTM_TOM_NCHANNELS);
+
+  g_ch[cl][ch].cb        = cb;
+  g_ch[cl][ch].remaining = stop_after_n;
 
   putreg32((uint32_t)fxclk_sel << TOM_CTRL_CLK_SRC_SHIFT,
-           EGTM_TOM_CH_CTRL(ch));
+           EGTM_TOM_CH_CTRL(cl, ch));
 
-  putreg32(period_ticks, EGTM_TOM_CH_SR0(ch));
-  putreg32(duty_ticks,   EGTM_TOM_CH_SR1(ch));
-  putreg32(0u,           EGTM_TOM_CH_CN0(ch));
+  putreg32(period_ticks, EGTM_TOM_CH_SR0(cl, ch));
+  putreg32(duty_ticks,   EGTM_TOM_CH_SR1(cl, ch));
+  putreg32(0u,           EGTM_TOM_CH_CN0(cl, ch));
 
   if (irq >= 0)
     {
-      putreg32(TOM_IRQ_MODE_PULSE, EGTM_TOM_CH_IRQ_MODE(ch));
-      putreg32(TOM_IRQ_EN_CCU0TC,  EGTM_TOM_CH_IRQ_EN(ch));
+      putreg32(TOM_IRQ_MODE_PULSE, EGTM_TOM_CH_IRQ_MODE(cl, ch));
+      putreg32(TOM_IRQ_EN_CCU0TC,  EGTM_TOM_CH_IRQ_EN(cl, ch));
 
-      irq_attach(irq, egtm_tom_isr, (void *)(uintptr_t)ch);
+      irq_attach(irq, egtm_tom_isr, (void *)EGTM_ISR_CTX_PACK(cl, ch));
       up_enable_irq(irq);
     }
 
   /* FUPD_CTRL must be armed before HOST_TRIG copies SR -> CM. */
 
-  putreg32(TGC_CH_ENABLE(ch), EGTM_TOM_TGC0_ENDIS_CTRL);
-  putreg32(TGC_CH_ENABLE(ch), EGTM_TOM_TGC0_OUTEN_CTRL);
-  putreg32(TGC_CH_ENABLE(ch), EGTM_TOM_TGC0_FUPD_CTRL);
-  putreg32(TGC_GLB_CTRL_HOST_TRIG, EGTM_TOM_TGC0_GLB_CTRL);
+  putreg32(TGC_CH_ENABLE(ch), EGTM_TOM_TGC_ENDIS_CTRL(cl, g));
+  putreg32(TGC_CH_ENABLE(ch), EGTM_TOM_TGC_OUTEN_CTRL(cl, g));
+  putreg32(TGC_CH_ENABLE(ch), EGTM_TOM_TGC_FUPD_CTRL(cl, g));
+  putreg32(TGC_GLB_CTRL_HOST_TRIG, EGTM_TOM_TGC_GLB_CTRL(cl, g));
 }
 
-void tc4xx_egtm_pwm_update(uint8_t ch, uint32_t duty_ticks)
+/****************************************************************************
+ * Name: tc4xx_egtm_pwm_update
+ *
+ * Description:
+ *   Update duty (SR1) on a running TOM channel and commit via HOST_TRIG.
+ *
+ ****************************************************************************/
+
+void tc4xx_egtm_pwm_update(uint8_t cl, uint8_t ch, uint32_t duty_ticks)
 {
-  DEBUGASSERT(ch < 8);
+  DEBUGASSERT(cl < EGTM_NCLUSTERS);
+  DEBUGASSERT(ch < EGTM_TOM_NCHANNELS);
 
-  putreg32(duty_ticks, EGTM_TOM_CH_SR1(ch));
-  putreg32(TGC_GLB_CTRL_HOST_TRIG, EGTM_TOM_TGC0_GLB_CTRL);
+  putreg32(duty_ticks, EGTM_TOM_CH_SR1(cl, ch));
+  putreg32(TGC_GLB_CTRL_HOST_TRIG,
+           EGTM_TOM_TGC_GLB_CTRL(cl, TGC_GROUP(ch)));
 }
 
-void tc4xx_egtm_pwm_stop(uint8_t ch)
+/****************************************************************************
+ * Name: tc4xx_egtm_pwm_stop
+ *
+ * Description:
+ *   Stop a running TOM channel and disable its output.
+ *
+ ****************************************************************************/
+
+void tc4xx_egtm_pwm_stop(uint8_t cl, uint8_t ch)
 {
-  DEBUGASSERT(ch < 8);
+  DEBUGASSERT(cl < EGTM_NCLUSTERS);
+  DEBUGASSERT(ch < EGTM_TOM_NCHANNELS);
 
-  g_ch[ch].remaining = 0;
-  egtm_ch_disable(ch);
+  g_ch[cl][ch].remaining = 0;
+  egtm_ch_disable(cl, ch);
 }
 
-void tc4xx_egtm_route_tout(uint8_t tout_n, uint8_t sel_code)
+/****************************************************************************
+ * Name: tc4xx_egtm_route_tout
+ *
+ * Description:
+ *   Route pad TOUT<tout_n> to the source selected by <sel_code>.
+ *
+ ****************************************************************************/
+
+void tc4xx_egtm_route_tout(uint16_t tout_n, uint8_t sel_code)
 {
   uint32_t x = tout_n % 6u;
 
