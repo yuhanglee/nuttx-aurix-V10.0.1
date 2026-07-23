@@ -23,12 +23,11 @@
 
 #ifdef CONFIG_TC4X_EGTM_PWM_LOWERHALF
 
-/* Init eGTM (idempotent), configure pad, route TOUT, and register
- * /dev/pwm<minor>. Only minor=0 is supported today.
- */
+/* Bind TOM channel <ch> of cluster <cluster> to /dev/pwm<minor>. */
 
-int tc4x_egtm_pwm_register(int minor, gpio_pinset_t pin,
-                            uint8_t tout, uint8_t sel_code);
+int tc4x_egtm_pwm_register(int minor, uint8_t cluster, uint8_t ch,
+                            gpio_pinset_t pin, uint16_t tout,
+                            uint8_t sel_code);
 
 #endif /* CONFIG_TC4X_EGTM_PWM_LOWERHALF */
 #endif /* __ARCH_TRICORE_SRC_TC4X_TC4X_EGTM_PWM_H */

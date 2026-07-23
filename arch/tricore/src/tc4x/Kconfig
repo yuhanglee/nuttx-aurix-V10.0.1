@@ -455,23 +455,15 @@ endif # TC4X_ASCLIN_SPI
 
 # eGTM
 menuconfig TC4X_EGTM_PWM
-	bool "TC4X eGTM PWM (TOM0)"
+	bool "TC4X eGTM PWM (TOM)"
 	default n
 	---help---
-		Enable the eGTM TOM0 PWM HAL (CLC + CMU + TOM + TGC + ICM).
+		Enable the eGTM TOM PWM HAL (CLC + CMU + TOM + TGC + ICM).
 		Provides the tc4x_egtm_* C API. Select the lower-half option
 		below to also expose /dev/pwmN via the NuttX standard PWM
 		framework.
 
 if TC4X_EGTM_PWM
-
-config TC4X_EGTM_TOM0_CH
-	int "TOM0 PWM channel (0..7)"
-	default 0
-	range 0 7
-	---help---
-		Which TOM0 channel the lower-half adapter and board bringup
-		drive by default.
 
 config TC4X_EGTM_PWM_LOWERHALF
 	bool "Register NuttX standard PWM driver (/dev/pwmN)"
@@ -479,9 +471,10 @@ config TC4X_EGTM_PWM_LOWERHALF
 	select PWM
 	---help---
 		Wraps the eGTM HAL behind the NuttX pwm_ops_s vtable so the
-		channel is reachable via the upper-half PWM character driver
-		(open("/dev/pwm0") + PWMIOC_* ioctls). The board bringup must
-		call pwm_register("/dev/pwm0", tc4x_egtm_pwm_initialize(0)).
+		channels are reachable via the upper-half PWM character
+		driver (open("/dev/pwm<minor>") + PWMIOC_* ioctls). The
+		board bringup must call tc4x_egtm_pwm_register() once per
+		/dev/pwmN node.
 
 if TC4X_EGTM_PWM_LOWERHALF
 
@@ -490,10 +483,8 @@ config TC4X_EGTM_PWM_GCLK_DEN
 	default 1
 	range 1 16777215
 	---help---
-		CMU divider for GCLK. Some TC4xx silicon revisions reject
-		writes to GCLK_DEN other than 1 (lock layer not yet
-		identified). Leave at 1; the driver auto-selects the FXCLK
-		tap per requested frequency.
+		CMU divider for GCLK. Leave at 1; the driver runs the TOM
+		off the fixed FXCLK tap 0 (tick = feGTM / 2).
 
 endif # TC4X_EGTM_PWM_LOWERHALF
 
