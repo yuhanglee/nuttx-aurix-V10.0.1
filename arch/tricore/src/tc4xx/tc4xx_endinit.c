@@ -70,8 +70,10 @@ static void endinit_set(uintptr_t ctrla_addr, bool enable)
    *              DR=0 re-enables watchdog (restores ENDINIT protection).
    */
 
+#ifdef CONFIG_WATCHDOG
   putreg32(enable ? 0u : CTRLB_DR,
            ctrla_addr + WDT_CTRLB_OFF - WDT_CTRLA_OFF);
+#endif
 
   /* Lock to apply */
 
