@@ -23,11 +23,13 @@
 #ifndef __ARCH_TRICORE_SRC_TC4X_HARDWARE_TC4X_ASCLIN_H
 #define __ARCH_TRICORE_SRC_TC4X_HARDWARE_TC4X_ASCLIN_H
 
+#include <nuttx/config.h>
+
 /****************************************************************************
  * Pre-processor Definitions
  ****************************************************************************/
 
-#define TRICORE_ASCLIN0_BASE        0xf46c0000
+#define TRICORE_ASCLIN0_BASE        (0xf02c0000 + CONFIG_TC4X_PERI_MMAP_OFFSET)
 #define TRICORE_ASCLIN_STRIDE       0x200
 #define TRICORE_ASCLIN_BASE(n)      (TRICORE_ASCLIN0_BASE + ((uint32_t)(n) * TRICORE_ASCLIN_STRIDE))
 

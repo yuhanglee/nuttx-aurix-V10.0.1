@@ -144,7 +144,7 @@ struct xcptcontext
 #define TRICORE_CFG_DSPR0_START     (0x70000000)
 
 #if defined(CONFIG_ARCH_CHIP_FAMILY_TC4X)
-#  define TRICORE_IR_LASR_ADDR          (0xf4430c20)
+#  define TRICORE_IR_LASR_ADDR          (0xf0030c20 + CONFIG_TC4X_PERI_MMAP_OFFSET)
 #  define TRICORE_IR_LASR_TOS_STRIDE    (0x34)
 #  define TRICORE_IR_LASR_PIPN_WIDTH    (11)
 #elif defined(CONFIG_ARCH_CHIP_FAMILY_TC3X)

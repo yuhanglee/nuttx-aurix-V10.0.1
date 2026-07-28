@@ -14,6 +14,11 @@ config TC4X_CHIP_TC4D7
 	---help---
 		Infineon AURIX TC4D7.
 
+config TC4X_CHIP_TC499
+	bool "TC499 SoC"
+	---help---
+		TC499 SoC
+
 endchoice
 
 config ARCH_TRICORE_CPU_COUNT
@@ -21,6 +26,19 @@ config ARCH_TRICORE_CPU_COUNT
 	default 1
 	---help---
 		Tricore CPU count
+
+config TC4X_PERI_MMAP_OFFSET
+	hex "Tricore base address"
+	default 0x4400000 if TC4X_CHIP_TC4D7
+	default 0 if TC4X_CHIP_TC499
+
+config TRICORE_STM_FREQUENCY
+	int "STM clock frequency (Hz)"
+	default 500000000
+	---help---
+		Frequency of the clock feeding the System Timer.  The tick
+		period is derived from it, so a wrong value scales all
+		timekeeping.
 
 config TC4X_WDT
 	bool "TC4x Watchdog Timer (WTU)"
