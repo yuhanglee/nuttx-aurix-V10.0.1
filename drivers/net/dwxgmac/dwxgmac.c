@@ -61,97 +61,87 @@
 #  define DWXGMAC_DMA_SECTION
 #endif
 
+#define ETH_IF_COUNT CONFIG_DWXGMAC_NETHERNET
+#define RX_DMA_DESC_CNT  CONFIG_DWXGMAC_NUM_RX_DMA_DESCRIPTORS
+#define TX_DMA_DESC_CNT  CONFIG_DWXGMAC_NUM_TX_DMA_DESCRIPTORS
+#define PKTBUF_SZ  ALIGN_UP(CONFIG_NET_ETH_PKTSIZE, 8)
+
 static struct eth_dwmac_dma_desc
-  g_rx0_descs[CONFIG_DWXGMAC_NUM_RX_DMA_DESCRIPTORS]
-  aligned_data(64) DWXGMAC_DMA_SECTION;
+  g_rx_descs[ETH_IF_COUNT][RX_DMA_DESC_CNT] aligned_data(64) DWXGMAC_DMA_SECTION;
 static struct eth_dwmac_dma_desc
-  g_tx0_descs[CONFIG_DWXGMAC_NUM_TX_DMA_DESCRIPTORS]
-  aligned_data(64) DWXGMAC_DMA_SECTION;
+  g_tx_descs[ETH_IF_COUNT][TX_DMA_DESC_CNT] aligned_data(64) DWXGMAC_DMA_SECTION;
 
 static uint8_t
-  g_rxbuf_pool[CONFIG_DWXGMAC_NUM_RX_DMA_DESCRIPTORS]
-              [ALIGN_UP(CONFIG_NET_ETH_PKTSIZE, 8)]
-  aligned_data(64) DWXGMAC_DMA_SECTION;
+  g_rxbuf_pool[ETH_IF_COUNT][RX_DMA_DESC_CNT][PKTBUF_SZ] aligned_data(64) DWXGMAC_DMA_SECTION;
 
 static uint8_t
-  g_txbuf_pool[CONFIG_DWXGMAC_NUM_TX_DMA_DESCRIPTORS]
-              [ALIGN_UP(CONFIG_NET_ETH_PKTSIZE, 8)]
-  aligned_data(64) DWXGMAC_DMA_SECTION;
+  g_txbuf_pool[ETH_IF_COUNT][TX_DMA_DESC_CNT][PKTBUF_SZ] aligned_data(64) DWXGMAC_DMA_SECTION;
 
-static uint8_t *g_txslot_buf[CONFIG_DWXGMAC_NUM_TX_DMA_DESCRIPTORS];
+static uint8_t *g_txslot_buf[ETH_IF_COUNT][TX_DMA_DESC_CNT];
 
 static uint8_t
-  g_pollbuf[ALIGN_UP(CONFIG_NET_ETH_PKTSIZE + CONFIG_NET_GUARDSIZE, 8)]
+  g_pollbuf[ETH_IF_COUNT][ALIGN_UP(CONFIG_NET_ETH_PKTSIZE + CONFIG_NET_GUARDSIZE, 8)]
   aligned_data(64) DWXGMAC_DMA_SECTION;
 
-static struct eth_dwmac_dma_ch_config g_dma_rx_cfg[1] =
-{
-  { .descs = g_rx0_descs,
-    .descs_count = CONFIG_DWXGMAC_NUM_RX_DMA_DESCRIPTORS,
-    .nr = 0
-  },
-};
+static struct eth_dwmac_dma_ch_config g_dma_rx_cfg[ETH_IF_COUNT][1];
+static struct eth_dwmac_dma_ch_config g_dma_tx_cfg[ETH_IF_COUNT][1];
+static struct eth_dwmac_rx_queue     g_mtl_rx_cfg[ETH_IF_COUNT][1];
+static struct eth_dwmac_tx_queue     g_mtl_tx_cfg[ETH_IF_COUNT][1];
+static struct eth_dwmac_config       g_dwmac_cfg[ETH_IF_COUNT];
+static struct eth_xgmac_config       g_xgmac_cfg[ETH_IF_COUNT];
+static struct eth_dwmac_dma_rx_ch_data g_dma_rx_data[ETH_IF_COUNT][1];
+static struct eth_dwmac_dma_tx_ch_data g_dma_tx_data[ETH_IF_COUNT][1];
+static struct eth_xgmac_data           g_xgmac_data[ETH_IF_COUNT];
 
-static struct eth_dwmac_dma_ch_config g_dma_tx_cfg[1] =
-{
-  { .descs = g_tx0_descs,
-    .descs_count = CONFIG_DWXGMAC_NUM_TX_DMA_DESCRIPTORS,
-    .nr = 0
-  },
-};
-
-static struct eth_dwmac_rx_queue g_mtl_rx_cfg[1] =
-{
-  { .nr = 0,
-    .size = 8192,
-    .priority = 0xFF,
-    .threshold = 64,
-    .sf = true,
-    .dma_channel = 0,
-    .route_multi_broad = true,
-  },
-};
-
-static struct eth_dwmac_tx_queue g_mtl_tx_cfg[1] =
-{
-  { .nr = 0,
-    .size = 4096,
-    .threshold = 64,
-    .sf = true
-  },
-};
-
-static const struct eth_dwmac_config g_dwmac_cfg0 =
-{
-  .dma_rx_channel = 1,
-  .dma_tx_channel = 1,
-  .dma_rx = g_dma_rx_cfg,
-  .dma_tx = g_dma_tx_cfg,
-  .mtl_rx_queues = 1,
-  .mtl_tx_queues = 1,
-  .mtl_rx = g_mtl_rx_cfg,
-  .mtl_tx = g_mtl_tx_cfg,
-  .is_xgmac = true,
-};
-
-static struct eth_xgmac_config g_xgmac_cfg[CONFIG_DWXGMAC_NETHERNET] =
-{
-  {
-    .dwmac = g_dwmac_cfg0,
-    .ubl = true,
-    .blen = 0x4,  /* BLEN16 (1 << 3 in SYSBUS_MODE, written as blen << 1) */
-  }
-};
-
-static struct eth_dwmac_dma_rx_ch_data g_dma_rx_data[1];
-static struct eth_dwmac_dma_tx_ch_data g_dma_tx_data[1];
-
-static struct eth_xgmac_data g_xgmac_data[CONFIG_DWXGMAC_NETHERNET] =
-{
-  { .dwmac = { .dma_rx = g_dma_rx_data, .dma_tx = g_dma_tx_data } },
-};
+static FAR struct xgmac_driver_s *g_ch_owner[8];
 
 static struct xgmac_driver_s g_xgmac[CONFIG_DWXGMAC_NETHERNET];
+
+static inline int xgmac_intf(FAR struct xgmac_driver_s *priv)
+{
+  return (int)(priv - g_xgmac);
+}
+
+static void xgmac_cfg_init(int intf)
+{
+  g_dma_rx_cfg[intf][0].descs       = g_rx_descs[intf];
+  g_dma_rx_cfg[intf][0].descs_count = RX_DMA_DESC_CNT;
+  g_dma_rx_cfg[intf][0].nr          = 0;
+
+  g_dma_tx_cfg[intf][0].descs       = g_tx_descs[intf];
+  g_dma_tx_cfg[intf][0].descs_count = TX_DMA_DESC_CNT;
+  g_dma_tx_cfg[intf][0].nr          = 0;
+
+  g_mtl_rx_cfg[intf][0].nr                = 0;
+  g_mtl_rx_cfg[intf][0].size              = 8192;
+  g_mtl_rx_cfg[intf][0].priority          = 0xFF;
+  g_mtl_rx_cfg[intf][0].threshold         = 64;
+  g_mtl_rx_cfg[intf][0].sf                = true;
+  g_mtl_rx_cfg[intf][0].dma_channel       = 0;
+  g_mtl_rx_cfg[intf][0].route_multi_broad = true;
+
+  g_mtl_tx_cfg[intf][0].nr        = 0;
+  g_mtl_tx_cfg[intf][0].size      = 4096;
+  g_mtl_tx_cfg[intf][0].threshold = 64;
+  g_mtl_tx_cfg[intf][0].sf        = true;
+
+  g_dwmac_cfg[intf].dma_rx_channel = 1;
+  g_dwmac_cfg[intf].dma_tx_channel = 1;
+  g_dwmac_cfg[intf].dma_rx         = g_dma_rx_cfg[intf];
+  g_dwmac_cfg[intf].dma_tx         = g_dma_tx_cfg[intf];
+  g_dwmac_cfg[intf].mtl_rx_queues  = 1;
+  g_dwmac_cfg[intf].mtl_tx_queues  = 1;
+  g_dwmac_cfg[intf].mtl_rx         = g_mtl_rx_cfg[intf];
+  g_dwmac_cfg[intf].mtl_tx         = g_mtl_tx_cfg[intf];
+  g_dwmac_cfg[intf].is_xgmac       = true;
+
+  g_xgmac_cfg[intf].dwmac = g_dwmac_cfg[intf];
+  g_xgmac_cfg[intf].ubl   = true;
+  g_xgmac_cfg[intf].blen  = 0x4;   /* BLEN16 */
+
+  g_xgmac_data[intf].dwmac.dma_rx = g_dma_rx_data[intf];
+  g_xgmac_data[intf].dwmac.dma_tx = g_dma_tx_data[intf];
+}
 
 static void xgmac_dma_rx_process(FAR struct xgmac_driver_s *priv, uint8_t ch);
 void xgmac_txavail_work(FAR void *arg);
@@ -173,7 +163,7 @@ static void dma_tx_data_init(FAR struct xgmac_driver_s *priv, uint8_t ch)
 
   for (i = 0; i < cnt; i++)
     {
-      g_txslot_buf[i] = g_txbuf_pool[i];
+      g_txslot_buf[xgmac_intf(priv)][i] = g_txbuf_pool[xgmac_intf(priv)][i];
     }
 }
 
@@ -189,7 +179,7 @@ static void dma_rx_data_init(FAR struct xgmac_driver_s *priv, uint8_t ch)
 
   for (i = 0; i < cnt; i++)
     {
-      d->data[i] = g_rxbuf_pool[i];
+      d->data[i] = g_rxbuf_pool[xgmac_intf(priv)][i];
     }
 
   memset(priv->config->dwmac.dma_rx[ch].descs, 0,
@@ -279,8 +269,14 @@ static void set_link_state(FAR struct xgmac_driver_s *priv, bool up)
       eth_dwmac_mac_set_link(priv, 2, true);
 #  endif
 #else
-      /* 100Mbps full duplex: SS=4 for XGMAC 100M */
+      /* XGMAC MAC_TX_CONFIGURATION.SS: 3=1G, 4=100M, 7=10M. */
+#  if CONFIG_DWXGMAC_LINK_SPEED == 1000
+      eth_dwmac_mac_set_link(priv, 3, true);
+#  elif CONFIG_DWXGMAC_LINK_SPEED == 100
       eth_dwmac_mac_set_link(priv, 4, true);
+#  else
+      eth_dwmac_mac_set_link(priv, 7, true);
+#  endif
 #endif
 
       for (ch = 0; ch < cfg->dma_tx_channel; ch++)
@@ -311,7 +307,7 @@ static int xgmac_send(FAR struct xgmac_driver_s *priv,
   struct eth_xgmac_tdes_rd *tdes;
   FAR uint8_t *txbuf;
 
-  if (!buf || len == 0 || len > sizeof(g_txbuf_pool[0]))
+  if (!buf || len == 0 || len > PKTBUF_SZ)
     return -EINVAL;
 
   nxmutex_lock(&td->lock);
@@ -330,8 +326,8 @@ static int xgmac_send(FAR struct xgmac_driver_s *priv,
        */
 
       txbuf = buf;
-      priv->dev.d_buf = g_txslot_buf[td->tail];
-      g_txslot_buf[td->tail] = buf;
+      priv->dev.d_buf = g_txslot_buf[xgmac_intf(priv)][td->tail];
+      g_txslot_buf[xgmac_intf(priv)][td->tail] = buf;
     }
   else
     {
@@ -340,7 +336,7 @@ static int xgmac_send(FAR struct xgmac_driver_s *priv,
        * immediately.
        */
 
-      txbuf = g_txslot_buf[td->tail];
+      txbuf = g_txslot_buf[xgmac_intf(priv)][td->tail];
       memcpy(txbuf, buf, len);
     }
 
@@ -549,22 +545,32 @@ int dwxgmac_mac_isr(int irq, FAR void *context, FAR void *arg)
    */
 
   while ((dma_status =
-          xgmac_read(priv->base + DMA_INTERRUPT_STATUS) & 0xFFFF) != 0)
+          xgmac_read(priv->dmabase + DMA_INTERRUPT_STATUS) & 0xFFFF) != 0)
     {
       while (dma_status)
         {
           uint8_t dma_ch = __builtin_ctz(dma_status);
           uint32_t ch_sts =
-            xgmac_read(priv->base + DMA_CHi_STATUS(dma_ch));
+            xgmac_read(priv->dmabase + DMA_CHi_STATUS(dma_ch));
+          FAR struct xgmac_driver_s *chpriv = g_ch_owner[dma_ch];
+
+          /* The channel belongs to whichever interface registered it, not
+           * necessarily the one this interrupt was attached for.
+           */
+
+          if (chpriv == NULL)
+            {
+              chpriv = priv;
+            }
 
           if (ch_sts & (DMA_CHi_STATUS_RI | DMA_CHi_STATUS_RBU))
-            xgmac_dma_rx_process(priv, dma_ch);
+            xgmac_dma_rx_process(chpriv, dma_ch);
 
           if (ch_sts & DMA_CHi_STATUS_TI)
-            xgmac_dma_tx_process(priv, dma_ch);
+            xgmac_dma_tx_process(chpriv, dma_ch);
 
           /* Clear all status bits for this channel */
-          xgmac_write(ch_sts, priv->base + DMA_CHi_STATUS(dma_ch));
+          xgmac_write(ch_sts, priv->dmabase + DMA_CHi_STATUS(dma_ch));
 
           dma_status &= ~(1u << dma_ch);
         }
@@ -602,8 +608,17 @@ static int dwxgmac_ifup(FAR struct net_driver_s *dev)
     up_enable_irq(priv->irq);
 
   priv->ifup = true;
-  set_link_state(priv, true);
-  netdev_carrier_on(dev);
+
+  set_link_state(priv, priv->link_up);
+
+  if (priv->link_up)
+    {
+      netdev_carrier_on(dev);
+    }
+  else
+    {
+      netdev_carrier_off(dev);
+    }
 
   return OK;
 }
@@ -669,32 +684,81 @@ static void xgmac_generate_mac(FAR uint8_t *mac)
   mac[5] = (rnd >> 16) & 0xFF;
 }
 
+/****************************************************************************
+ * Name: dwxgmac_carrier
+ *
+ * Description:
+ *   Report a PHY link change.  Boards whose link takes time to converge
+ *   call this when the PHY (and SerDes, where present) reports link, and
+ *   again if it is lost.
+ *
+ ****************************************************************************/
+
+void dwxgmac_carrier(int intf, bool up)
+{
+  FAR struct xgmac_driver_s *priv = &g_xgmac[intf];
+
+  priv->link_up = up;
+
+  if (!priv->ifup)
+    {
+      return;
+    }
+
+  set_link_state(priv, up);
+
+  if (up)
+    {
+      netdev_carrier_on(&priv->dev);
+    }
+  else
+    {
+      netdev_carrier_off(&priv->dev);
+    }
+}
+
 int xgmac_initialize(int intf)
 {
   FAR struct xgmac_driver_s *priv;
   uint8_t ch;
   int ret;
+  uint32_t hwf0;
 
   DEBUGASSERT(intf < CONFIG_DWXGMAC_NETHERNET);
   priv = &g_xgmac[intf];
   memset(priv, 0, sizeof(*priv));
 
-  priv->base   = CONFIG_DWXGMAC_BASE;
-  priv->irq    = CONFIG_DWXGMAC_DMA_IRQ;
-  priv->config = &g_xgmac_cfg[intf];
-  priv->data   = &g_xgmac_data[intf];
+  xgmac_cfg_init(intf);
+
+  priv->base    = CONFIG_DWXGMAC_BASE + intf * CONFIG_DWXGMAC_MAC_STRIDE;
+  priv->dmabase = CONFIG_DWXGMAC_BASE + CONFIG_DWXGMAC_DMA_OFFSET;
+  priv->irq     = CONFIG_DWXGMAC_DMA_IRQ;
+  priv->config  = &g_xgmac_cfg[intf];
+  priv->data    = &g_xgmac_data[intf];
+
+  /* FIXME: boards without link reporting never
+   * call dwxgmac_carrier(), and must not be left with carrier down.
+   */
+
+  priv->link_up = true;
 
   priv->dev.d_ifup    = dwxgmac_ifup;
   priv->dev.d_ifdown  = dwxgmac_ifdown;
   priv->dev.d_txavail = dwxgmac_txavail;
   priv->dev.d_private = priv;
-  priv->dev.d_buf     = g_pollbuf;
+  priv->dev.d_buf     = g_pollbuf[intf];
 
   for (ch = 0; ch < priv->config->dwmac.dma_tx_channel; ch++)
     dma_tx_data_init(priv, ch);
 
   for (ch = 0; ch < priv->config->dwmac.dma_rx_channel; ch++)
     dma_rx_data_init(priv, ch);
+
+  for (ch = 0; ch < priv->config->dwmac.dma_rx_channel; ch++)
+    g_ch_owner[priv->config->dwmac.dma_rx[ch].nr] = priv;
+
+  for (ch = 0; ch < priv->config->dwmac.dma_tx_channel; ch++)
+    g_ch_owner[priv->config->dwmac.dma_tx[ch].nr] = priv;
 
   dma_init(priv);
 
@@ -707,16 +771,14 @@ int xgmac_initialize(int intf)
   xgmac_write(0xFFFFFFFF, priv->base + MMC_TX_INTERRUPT_MASK);
   xgmac_write(MMC_CONTROL_MCF | MMC_CONTROL_CNTRST,
               priv->base + MMC_CONTROL);
-
-  {
-    uint32_t hwf0 = xgmac_read(priv->base + MAC_HW_FEATURE0);
-
-    priv->txcoe = (hwf0 & MAC_HW_FEATURE0_TXCOESEL) != 0;
-    priv->data->dwmac.txcoe_available = priv->txcoe;
-    priv->data->dwmac.rxcoe_available =
-      (hwf0 & MAC_HW_FEATURE0_RXCOESEL) != 0;
-  }
 #endif
+
+  hwf0 = xgmac_read(priv->base + MAC_HW_FEATURE0);
+
+  priv->txcoe = (hwf0 & MAC_HW_FEATURE0_TXCOESEL) != 0;
+  priv->data->dwmac.txcoe_available = priv->txcoe;
+  priv->data->dwmac.rxcoe_available =
+             (hwf0 & MAC_HW_FEATURE0_RXCOESEL) != 0;
 
   mtl_init(priv);
   mac_init(priv);

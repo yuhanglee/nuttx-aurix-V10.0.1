@@ -164,7 +164,7 @@ static inline void eth_dwmac_dma_rx_set_tail(const struct xgmac_driver_s *priv,
   void *tail = &cfg->dwmac.dma_rx[dma_ch].descs[data->dma_rx[dma_ch].tail];
 
   xgmac_write((uint32_t)(uintptr_t)tail,
-              priv->base + DMA_CHi_RXDESC_TAIL_LPOINTER(hw_ch));
+              priv->dmabase + DMA_CHi_RXDESC_TAIL_LPOINTER(hw_ch));
 }
 
 static inline void eth_dwmac_dma_rx_init(const struct xgmac_driver_s *priv,
@@ -174,22 +174,22 @@ static inline void eth_dwmac_dma_rx_init(const struct xgmac_driver_s *priv,
   uint8_t hw_ch = cfg->dwmac.dma_rx[dma_ch].nr;
   const struct eth_dwmac_dma_ch_config *dcfg = &cfg->dwmac.dma_rx[dma_ch];
 
-  xgmac_write(0, priv->base + DMA_CHi_CONTROL(hw_ch));
+  xgmac_write(0, priv->dmabase + DMA_CHi_CONTROL(hw_ch));
 
-  xgmac_write(0, priv->base + DMA_CHi_RXDESC_LIST_HADDRESS(hw_ch));
+  xgmac_write(0, priv->dmabase + DMA_CHi_RXDESC_LIST_HADDRESS(hw_ch));
   xgmac_write((uint32_t)(uintptr_t)dcfg->descs,
-              priv->base + DMA_CHi_RXDESC_LIST_LADDRESS(hw_ch));
+              priv->dmabase + DMA_CHi_RXDESC_LIST_LADDRESS(hw_ch));
 
   xgmac_write(DMA_CHi_RX_CONTROL_RPF |
               FIELD_PREP(DMA_CHi_RX_CONTROL_RBSZ,
                          ALIGN_UP(CONFIG_NET_ETH_PKTSIZE, 8)) |
               FIELD_PREP(DMA_CHi_RX_CONTROL_RXPBL, 32),
-              priv->base + DMA_CHi_RX_CONTROL(hw_ch));
+              priv->dmabase + DMA_CHi_RX_CONTROL(hw_ch));
   xgmac_write(FIELD_PREP(DMA_CHi_RX_CONTROL2_RDRL,
               dcfg->descs_count - 1),
-              priv->base + DMA_CHi_RX_CONTROL2(hw_ch));
+              priv->dmabase + DMA_CHi_RX_CONTROL2(hw_ch));
   xgmac_write((uint32_t)(uintptr_t)dcfg->descs,
-              priv->base + DMA_CHi_RXDESC_TAIL_LPOINTER(hw_ch));
+              priv->dmabase + DMA_CHi_RXDESC_TAIL_LPOINTER(hw_ch));
 }
 
 static inline void eth_dwmac_dma_rx_start(const struct xgmac_driver_s *priv,
@@ -199,7 +199,7 @@ static inline void eth_dwmac_dma_rx_start(const struct xgmac_driver_s *priv,
   uint8_t hw_ch = cfg->dwmac.dma_rx[dma_ch].nr;
 
   xgmac_modreg(DMA_CHi_RX_CONTROL_SR, DMA_CHi_RX_CONTROL_SR,
-               priv->base + DMA_CHi_RX_CONTROL(hw_ch));
+               priv->dmabase + DMA_CHi_RX_CONTROL(hw_ch));
 }
 
 static inline void eth_dwmac_dma_rx_stop(const struct xgmac_driver_s *priv,
@@ -209,7 +209,7 @@ static inline void eth_dwmac_dma_rx_stop(const struct xgmac_driver_s *priv,
   uint8_t hw_ch = cfg->dwmac.dma_rx[dma_ch].nr;
 
   xgmac_modreg(0, DMA_CHi_RX_CONTROL_SR,
-               priv->base + DMA_CHi_RX_CONTROL(hw_ch));
+               priv->dmabase + DMA_CHi_RX_CONTROL(hw_ch));
 }
 
 static inline void eth_dwmac_dma_rx_irq_enable(const struct xgmac_driver_s *priv,
@@ -230,7 +230,7 @@ static inline void eth_dwmac_dma_rx_irq_enable(const struct xgmac_driver_s *priv
                DMA_CHi_INTERRUPT_ENABLE_NIE |
                DMA_CHi_INTERRUPT_ENABLE_FBEE |
                DMA_CHi_INTERRUPT_ENABLE_AIE,
-               priv->base + DMA_CHi_INTERRUPT_ENABLE(hw_ch));
+               priv->dmabase + DMA_CHi_INTERRUPT_ENABLE(hw_ch));
 }
 
 static inline void eth_dwmac_dma_rx_disable_irq(const struct xgmac_driver_s *priv,
@@ -244,7 +244,7 @@ static inline void eth_dwmac_dma_rx_disable_irq(const struct xgmac_driver_s *pri
                DMA_CHi_INTERRUPT_ENABLE_NIE |
                DMA_CHi_INTERRUPT_ENABLE_FBEE |
                DMA_CHi_INTERRUPT_ENABLE_AIE,
-               priv->base + DMA_CHi_INTERRUPT_ENABLE(hw_ch));
+               priv->dmabase + DMA_CHi_INTERRUPT_ENABLE(hw_ch));
 }
 
 static inline void eth_dwmac_dma_rx_clear_irq(const struct xgmac_driver_s *priv,
@@ -254,7 +254,7 @@ static inline void eth_dwmac_dma_rx_clear_irq(const struct xgmac_driver_s *priv,
   uint8_t hw_ch = cfg->dwmac.dma_rx[dma_ch].nr;
 
   xgmac_write(DMA_CHi_STATUS_RI | DMA_CHi_STATUS_NIS,
-              priv->base + DMA_CHi_STATUS(hw_ch));
+              priv->dmabase + DMA_CHi_STATUS(hw_ch));
 }
 
 static inline void eth_dwmac_dma_tx_set_tail(const struct xgmac_driver_s *priv,
@@ -266,7 +266,7 @@ static inline void eth_dwmac_dma_tx_set_tail(const struct xgmac_driver_s *priv,
   void *tail = &cfg->dwmac.dma_tx[dma_ch].descs[data->dma_tx[dma_ch].tail];
 
   xgmac_write((uint32_t)(uintptr_t)tail,
-              priv->base + DMA_CHi_TXDESC_TAIL_LPOINTER(hw_ch));
+              priv->dmabase + DMA_CHi_TXDESC_TAIL_LPOINTER(hw_ch));
 }
 
 static inline void eth_dwmac_dma_tx_init(const struct xgmac_driver_s *priv,
@@ -276,17 +276,21 @@ static inline void eth_dwmac_dma_tx_init(const struct xgmac_driver_s *priv,
   uint8_t hw_ch = cfg->dwmac.dma_tx[dma_ch].nr;
   const struct eth_dwmac_dma_ch_config *dcfg = &cfg->dwmac.dma_tx[dma_ch];
 
-  xgmac_write(0, priv->base + DMA_CHi_TXDESC_LIST_HADDRESS(hw_ch));
+  xgmac_write(0, priv->dmabase + DMA_CHi_TXDESC_LIST_HADDRESS(hw_ch));
   xgmac_write((uint32_t)(uintptr_t)dcfg->descs,
-              priv->base + DMA_CHi_TXDESC_LIST_LADDRESS(hw_ch));
+              priv->dmabase + DMA_CHi_TXDESC_LIST_LADDRESS(hw_ch));
   xgmac_write(FIELD_PREP(DMA_CHi_TX_CONTROL2_TDRL,
               dcfg->descs_count - 1),
-              priv->base + DMA_CHi_TX_CONTROL2(hw_ch));
-  xgmac_modreg(FIELD_PREP(DMA_CHi_TX_CONTROL_TXPBL, 32),
-               DMA_CHi_TX_CONTROL_TXPBL,
-               priv->base + DMA_CHi_TX_CONTROL(hw_ch));
+              priv->dmabase + DMA_CHi_TX_CONTROL2(hw_ch));
+  /* PBL=32 and OSP=1 (bit 4): fetch next frame while current one is
+   * still going out.
+   */
+
+  xgmac_modreg(FIELD_PREP(DMA_CHi_TX_CONTROL_TXPBL, 32) | BIT(4),
+               DMA_CHi_TX_CONTROL_TXPBL | BIT(4),
+               priv->dmabase + DMA_CHi_TX_CONTROL(hw_ch));
   xgmac_write((uint32_t)(uintptr_t)dcfg->descs,
-              priv->base + DMA_CHi_TXDESC_TAIL_LPOINTER(hw_ch));
+              priv->dmabase + DMA_CHi_TXDESC_TAIL_LPOINTER(hw_ch));
 }
 
 static inline void eth_dwmac_dma_tx_start(const struct xgmac_driver_s *priv,
@@ -296,7 +300,7 @@ static inline void eth_dwmac_dma_tx_start(const struct xgmac_driver_s *priv,
   uint8_t hw_ch = cfg->dwmac.dma_tx[dma_ch].nr;
 
   xgmac_modreg(DMA_CHi_TX_CONTROL_ST, DMA_CHi_TX_CONTROL_ST,
-               priv->base + DMA_CHi_TX_CONTROL(hw_ch));
+               priv->dmabase + DMA_CHi_TX_CONTROL(hw_ch));
 }
 
 static inline void eth_dwmac_dma_tx_stop(const struct xgmac_driver_s *priv,
@@ -306,7 +310,7 @@ static inline void eth_dwmac_dma_tx_stop(const struct xgmac_driver_s *priv,
   uint8_t hw_ch = cfg->dwmac.dma_tx[dma_ch].nr;
 
   xgmac_modreg(0, DMA_CHi_TX_CONTROL_ST,
-               priv->base + DMA_CHi_TX_CONTROL(hw_ch));
+               priv->dmabase + DMA_CHi_TX_CONTROL(hw_ch));
 }
 
 static inline void eth_dwmac_dma_tx_irq_enable(const struct xgmac_driver_s *priv,
@@ -323,7 +327,7 @@ static inline void eth_dwmac_dma_tx_irq_enable(const struct xgmac_driver_s *priv
                DMA_CHi_INTERRUPT_ENABLE_NIE |
                DMA_CHi_INTERRUPT_ENABLE_FBEE |
                DMA_CHi_INTERRUPT_ENABLE_AIE,
-               priv->base + DMA_CHi_INTERRUPT_ENABLE(hw_ch));
+               priv->dmabase + DMA_CHi_INTERRUPT_ENABLE(hw_ch));
 }
 
 static inline void eth_dwmac_dma_tx_disable_irq(const struct xgmac_driver_s *priv,
@@ -337,7 +341,7 @@ static inline void eth_dwmac_dma_tx_disable_irq(const struct xgmac_driver_s *pri
                DMA_CHi_INTERRUPT_ENABLE_NIE |
                DMA_CHi_INTERRUPT_ENABLE_FBEE |
                DMA_CHi_INTERRUPT_ENABLE_AIE,
-               priv->base + DMA_CHi_INTERRUPT_ENABLE(hw_ch));
+               priv->dmabase + DMA_CHi_INTERRUPT_ENABLE(hw_ch));
 }
 
 static inline void eth_dwmac_dma_tx_clear_irq(const struct xgmac_driver_s *priv,
@@ -347,7 +351,7 @@ static inline void eth_dwmac_dma_tx_clear_irq(const struct xgmac_driver_s *priv,
   uint8_t hw_ch = cfg->dwmac.dma_tx[dma_ch].nr;
 
   xgmac_write(DMA_CHi_STATUS_TI | DMA_CHi_STATUS_TBU | DMA_CHi_STATUS_NIS,
-              priv->base + DMA_CHi_STATUS(hw_ch));
+              priv->dmabase + DMA_CHi_STATUS(hw_ch));
 }
 
 static inline void eth_dwmac_dma_tx_queue_flush(const struct xgmac_driver_s *priv,
@@ -364,12 +368,12 @@ static inline int eth_dwmac_dma_reset(const struct xgmac_driver_s *priv)
   uint32_t v;
   int i;
 
-  v = xgmac_read(priv->base + DMA_MODE);
-  xgmac_write(v | DMA_MODE_SWR, priv->base + DMA_MODE);
+  v = xgmac_read(priv->dmabase + DMA_MODE);
+  xgmac_write(v | DMA_MODE_SWR, priv->dmabase + DMA_MODE);
 
   for (i = 0; i < 1000; i++)
     {
-      if ((xgmac_read(priv->base + DMA_MODE) & DMA_MODE_SWR) == 0)
+      if ((xgmac_read(priv->dmabase + DMA_MODE) & DMA_MODE_SWR) == 0)
         return 0;
       up_udelay(50);
     }
@@ -384,7 +388,7 @@ static inline void eth_dwmac_dma_set_sysbus(const struct xgmac_driver_s *priv)
   xgmac_write((cfg->aal ? DMA_SYSBUS_MODE_AAL : 0) |
               (cfg->ubl ? DMA_SYSBUS_MODE_UBL : 0) |
               ((uint32_t)cfg->blen << 1),
-              priv->base + DMA_SYSBUS_MODE);
+              priv->dmabase + DMA_SYSBUS_MODE);
 }
 
 static inline void eth_dwmac_mac_config(const struct xgmac_driver_s *priv)
@@ -394,6 +398,8 @@ static inline void eth_dwmac_mac_config(const struct xgmac_driver_s *priv)
               MAC_RX_CONFIGURATION_DCRCC |
               MAC_RX_CONFIGURATION_GPSLCE |
               FIELD_PREP(MAC_RX_CONFIGURATION_GPSL, 1518) |
+              (priv->data->dwmac.rxcoe_available ?
+                 MAC_RX_CONFIGURATION_IPC : 0) |
 #ifdef CONFIG_NET_DWXGMAC_MAC_LOOPBACK
               MAC_RX_CONFIGURATION_LM |
 #endif
@@ -467,7 +473,10 @@ static inline void eth_dwmac_mtl_rxq_init(const struct xgmac_driver_s *priv,
 {
   const struct eth_dwmac_rx_queue *qcfg = &priv->config->dwmac.mtl_rx[queue];
 
-  xgmac_write(FIELD_PREP(MTL_RXQX_OPERATION_MODE_RQS, qcfg->size / 256) |
+  /* RQS holds (queue size in bytes / 256) - 1. */
+
+  xgmac_write(FIELD_PREP(MTL_RXQX_OPERATION_MODE_RQS,
+                         (qcfg->size + 255) / 256 - 1) |
               (qcfg->sf ? MTL_RXQX_OPERATION_MODE_RSF : 0),
               priv->base + MTL_RXQX_OPERATION_MODE(qcfg->nr));
 }
@@ -477,7 +486,13 @@ static inline void eth_dwmac_mtl_txq_init(const struct xgmac_driver_s *priv,
 {
   const struct eth_dwmac_tx_queue *qcfg = &priv->config->dwmac.mtl_tx[queue];
 
-  xgmac_write(FIELD_PREP(MTL_TXQX_OPERATION_MODE_TQS, 7) |
+  /* TQS holds (queue size / 256) - 1.  Size to the synthesized TX FIFO
+   * so full-size frames fit; HW checksum insertion needs the entire
+   * frame in the FIFO.
+   */
+
+  xgmac_write(FIELD_PREP(MTL_TXQX_OPERATION_MODE_TQS,
+                         (qcfg->size + 255) / 256 - 1) |
               (qcfg->sf ? MTL_TXQX_OPERATION_MODE_TSF
                         : FIELD_PREP(MTL_TXQX_OPERATION_MODE_TTC, qcfg->threshold)) |
               FIELD_PREP(GENMASK(3, 2), 0x2),

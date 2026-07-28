@@ -18,6 +18,23 @@ config DWXGMAC_BASE
     hex "XGMAC MAC base address"
     default 0xf9010000
 
+config DWXGMAC_MAC_STRIDE
+    hex "Address stride between per-port MAC cores"
+    default 0x0
+    ---help---
+        Distance between the MAC core of one Ethernet port and the next.
+        Interface i uses DWXGMAC_BASE + i * this value.  Only needed when
+        more than one interface is enabled (0x2000 on the Infineon GETH).
+
+config DWXGMAC_DMA_OFFSET
+    hex "Offset from the MAC base to the DMA register block"
+    default 0x0
+    ---help---
+        On most parts the DWC Ethernet DMA registers are contiguous with the
+        MAC core (offset 0).  The Infineon LETH wrapper places the shared DMA
+        block far from the per-port MAC core, so this offset is added to the
+        MAC base to reach the DMA registers (0xE000 for LETH).
+
 config DWXGMAC_NUM_RX_DMA_DESCRIPTORS
     int "Number of RX DMA descriptors"
     default 8
@@ -53,7 +70,8 @@ config NET_DWXGMAC_MAC_LOOPBACK
 	bool "Enable MAC-internal loopback (debug only)"
 	default n
 	---help---
-		Sets MAC_RX_CONFIGURATION.LM so the MAC loops every transmitted
+		Sets the MAC loopback bit (MAC_RX_CONFIGURATION.LM on XGMAC,
+		MAC_CONFIGURATION.LM on QOS) so the MAC loops every transmitted
 		frame back into its own receive path, bypassing the MII/RMII
 		PHY pads.  Use this only to isolate MAC vs. PHY/board issues.
 

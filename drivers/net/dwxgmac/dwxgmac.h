@@ -200,7 +200,7 @@ struct eth_dwmac_data
 
 struct eth_xgmac_config
 {
-  const struct eth_dwmac_config dwmac;
+  struct eth_dwmac_config dwmac;
   uint8_t blen;
   bool aal;
   bool ubl;
@@ -214,7 +214,9 @@ struct eth_xgmac_data
 struct xgmac_driver_s
 {
   struct net_driver_s dev;
+  bool link_up;
   uintptr_t base;
+  uintptr_t dmabase;
   int irq;
 
   struct eth_xgmac_config *config;

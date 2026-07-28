@@ -236,7 +236,7 @@ static inline void eth_dwmac_dma_rx_set_tail(const struct xgmac_driver_s *priv,
   void *tail = &cfg->dwmac.dma_rx[dma_ch].descs[data->dma_rx[dma_ch].tail];
 
   xgmac_write((uint32_t)(uintptr_t)tail,
-                priv->base + DMA_CHi_RXDESC_TAIL_POINTER(hw_ch));
+                priv->dmabase + DMA_CHi_RXDESC_TAIL_POINTER(hw_ch));
 }
 
 static inline void eth_dwmac_dma_rx_init(const struct xgmac_driver_s *priv,
@@ -245,7 +245,7 @@ static inline void eth_dwmac_dma_rx_init(const struct xgmac_driver_s *priv,
   const struct eth_xgmac_config *cfg = priv->config;
   uint8_t hw_ch = cfg->dwmac.dma_rx[dma_ch].nr;
   const struct eth_dwmac_dma_ch_config *dcfg = &cfg->dwmac.dma_rx[dma_ch];
-  uintptr_t dma = priv->base;
+  uintptr_t dma = priv->dmabase;
 
 #if UINTPTR_MAX == UINT64_MAX
   xgmac_write((uint32_t)((uintptr_t)dcfg->descs >> 32),
@@ -271,7 +271,7 @@ static inline void eth_dwmac_dma_rx_start(const struct xgmac_driver_s *priv,
   uint8_t hw_ch = cfg->dwmac.dma_rx[dma_ch].nr;
 
   xgmac_modreg(DMA_CHi_RX_CONTROL_SR, DMA_CHi_RX_CONTROL_SR,
-                 priv->base + DMA_CHi_RX_CONTROL(hw_ch));
+                 priv->dmabase + DMA_CHi_RX_CONTROL(hw_ch));
 }
 
 static inline void eth_dwmac_dma_rx_stop(const struct xgmac_driver_s *priv,
@@ -281,7 +281,7 @@ static inline void eth_dwmac_dma_rx_stop(const struct xgmac_driver_s *priv,
   uint8_t hw_ch = cfg->dwmac.dma_rx[dma_ch].nr;
 
   xgmac_modreg(0, DMA_CHi_RX_CONTROL_SR,
-                 priv->base + DMA_CHi_RX_CONTROL(hw_ch));
+                 priv->dmabase + DMA_CHi_RX_CONTROL(hw_ch));
 }
 
 static inline void eth_dwmac_dma_rx_irq_enable(const struct xgmac_driver_s *priv,
@@ -300,7 +300,7 @@ static inline void eth_dwmac_dma_rx_irq_enable(const struct xgmac_driver_s *priv
                  DMA_CHi_INTERRUPT_ENABLE_FBEE |
                  DMA_CHi_INTERRUPT_ENABLE_CDEE |
                  DMA_CHi_INTERRUPT_ENABLE_AIE,
-                 priv->base + DMA_CHi_INTERRUPT_ENABLE(hw_ch));
+                 priv->dmabase + DMA_CHi_INTERRUPT_ENABLE(hw_ch));
 }
 
 static inline void eth_dwmac_dma_rx_disable_irq(const struct xgmac_driver_s *priv,
@@ -315,7 +315,7 @@ static inline void eth_dwmac_dma_rx_disable_irq(const struct xgmac_driver_s *pri
                  DMA_CHi_INTERRUPT_ENABLE_FBEE |
                  DMA_CHi_INTERRUPT_ENABLE_CDEE |
                  DMA_CHi_INTERRUPT_ENABLE_AIE,
-                 priv->base + DMA_CHi_INTERRUPT_ENABLE(hw_ch));
+                 priv->dmabase + DMA_CHi_INTERRUPT_ENABLE(hw_ch));
 }
 
 static inline void eth_dwmac_dma_rx_clear_irq(const struct xgmac_driver_s *priv,
@@ -325,7 +325,7 @@ static inline void eth_dwmac_dma_rx_clear_irq(const struct xgmac_driver_s *priv,
   uint8_t hw_ch = cfg->dwmac.dma_rx[dma_ch].nr;
 
   xgmac_write(DMA_CHi_STATUS_RI | DMA_CHi_STATUS_NIS,
-                priv->base + DMA_CHi_STATUS(hw_ch));
+                priv->dmabase + DMA_CHi_STATUS(hw_ch));
 }
 
 static inline void eth_dwmac_dma_tx_set_tail(const struct xgmac_driver_s *priv,
@@ -337,7 +337,7 @@ static inline void eth_dwmac_dma_tx_set_tail(const struct xgmac_driver_s *priv,
   void *tail = &cfg->dwmac.dma_tx[dma_ch].descs[data->dma_tx[dma_ch].tail];
 
   xgmac_write((uint32_t)(uintptr_t)tail,
-                priv->base + DMA_CHi_TXDESC_TAIL_POINTER(hw_ch));
+                priv->dmabase + DMA_CHi_TXDESC_TAIL_POINTER(hw_ch));
 }
 
 static inline void eth_dwmac_dma_tx_init(const struct xgmac_driver_s *priv,
@@ -346,7 +346,7 @@ static inline void eth_dwmac_dma_tx_init(const struct xgmac_driver_s *priv,
   const struct eth_xgmac_config *cfg = priv->config;
   uint8_t hw_ch = cfg->dwmac.dma_tx[dma_ch].nr;
   const struct eth_dwmac_dma_ch_config *dcfg = &cfg->dwmac.dma_tx[dma_ch];
-  uintptr_t dma = priv->base;
+  uintptr_t dma = priv->dmabase;
 
 #if UINTPTR_MAX == UINT64_MAX
   xgmac_write((uint32_t)((uintptr_t)dcfg->descs >> 32),
@@ -371,7 +371,7 @@ static inline void eth_dwmac_dma_tx_start(const struct xgmac_driver_s *priv,
   uint8_t hw_ch = cfg->dwmac.dma_tx[dma_ch].nr;
 
   xgmac_modreg(DMA_CHi_TX_CONTROL_ST, DMA_CHi_TX_CONTROL_ST,
-                 priv->base + DMA_CHi_TX_CONTROL(hw_ch));
+                 priv->dmabase + DMA_CHi_TX_CONTROL(hw_ch));
 }
 
 static inline void eth_dwmac_dma_tx_stop(const struct xgmac_driver_s *priv,
@@ -381,7 +381,7 @@ static inline void eth_dwmac_dma_tx_stop(const struct xgmac_driver_s *priv,
   uint8_t hw_ch = cfg->dwmac.dma_tx[dma_ch].nr;
 
   xgmac_modreg(0, DMA_CHi_TX_CONTROL_ST,
-                 priv->base + DMA_CHi_TX_CONTROL(hw_ch));
+                 priv->dmabase + DMA_CHi_TX_CONTROL(hw_ch));
 }
 
 static inline void eth_dwmac_dma_tx_irq_enable(const struct xgmac_driver_s *priv,
@@ -400,7 +400,7 @@ static inline void eth_dwmac_dma_tx_irq_enable(const struct xgmac_driver_s *priv
                  DMA_CHi_INTERRUPT_ENABLE_FBEE |
                  DMA_CHi_INTERRUPT_ENABLE_CDEE |
                  DMA_CHi_INTERRUPT_ENABLE_AIE,
-                 priv->base + DMA_CHi_INTERRUPT_ENABLE(hw_ch));
+                 priv->dmabase + DMA_CHi_INTERRUPT_ENABLE(hw_ch));
 }
 
 static inline void eth_dwmac_dma_tx_disable_irq(const struct xgmac_driver_s *priv,
@@ -415,7 +415,7 @@ static inline void eth_dwmac_dma_tx_disable_irq(const struct xgmac_driver_s *pri
                  DMA_CHi_INTERRUPT_ENABLE_FBEE |
                  DMA_CHi_INTERRUPT_ENABLE_CDEE |
                  DMA_CHi_INTERRUPT_ENABLE_AIE,
-                 priv->base + DMA_CHi_INTERRUPT_ENABLE(hw_ch));
+                 priv->dmabase + DMA_CHi_INTERRUPT_ENABLE(hw_ch));
 }
 
 static inline void eth_dwmac_dma_tx_clear_irq(const struct xgmac_driver_s *priv,
@@ -425,7 +425,7 @@ static inline void eth_dwmac_dma_tx_clear_irq(const struct xgmac_driver_s *priv,
   uint8_t hw_ch = cfg->dwmac.dma_tx[dma_ch].nr;
 
   xgmac_write(DMA_CHi_STATUS_TI | DMA_CHi_STATUS_TBU | DMA_CHi_STATUS_NIS,
-                priv->base + DMA_CHi_STATUS(hw_ch));
+                priv->dmabase + DMA_CHi_STATUS(hw_ch));
 }
 
 static inline void eth_dwmac_dma_tx_queue_flush(const struct xgmac_driver_s *priv,
@@ -444,8 +444,8 @@ static inline int eth_dwmac_dma_reset(const struct xgmac_driver_s *priv)
   uint32_t v;
   int i;
 
-  v = xgmac_read(priv->base + DMA_MODE);
-  xgmac_write(v | DMA_MODE_SWR, priv->base + DMA_MODE);
+  v = xgmac_read(priv->dmabase + DMA_MODE);
+  xgmac_write(v | DMA_MODE_SWR, priv->dmabase + DMA_MODE);
 
   /* SWR self-clears only once the PHY supplies the RX clock,
    * which can take ~100ms on (R)GMII/RMII links.
@@ -453,7 +453,7 @@ static inline int eth_dwmac_dma_reset(const struct xgmac_driver_s *priv)
 
   for (i = 0; i < 5000; i++)
     {
-      if ((xgmac_read(priv->base + DMA_MODE) & DMA_MODE_SWR) == 0)
+      if ((xgmac_read(priv->dmabase + DMA_MODE) & DMA_MODE_SWR) == 0)
         return 0;
       up_udelay(100);
     }
@@ -471,14 +471,18 @@ static inline void eth_dwmac_dma_set_sysbus(const struct xgmac_driver_s *priv)
                 DMA_SYSBUS_MODE_EAME |
 #endif
                 ((uint32_t)cfg->blen << 1),
-                priv->base + DMA_SYSBUS_MODE);
+                priv->dmabase + DMA_SYSBUS_MODE);
 }
 
 static inline void eth_dwmac_mac_config(const struct xgmac_driver_s *priv)
 {
   xgmac_write(MAC_CONFIGURATION_IPC |
                 MAC_CONFIGURATION_CST |
-                MAC_CONFIGURATION_ACS,
+                MAC_CONFIGURATION_ACS |
+#ifdef CONFIG_NET_DWXGMAC_MAC_LOOPBACK
+                MAC_CONFIGURATION_LM |
+#endif
+                0,
                 priv->base + MAC_CONFIGURATION);
 
   xgmac_write(MAC_PACKET_FILTER_PM, priv->base + MAC_PACKET_FILTER);
