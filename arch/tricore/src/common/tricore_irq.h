@@ -52,8 +52,8 @@ static inline uint32_t tricore_default_ir_tos(void)
 #endif
 
 #if defined(CONFIG_ARCH_CHIP_FAMILY_TC4XX)
-#  define IFX_IR_INT_BASE           0xf4430000
-#  define IFX_IR_SRC_BASE           0xf4432000
+#    define IFX_IR_INT_BASE         (0xf0030000 + CONFIG_TC4XX_PERI_MMAP_OFFSET)
+#    define IFX_IR_SRC_BASE         (0xf0032000 + CONFIG_TC4XX_PERI_MMAP_OFFSET)
 
 #define IFX_STM_BASE_SRN            8
 

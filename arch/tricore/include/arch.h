@@ -141,7 +141,7 @@ struct xcptcontext
 #define	IFX_CFG_DSPR0_START			(0x70000000)
 
 #if defined(CONFIG_ARCH_CHIP_FAMILY_TC4XX)
-#  define IFX_IR_LASR_ADDR          (0xF4430C20)
+#  define IFX_IR_LASR_ADDR        (0xF0030C20 + CONFIG_TC4XX_PERI_MMAP_OFFSET)
 #  define IFX_IR_LASR_TOS_STRIDE    (0x34)
 #  define IFX_IR_LASR_PIPN_WIDTH    (11)
 #elif defined(CONFIG_ARCH_CHIP_FAMILY_TC3XX)

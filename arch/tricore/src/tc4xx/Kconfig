@@ -3,11 +3,16 @@ comment "Infineon Aurix TC4XX Family configurations"
 choice
 	prompt "Infineon Aurix TC4XX Chip selection"
 
-
 config TC4XX_CHIP_TC4D7
 	bool "TC4D7 SoC"
 	---help---
 		TC4D7 SoC
+
+
+config TC4XX_CHIP_TC499
+	bool "TC499 SoC"
+	---help---
+		TC499 SoC
 
 endchoice
 
@@ -18,6 +23,11 @@ config ARCH_TRICORE_CPU_COUNT
 		Tricore CPU count
 
 menu "TC4XX Peripheral Support"
+
+config TC4XX_PERI_MMAP_OFFSET
+       hex "Tricore base address"
+       default 0x4400000 if TC4XX_CHIP_TC4D7
+       default 0 if TC4XX_CHIP_TC499
 
 # UART
 config TRICORE_UART0
@@ -47,6 +57,14 @@ config TRICORE_ASCLINF_FREQUENCY
         default 200000000
 
 endif # TRICORE_UART0
+
+config TRICORE_STM_FREQUENCY
+        int "STM clock frequency (Hz)"
+        default 500000000
+        ---help---
+                Frequency of the clock feeding the System Timer.  The tick
+                period is derived from it, so a wrong value scales all
+                timekeeping.
 
 config TRICORE_UART1
         bool "ASCLIN1 UART"

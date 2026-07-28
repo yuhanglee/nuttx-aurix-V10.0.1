@@ -58,7 +58,11 @@
 
 #define IFX_STM_SRC_INDEX(core, stm) (8 + stm)
 
+#ifdef CONFIG_TRICORE_STM_FREQUENCY
+#define IFX_STM_FREQ                CONFIG_TRICORE_STM_FREQUENCY
+#else
 #define IFX_STM_FREQ                (500 * 1000 * 1000)
+#endif
 #define IFX_STM_HAS_64BIT_READ     1
 
 #elif defined(CONFIG_ARCH_CHIP_FAMILY_TC3XX)
