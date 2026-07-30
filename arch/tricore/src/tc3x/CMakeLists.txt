@@ -34,4 +34,8 @@ if(CONFIG_TC3X_GPT1_PWM OR CONFIG_TC3X_GPT2_PWM)
   list(APPEND SRCS tc3x_gpt12_pwm.c)
 endif()
 
+if(CONFIG_TC3X_GPT2_CAP OR CONFIG_TC3X_GPT1_CAP)
+  list(APPEND SRCS tc3x_gpt12_cap.c)
+endif()
+
 target_sources(arch PRIVATE ${SRCS})

@@ -244,3 +244,55 @@ config TC3X_GPT2_PWM_T6_SRN
 		189 = IRQ_GPT120_T6 (TC37x/TC39x SRC table).
 
 endif # TC3X_GPT2_PWM
+
+# GPT12 Capture
+menuconfig TC3X_GPT12_CAP
+        bool "TC3xx GPT12 capture (T5/CAPREL)"
+        default n
+        depends on CAPTURE
+        ---help---
+                Enable the GPT2-block capture lower-half driver.  Uses timer
+                T5 and CAPREL to measure the frequency and duty cycle of a
+                signal on the CAPIN input pin.  Registers /dev/capN.
+
+                T5 runs free in Timer mode.  Three consecutive edge captures
+                (rising, falling, rising) give the period and pulse width.
+                Frequency and duty cycle are derived from T5 tick counts.
+
+                CAPREL is shared with the GPT2 PWM path (TC3X_GPT2_PWM).
+                Both cannot be active simultaneously.  start() returns
+                -EBUSY if T6 is already running.
+
+if TC3X_GPT12_CAP
+
+config TC3X_GPT12_CAP_CAPREL_SRN
+        int "GPT12 CAPREL SRN (Service Request Node) index"
+        default 184
+        range 1 2047
+        ---help---
+                NuttX IRQ number for the GPT120 CAPREL interrupt.
+                Verify the correct value for your specific TC3xx device.
+
+config TC3X_GPT12_CAP_T5I
+        int "T5 input prescaler (T5I field, 0=div1 .. 7=div128)"
+        default 4
+        range 0 7
+        ---help---
+                Per-timer prescaler for T5.  T5 clock = fGPT / 2^T5I
+                where fGPT = fSPB / 2 (50 MHz with fSPB = 100 MHz).
+
+                T5I=4 (default): f_T5 = 3.125 MHz, min freq ~48 Hz.
+                T5I=6: f_T5 ~781 kHz, min freq ~12 Hz.
+                T5I=7: f_T5 ~390 kHz, min freq ~6 Hz.
+
+config TC3X_GPT12_CAP_CAPIN_SEL
+        int "PISEL.ISCAPIN pin select (0=CAPINA, 1=CAPINB)"
+        default 0
+        range 0 1
+        ---help---
+                Selects which physical pin is routed to the CAPIN input.
+                0 = CAPINA, 1 = CAPINB.
+                Verify the alternate-function pin mapping for your device
+                before changing this value.
+
+endif # TC3X_GPT12_CAP
