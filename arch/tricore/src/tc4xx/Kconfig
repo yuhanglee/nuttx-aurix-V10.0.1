@@ -211,6 +211,25 @@ config TRICORE_GETH_BRIDGE_IRQ
     int "Tricore GETH bridge interrupt number"
     default 760
 
+choice
+	prompt "GETH MII interface mode"
+	default TRICORE_GETH_IF_RMII
+	---help---
+		How the MAC is wired to the PHY on this board.
+
+config TRICORE_GETH_IF_RMII
+	bool "RMII"
+	---help---
+		Reduced MII straight out of the port pads.
+
+config TRICORE_GETH_IF_SGMII
+	bool "SGMII"
+	---help---
+		SGMII over the HSPHY SerDes, via XPCS.  Needs the VDDPH_PHY
+		analog supplies and an XPCS bring-up before the MAC is usable.
+
+endchoice
+
 endif # TC4XX_GETH
 
 # LETH

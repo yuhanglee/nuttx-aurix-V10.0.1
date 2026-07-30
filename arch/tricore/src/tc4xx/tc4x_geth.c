@@ -138,9 +138,20 @@ static void init_pms_supplies(void)
   pms_enable_supply(PMS_VMONP_VDDPHY0CON, 0, PMS_VMONP_VDDPHY0STAT);
   pms_enable_supply(PMS_VMONP_VDDPHY1CON, 0, 0);
   pms_enable_supply(PMS_VMONP_VDDPHY2CON, 0, 0);
+
+#ifdef CONFIG_TRICORE_GETH_IF_SGMII
+  /* Triboard SGMII SerDes needs the VDDPH_PHY analog rails too. */
+  pms_enable_supply(PMS_VMONP_VDDPHPHY0CON, PMS_VMONP_VDDPHPHY0RST,
+                    PMS_VMONP_VDDPHPHY0STAT);
+  pms_enable_supply(PMS_VMONP_VDDPHPHY1CON, PMS_VMONP_VDDPHPHY1RST,
+                    PMS_VMONP_VDDPHPHY1STAT);
+  pms_enable_supply(PMS_VMONP_VDDPHPHY2CON, PMS_VMONP_VDDPHPHY2RST,
+                    PMS_VMONP_VDDPHPHY2STAT);
+#endif
 }
 
-static int init_hsphy_for_rmii(int port)
+static int init_hsphy_mode(int port,
+                           const struct tc4x_geth_sigmux_s *mux)
 {
   int i;
 
@@ -177,20 +188,62 @@ static int init_hsphy_for_rmii(int port)
       return -EIO;
     }
 
+#ifdef CONFIG_TRICORE_GETH_IF_SGMII
+  /* PHYCTRL1: FSP=0 (XGMAC function), PRS=0 (internal refclk),
+   * PWRDWN=0 -> wait 25us -> RST=0.
+   */
+  xgmac_modreg(0, BIT(0) | BIT(1) | BIT(8), TC4XX_HSPHY_PHYCTRL1(port));
+  up_udelay(25);
+  xgmac_modreg(0, BIT(7), TC4XX_HSPHY_PHYCTRL1(port));
+
+  /* IntfMode[30:28]=SGMII(=4) plus this board's MDIO mux. */
+
+  xgmac_modreg((4u << 28) |
+               ((mux->mdio << GETH_ETH_MDIO_SHIFT) & GETH_ETH_MDIO_MASK) |
+               GETH_ETH_MDIOEN,
+               GENMASK(30, 28) | GETH_ETH_MDIO_MASK | GETH_ETH_MDIOEN,
+               TC4XX_HSPHY_ETH(port));
+
+  for (i = 0; i < 100; i++)
+    {
+      if (xgmac_read(TC4XX_HSPHY_PHYCTRL1(port)) & BIT(3))
+        break;
+      up_mdelay(1);
+    }
+
+  if (i == 100)
+    {
+      nerr("HSPHY PHY%d INITDONE timeout\n", port);
+      return -EIO;
+    }
+
+  xgmac_modreg(BIT(4), BIT(4), TC4XX_HSPHY_PHYCTRL1(port));
+#else
   xgmac_modreg(0, BIT(8), TC4XX_HSPHY_PHYCTRL1(port));
   up_udelay(25);
   xgmac_modreg(0, BIT(7), TC4XX_HSPHY_PHYCTRL1(port));
 
   xgmac_modreg(BIT(29), GENMASK(30,28), TC4XX_HSPHY_ETH(port)); // rmii
-  xgmac_modreg(GENMASK(15,12), GENMASK(15,12), TC4XX_HSPHY_ETH(port)); // RXD0D, RXD1D
-  xgmac_modreg(GENMASK(23,22), GENMASK(23,22),  TC4XX_HSPHY_ETH(port)); // REFCLKD
-  xgmac_modreg(BIT(9), GENMASK(9,8),  TC4XX_HSPHY_ETH(port)); // CRSDVC
+
+  xgmac_modreg(((mux->rxd0 << GETH_ETH_RXD0_SHIFT) & GETH_ETH_RXD0_MASK) |
+               ((mux->rxd1 << GETH_ETH_RXD1_SHIFT) & GETH_ETH_RXD1_MASK),
+               GETH_ETH_RXD0_MASK | GETH_ETH_RXD1_MASK,
+               TC4XX_HSPHY_ETH(port));
+  xgmac_modreg((mux->refclk << GETH_ETH_REFCLK_SHIFT) & GETH_ETH_REFCLK_MASK,
+               GETH_ETH_REFCLK_MASK, TC4XX_HSPHY_ETH(port));
+  xgmac_modreg((mux->crsdv << GETH_ETH_CRSDV_SHIFT) & GETH_ETH_CRSDV_MASK,
+               GETH_ETH_CRSDV_MASK, TC4XX_HSPHY_ETH(port));
 
 
-  xgmac_modreg(0x7u, 0x7u, TC4XX_HSPHY_ETH(port)); // MDIO=D, MDIOEN=1
+  xgmac_modreg(((mux->mdio << GETH_ETH_MDIO_SHIFT) & GETH_ETH_MDIO_MASK) |
+               GETH_ETH_MDIOEN,
+               GETH_ETH_MDIO_MASK | GETH_ETH_MDIOEN,
+               TC4XX_HSPHY_ETH(port));
+#endif
 
   xgmac_modreg(BIT(4), BIT(4), TC4XX_HSPHY_CMNCFG);
 
+#ifndef CONFIG_TRICORE_GETH_IF_SGMII
   if (port == 0)
     {
       /* TX outputs: alt10 per BGA292 RMIIC pin map. */
@@ -206,6 +259,7 @@ static int init_hsphy_for_rmii(int port)
       tc4x_port_set_input(16, 4);  /* RXD0 D */
 
     }
+#endif
 
   return OK;
 }
@@ -265,9 +319,13 @@ static int init_geth(int port)
   xgmac_write(0xFFFFFFFF, TC4XX_ETH_ACCEN_GBL_WRA);
   xgmac_write(0xFFFFFFFF, TC4XX_ETH_ACCEN_GBL_WRB);
 
-  /* MAC0 port-specific access enable -- was missing */
+  /* Enable per-MAC access. Both MAC0 and MAC1 unconditionally
+   * so MAC1 or MAC0 works from board.
+   */
   xgmac_write(0xFFFFFFFF, TC4XX_ETH_ACCEN_MAC0_WRA);
   xgmac_write(0xFFFFFFFF, TC4XX_ETH_ACCEN_MAC0_WRB);
+  xgmac_write(0xFFFFFFFF, TC4XX_ETH_ACCEN_MAC1_WRA);
+  xgmac_write(0xFFFFFFFF, TC4XX_ETH_ACCEN_MAC1_WRB);
 
   for (i = 0; i < 8; i++)
     {
@@ -278,27 +336,47 @@ static int init_geth(int port)
   return OK;
 }
 
-static void init_geth_bridge(void)
+static void init_geth_bridge(int hw_port)
 {
-
-  /* DMA_PORT_SELECTION: assign all 8 DMA channels to port 0. */
-  xgmac_write(0, TC4XX_BRIDGE_DMA_PORT_SEL);
-
-  xgmac_write(0xFF00FF00u, TC4XX_BRIDGE_PORT0_CTRL);
+  if (hw_port == 1)
+    {
+      /* Triboard: single-port bridge mode routes to Port 1 (MAC1).
+       * FWDCTRL bit 30 = PORT_SEL, bit 31 = Q_CH_MAPPING_EN.
+       * Reset value is 0x40 (MAX_PKT_LENGTH); preserve it, add PORT_SEL=1.
+       */
+      xgmac_write(0x01u, TC4XX_BRIDGE_DMA_PORT_SEL);
+      xgmac_modreg(BIT(30), BIT(30) | BIT(31), TC4XX_BRIDGE_FWDCTRL);
+      xgmac_write(0x01000100u, TC4XX_BRIDGE_PORT1_CTRL);
+    }
+  else
+    {
+      /* DMA_PORT_SELECTION: assign all 8 DMA channels to port 0. */
+      xgmac_write(0, TC4XX_BRIDGE_DMA_PORT_SEL);
+      xgmac_write(0xFF00FF00u, TC4XX_BRIDGE_PORT0_CTRL);
+    }
 
   /* Clear any stale port loopback / RxQ flush state. */
   xgmac_write(0, TC4XX_BRIDGE_BASE + 0x004);
 }
 
-int tc4x_geth_init(int intf)
+int tc4x_geth_init(int intf, const struct tc4x_geth_sigmux_s *mux)
 {
   int ret;
 
   init_pms_supplies();
 
-  ret = init_hsphy_for_rmii(intf);
+  ret = init_hsphy_mode(intf, mux);
   if (ret < 0)
     return ret;
+
+#ifdef CONFIG_TRICORE_GETH_IF_SGMII
+  ret = tc4x_xpcs1_sgmii_1g_init();
+  if (ret < 0)
+    {
+      nerr("XPCS1 SGMII init failed: %d\n", ret);
+      return ret;
+    }
+#endif
 
   ret = init_geth(intf);
   if (ret < 0)
@@ -308,7 +386,7 @@ int tc4x_geth_init(int intf)
   if (ret < 0)
     return ret;
 
-  init_geth_bridge();
+  init_geth_bridge(intf);
 
   ret = irq_attach(CONFIG_TRICORE_GETH_BRIDGE_IRQ, xgmac_mac_bridge_isr, (void *)intf);
   if (ret < 0)

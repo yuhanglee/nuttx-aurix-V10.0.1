@@ -34,6 +34,8 @@
 #define TC4XX_ETH_ACCEN_GBL_WRB     (TC4XX_ETH_BASE + 0x044)
 #define TC4XX_ETH_ACCEN_MAC0_WRA    (TC4XX_ETH_BASE + 0x060)
 #define TC4XX_ETH_ACCEN_MAC0_WRB    (TC4XX_ETH_BASE + 0x064)
+#define TC4XX_ETH_ACCEN_MAC1_WRA    (TC4XX_ETH_BASE + 0x080)
+#define TC4XX_ETH_ACCEN_MAC1_WRB    (TC4XX_ETH_BASE + 0x084)
 #define TC4XX_ETH_ACCEN_CH_WRA(i)   (TC4XX_ETH_BASE + 0x0A0 + 0x20 * (i))
 #define TC4XX_ETH_ACCEN_CH_WRB(i)   (TC4XX_ETH_BASE + 0x0A4 + 0x20 * (i))
 
@@ -56,6 +58,32 @@
 #define TC4XX_HSPHY_CMNCFG           (TC4XX_HSPHY_BASE + 0x200)
 #define TC4XX_HSPHY_PHYCTRL0(i)      (TC4XX_HSPHY_BASE + 0x210 + (8 * (i)))
 #define TC4XX_HSPHY_PHYCTRL1(i)      (TC4XX_HSPHY_BASE + 0x214 + (8 * (i)))
+
+#define GETH_ETH_MDIO_SHIFT     0
+#define GETH_ETH_MDIO_MASK      GENMASK(1, 0)
+#define GETH_ETH_MDIOEN         BIT(2)
+#define GETH_ETH_CRSDV_SHIFT    8
+#define GETH_ETH_CRSDV_MASK     GENMASK(9, 8)
+#define GETH_ETH_RXD0_SHIFT     12
+#define GETH_ETH_RXD0_MASK      GENMASK(13, 12)
+#define GETH_ETH_RXD1_SHIFT     14
+#define GETH_ETH_RXD1_MASK      GENMASK(15, 14)
+#define GETH_ETH_REFCLK_SHIFT   22
+#define GETH_ETH_REFCLK_MASK    GENMASK(23, 22)
+
+/* Board routing for one GETH port: which alternate pin each signal uses,
+ * 0=A, 1=B, 2=C, 3=D.  The RX signals apply to RMII only.
+ */
+
+struct tc4x_geth_sigmux_s
+{
+  uint8_t mdio;
+  uint8_t rxd0;
+  uint8_t rxd1;
+  uint8_t refclk;
+  uint8_t crsdv;
+};
+
 #define TC4XX_HSPHY_ETH(i)           (TC4XX_HSPHY_BASE + 0x600 + (4 * (i)))
 #define TC4XX_HSPHY_DLLCFG           (TC4XX_HSPHY_BASE + 0x628)
 

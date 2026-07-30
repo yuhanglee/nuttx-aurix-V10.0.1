@@ -11,6 +11,9 @@ endif
 
 ifeq ($(CONFIG_TC4XX_GETH),y)
 CHIP_CSRCS += tc4x_geth.c
+ifeq ($(CONFIG_TRICORE_GETH_IF_SGMII),y)
+CHIP_CSRCS += tc4x_xpcs.c
+endif
 endif
 
 ifeq ($(CONFIG_TC4XX_LETH),y)
