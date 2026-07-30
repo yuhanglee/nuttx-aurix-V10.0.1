@@ -47,6 +47,9 @@
 int mcmcan_board_initialize(void);
 #endif
 
+#if defined(CONFIG_TC3XX_GPT1_PWM) || defined(CONFIG_TC3XX_GPT2_PWM)
+#include "tc3xx_gpt12_pwm.h"
+#endif
 #ifdef CONFIG_TC3XX_GETH
 int tc375_ethernet_initialize(void);
 #endif
@@ -101,6 +104,34 @@ int board_app_initialize(uintptr_t arg)
   if (ret < 0)
     {
       _err("BUTTON register failed: %d\n", ret);
+    }
+#endif
+
+#ifdef CONFIG_TC3XX_GPT1_PWM
+  /* GPT1 PWM on T3OUT.
+   * TC375 Lite Kit: P10.6 O4 = GPT120_T3OUT (TC37x pin list).
+   */
+
+  aurix_config_gpio(AURIX_GPIO(10, 6, GPIO_PERIPH, GPIO_ALT4));
+  ret = tc3xx_gpt12_pwm_register(0);
+
+  if (ret < 0)
+    {
+      _err("GPT1 PWM /dev/pwm0 init failed: %d\n", ret);
+    }
+#endif
+
+#ifdef CONFIG_TC3XX_GPT2_PWM
+  /* GPT2 PWM on T6OUT.
+   * TC375 Lite Kit: P10.5 O5 = GPT120_T6OUT (TC37x pin list).
+   */
+
+  aurix_config_gpio(AURIX_GPIO(10, 5, GPIO_PERIPH, GPIO_ALT5));
+  ret = tc3xx_gpt12_pwm_register(1);
+
+  if (ret < 0)
+    {
+      _err("GPT2 PWM /dev/pwm1 init failed: %d\n", ret);
     }
 #endif
 
