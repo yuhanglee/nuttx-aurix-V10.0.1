@@ -111,6 +111,7 @@ CONFIG_NET_ETH_PKTSIZE=1514
 
 # Ethernet throughput tuning: deeper DMA rings keep more frames in
 # flight, and a larger IOB pool grows the TCP receive window.
+CONFIG_DWXGMAC_LINK_SPEED=100
 CONFIG_DWXGMAC_NUM_RX_DMA_DESCRIPTORS=32
 CONFIG_DWXGMAC_NUM_TX_DMA_DESCRIPTORS=32
 CONFIG_IOB_NBUFFERS=256

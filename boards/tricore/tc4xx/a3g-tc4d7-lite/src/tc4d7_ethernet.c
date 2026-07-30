@@ -35,6 +35,7 @@
 #include <nuttx/net/mii.h>
 #include <nuttx/net/mdio.h>
 
+#include "tc4x_geth.h"
 #include "tc4xx_gpio.h"
 
 
@@ -50,6 +51,19 @@
 
 struct mdio_bus_s *dwxgmac_mdio_bus_initialize(uint8_t port, uintptr_t base);
 
+
+/* GETH signal routing on this board: RMII with RXD0/RXD1 and REFCLK on
+ * alternate D, CRS_DV on C, MDIO on D.
+ */
+
+static const struct tc4x_geth_sigmux_s g_geth_sigmux =
+{
+  .mdio   = 3,
+  .rxd0   = 3,
+  .rxd1   = 3,
+  .refclk = 3,
+  .crsdv  = 2,
+};
 
 static void tc4d7_config_geth_pins(void)
 {
@@ -254,7 +268,7 @@ int tc4d7_ethernet_initialize(void)
 
   tc4d7_config_geth_pins();
 
-  ret = tc4x_geth_init(0);
+  ret = tc4x_geth_init(0, &g_geth_sigmux);
   if (ret < 0)
     {
       nerr("ERROR: xgmac_initialize failed: %d\n", ret);
