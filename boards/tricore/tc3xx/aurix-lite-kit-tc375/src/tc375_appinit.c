@@ -50,6 +50,11 @@ int mcmcan_board_initialize(void);
 #if defined(CONFIG_TC3XX_GPT1_PWM) || defined(CONFIG_TC3XX_GPT2_PWM)
 #include "tc3xx_gpt12_pwm.h"
 #endif
+
+#ifdef CONFIG_TC3XX_GPT12_CAP
+#include "tc3xx_gpt12_cap.h"
+#endif
+
 #ifdef CONFIG_TC3XX_GETH
 int tc375_ethernet_initialize(void);
 #endif
@@ -132,6 +137,20 @@ int board_app_initialize(uintptr_t arg)
   if (ret < 0)
     {
       _err("GPT2 PWM /dev/pwm1 init failed: %d\n", ret);
+    }
+#endif
+
+#ifdef CONFIG_TC3XX_GPT12_CAP
+  /* GPT12 capture on CAPINA.
+   * TC37x: P13.2 = GPT120_CAPINA.  Connect signal under test to P13.2.
+   * Verify pin accessibility on your board before use.
+   */
+
+  aurix_config_gpio(AURIX_GPIO(13, 2, GPIO_INPUT, GPIO_PULL_UP));
+  ret = tc3xx_gpt12_cap_register(0);
+  if (ret < 0)
+    {
+      _err("GPT12 capture /dev/cap0 init failed: %d\n", ret);
     }
 #endif
 
