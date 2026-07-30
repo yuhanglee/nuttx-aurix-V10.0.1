@@ -454,6 +454,8 @@ config TRICORE_LETH_BASE
     hex "Tricore LETH base address"
     default 0xf9400000
 
+endif # TC4XX_LETH
+
 config BOARD_PHY_AUTONEG
 	bool "Ethernet PHY autonegotiation"
 	default y
@@ -462,8 +464,6 @@ config BOARD_PHY_AUTONEG
 		and wait for the result, instead of forcing a fixed speed
 		This lives here rather than in a board because board
 		kept outside the tree never has its own Kconfig.
-
-endif # TC4XX_LETH
 
 config TC4X_XSPI
 	bool "xSPI controller"
