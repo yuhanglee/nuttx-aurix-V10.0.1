@@ -13,6 +13,10 @@ ifeq ($(CONFIG_TC4XX_GETH),y)
 CHIP_CSRCS += tc4x_geth.c
 endif
 
+ifeq ($(CONFIG_TC4XX_LETH),y)
+CHIP_CSRCS += tc4x_leth.c
+endif
+
 # QSPI
 ifeq ($(CONFIG_TC4XX_QSPI),y)
 CHIP_CSRCS += tc4x_qspi.c
