@@ -30,4 +30,8 @@ if(CONFIG_TC3X_QSPI)
   list(APPEND SRCS tc3x_qspi.c)
 endif()
 
+if(CONFIG_TC3X_GPT1_PWM OR CONFIG_TC3X_GPT2_PWM)
+  list(APPEND SRCS tc3x_gpt12_pwm.c)
+endif()
+
 target_sources(arch PRIVATE ${SRCS})

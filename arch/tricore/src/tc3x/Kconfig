@@ -183,3 +183,64 @@ config TC3X_WDT_FSPB
 	---help---
 		Source clock for the WDT divider chain.  TC375 runs fSPB at
 		100 MHz by default; adjust to match your clock-tree.
+
+# GPT1 PWM
+menuconfig TC3X_GPT1_PWM
+	bool "TC3xx GPT1 PWM output (T2/T3/T4)"
+	default n
+	depends on PWM
+	---help---
+		Enable the GPT1-block PWM lower-half driver.  Uses timers
+		T3 (core), T2, and T4 (auxiliaries) to generate a PWM signal on
+		the T3OUT alternate-function pin.  Provides /dev/pwm0.
+
+		Frequency range depends on fSPB (100 MHz default) and the
+		prescaler combination chosen at runtime.  With the widest
+		prescaler (BPS1=÷32, T3I=÷128) the minimum frequency is
+		approximately 0.4 Hz; the maximum with BPS1=÷4, T3I=÷1 is
+		approximately 381 kHz.
+
+if TC3X_GPT1_PWM
+
+config TC3X_GPT120_BASE
+	hex "GPT120 module base address"
+	default 0xF0001800
+	---help---
+		Base address of the GPT120 peripheral. Verify against the TC3xx
+		User Manual address map chapter before use.
+
+config TC3X_GPT1_PWM_T3_SRN
+	int "GPT120 T3 overflow SRN (Service Request Node) index"
+	default 186
+	range 1 2047
+	---help---
+		NuttX IRQ number for the GPT120 T3 overflow interrupt.
+		186 = IRQ_GPT120_T3 (TC37x/TC39x SRC table).
+
+endif # TC3X_GPT1_PWM
+
+# GPT2 PWM
+menuconfig TC3X_GPT2_PWM
+	bool "TC3xx GPT2 PWM output (T6/CAPREL)"
+	default n
+	depends on PWM
+	---help---
+		Enable the GPT2-block PWM lower-half driver.  Uses timer T6
+		and the CAPREL register to generate a PWM signal on the T6OUT
+		alternate-function pin.  Provides /dev/pwm1.
+
+		Differs from GPT1: CAPREL holds only one reload value, so the
+		T6 overflow ISR switches it between the high and low phase
+		preloads on each overflow.
+
+if TC3X_GPT2_PWM
+
+config TC3X_GPT2_PWM_T6_SRN
+	int "GPT120 T6 overflow SRN (Service Request Node) index"
+	default 189
+	range 1 2047
+	---help---
+		NuttX IRQ number for the GPT120 T6 overflow interrupt.
+		189 = IRQ_GPT120_T6 (TC37x/TC39x SRC table).
+
+endif # TC3X_GPT2_PWM
