@@ -66,6 +66,10 @@ int mcmcan_board_initialize(void);
 #  include "tc3x_gpt12_pwm.h"
 #endif
 
+#if defined(CONFIG_TC3X_GPT2_CAP) || defined(CONFIG_TC3X_GPT1_CAP)
+#  include "tc3x_gpt12_cap.h"
+#endif
+
 /****************************************************************************
  * Public Functions
  ****************************************************************************/
@@ -193,6 +197,24 @@ void board_late_initialize(void)
     if (ret < 0)
       {
         _err("GPT2 PWM /dev/pwm1 init failed: %d\n", ret);
+      }
+  }
+#endif
+
+#ifdef CONFIG_TC3X_GPT12_CAP
+  /* GPT12 capture on CAPINA.
+   * TC37x: P13.2 = GPT120_CAPINA.  Connect signal under test to P13.2.
+   * Verify pin accessibility on your board before use.
+   */
+
+  {
+    int ret;
+
+    aurix_config_gpio(AURIX_GPIO(13, 2, GPIO_INPUT, GPIO_PULL_UP));
+    ret = tc3x_gpt12_cap_register(0);
+    if (ret < 0)
+      {
+        _err("GPT12 capture /dev/cap0 init failed: %d\n", ret);
       }
   }
 #endif
