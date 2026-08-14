@@ -21,7 +21,7 @@ ifneq ($(filter y, $(CONFIG_TC3XX_GPT1_PWM) $(CONFIG_TC3XX_GPT2_PWM)),)
   CHIP_CSRCS += tc3xx_gpt12_pwm.c
 endif
 
-ifeq ($(CONFIG_TC3XX_GPT12_CAP),y)
+ifneq ($(CONFIG_TC3XX_GPT2_CAP)$(CONFIG_TC3XX_GPT1_CAP),)
   CHIP_CSRCS += tc3xx_gpt12_cap.c
 endif
 
