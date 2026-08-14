@@ -25,6 +25,7 @@
  ****************************************************************************/
 
 #include <nuttx/config.h>
+#include <debug.h>
 
 #include "tricore_gpio.h"
 
@@ -246,20 +247,76 @@ void board_late_initialize(void)
   }
 #endif
 
-#ifdef CONFIG_TC3X_GPT12_CAP
-  /* GPT12 capture on CAPINA.
+#ifdef CONFIG_TC3X_GPT2_CAP
+  /* GPT2 CAPIN capture (/dev/cap0).
    * TC37x: P13.2 = GPT120_CAPINA.  Connect signal under test to P13.2.
    * Verify pin accessibility on your board before use.
    */
 
   {
-    int ret;
+    int ret = tc3x_gpt12_cap_register(0);
 
     aurix_config_gpio(AURIX_GPIO(13, 2, GPIO_INPUT, GPIO_PULL_UP));
-    ret = tc3x_gpt12_cap_register(0);
     if (ret < 0)
       {
-        _err("GPT12 capture /dev/cap0 init failed: %d\n", ret);
+        _err("GPT2 CAPIN capture /dev/cap0 init failed: %d\n", ret);
+      }
+  }
+#endif
+
+#ifdef CONFIG_TC3X_GPT1_CAP_T2
+  /* GPT1 T2IN capture.
+   * TC375 Lite Kit: P00.7 = GPT120_T2INA (PISEL.IST2IN=0).
+   * Connect the signal under test to P00.7.
+   */
+
+  {
+    int ret;
+
+    aurix_config_gpio(AURIX_GPIO(0, 7, GPIO_INPUT, GPIO_PULL_UP));
+    ret = tc3x_gpt12_cap_register(2);
+    if (ret < 0)
+      {
+        _err("GPT1 T2IN capture /dev/cap2 init failed: %d\n", ret);
+      }
+  }
+#endif
+
+#ifdef CONFIG_TC3X_GPT2_CAP_T3IN
+  /* GPT2 T3IN capture (/dev/cap3).
+   * TC375 Lite Kit: P02.6 = GPT120_T3INA (PISEL.IST3IN=0).
+   * T3IN shares T5/CAPREL with CAPIN (/dev/cap0); only one may be active
+   * at a time.  start() returns -EBUSY if the other channel is running.
+   * Connect the signal under test to P02.6.
+   */
+
+  {
+    int ret;
+
+    aurix_config_gpio(AURIX_GPIO(2, 6, GPIO_INPUT, GPIO_PULL_UP));
+    ret = tc3x_gpt12_cap_register(3);
+    if (ret < 0)
+      {
+        _err("GPT2 T3IN capture /dev/cap3 init failed: %d\n", ret);
+      }
+  }
+#endif
+
+#ifdef CONFIG_TC3X_GPT1_CAP_T4
+  /* GPT1 T4IN capture.
+   * TC375 Lite Kit: P02.8 = GPT120_T4INA (PISEL.IST4IN=0).
+   * NOTE: P02.6 is T3INA, NOT T4INA.  T4INA = P02.8.
+   * Connect the signal under test to P02.8.
+   */
+
+  {
+    int ret;
+
+    aurix_config_gpio(AURIX_GPIO(2, 8, GPIO_INPUT, GPIO_PULL_UP));
+    ret = tc3x_gpt12_cap_register(4);
+    if (ret < 0)
+      {
+        _err("GPT1 T4IN capture /dev/cap4 init failed: %d\n", ret);
       }
   }
 #endif
