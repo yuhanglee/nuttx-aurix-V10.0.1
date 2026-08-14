@@ -35,7 +35,7 @@
 
 #include <nuttx/config.h>
 
-#ifdef CONFIG_TC3X_GPT12_CAP
+#if defined(CONFIG_TC3X_GPT2_CAP) || defined(CONFIG_TC3X_GPT1_CAP)
 
 /****************************************************************************
  * Public Function Prototypes
@@ -44,8 +44,14 @@
 /****************************************************************************
  * Name: tc3x_gpt12_cap_register
  *
- *   Enable the GPT120 clock and register /dev/capN with the capture
- *   upper-half driver.
+ *   Enable the GPT120 clock and register /dev/capN with the NuttX capture
+ *   upper-half driver.  The board init layer must configure the GPIO pin
+ *   before calling this function.
+ *
+ *   minor == 0        ->  CAPIN  (GPT2 T5/CAPREL CT3=0, CONFIG_TC3X_GPT2_CAP)
+ *   minor == 2        ->  T2IN   (GPT1 T3/T2, CONFIG_TC3X_GPT1_CAP)
+ *   minor == 3        ->  T3IN   (GPT2 T5/CAPREL CT3=1, CONFIG_TC3X_GPT2_CAP_T3IN)
+ *   minor == 4        ->  T4IN   (GPT1 T3/T4, CONFIG_TC3X_GPT1_CAP)
  *
  * Input Parameters:
  *   minor - Device minor number (N in /dev/capN).
@@ -57,6 +63,6 @@
 
 int tc3x_gpt12_cap_register(int minor);
 
-#endif /* CONFIG_TC3X_GPT12_CAP */
+#endif /* CONFIG_TC3X_GPT2_CAP || CONFIG_TC3X_GPT1_CAP */
 
 #endif /* __ARCH_TRICORE_SRC_TC3X_GPT12_CAP_H */
