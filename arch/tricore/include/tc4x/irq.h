@@ -34,9 +34,26 @@
 #include <nuttx/config.h>
 
 /****************************************************************************
- * Pre-processor Prototypes
+ * Pre-processor Definitions
  ****************************************************************************/
 #define NR_IRQS 2048
+
+/* SMU Service Request nodes (TC4Dx Interrupt Router).
+ *   SMU_IR_IRQ[0..2] -> SMU_SAFE0 IGCS0/1/2
+ *   SMU_IR_IRQ[3..5] -> SMU_SAFE1 IGCS0/1/2
+ *   SMU_CSIRQ        -> cross-signaling IRQ
+ */
+
+#define TC4X_IRQ_SMU_SAFE0_IGCS0  1216
+#define TC4X_IRQ_SMU_SAFE0_IGCS1  1217
+#define TC4X_IRQ_SMU_SAFE0_IGCS2  1218
+#define TC4X_IRQ_SMU_SAFE1_IGCS0  1219
+#define TC4X_IRQ_SMU_SAFE1_IGCS1  1220
+#define TC4X_IRQ_SMU_SAFE1_IGCS2  1221
+#define TC4X_IRQ_SMU_CSIRQ        1222
+
+#define TC4X_IRQ_SMM0             1212
+#define TC4X_IRQ_SMM1             1213
 
 /****************************************************************************
  * Public Types

@@ -627,6 +627,16 @@ void up_clockconfig(void)
   uint32_t stat;
   uint32_t val;
 
+  /* Skip PLL init on warm reset; PLLs already locked. */
+
+  if ((getreg32(REGADDR(TC4X_CLOCK_SYSPLLSTAT_OFFSET)) &
+       TC4X_PLLSTAT_PLLLOCK) &&
+      (getreg32(REGADDR(TC4X_CLOCK_PERPLLSTAT_OFFSET)) &
+       TC4X_PLLSTAT_PLLLOCK))
+    {
+      return;
+    }
+
   /* External oscillator */
 
   tc4x_osc_init();

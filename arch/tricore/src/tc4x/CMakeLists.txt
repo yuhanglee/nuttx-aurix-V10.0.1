@@ -53,4 +53,8 @@ if(CONFIG_TC4X_GPT1_PWM OR CONFIG_TC4X_GPT2_PWM)
   list(APPEND SRCS tc4x_gpt12_pwm.c)
 endif()
 
+if(CONFIG_TC4X_SMU)
+  list(APPEND SRCS tc4x_smu.c)
+endif()
+
 target_sources(arch PRIVATE ${SRCS})

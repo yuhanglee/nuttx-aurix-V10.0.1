@@ -22,6 +22,11 @@
 
 CHIP_CSRCS += tc4x_clockconfig.c
 CHIP_CSRCS += tc4x_gpio.c
+
+ifeq ($(CONFIG_TC4X_SMU),y)
+CHIP_CSRCS += tc4x_smu.c
+CFLAGS += -I$(TOPDIR)/drivers/misc
+endif
 CHIP_CSRCS += tc4x_watchdog.c
 
 ifeq ($(CONFIG_TC4X_I2C),y)
