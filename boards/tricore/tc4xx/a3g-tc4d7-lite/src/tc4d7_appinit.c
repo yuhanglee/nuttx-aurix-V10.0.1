@@ -47,6 +47,17 @@
 #include "hardware/tc4x_wdt.h"
 #endif
 
+#ifdef CONFIG_TC4X_SMU
+#include "hardware/tc4x_smu.h"
+#endif
+
+#ifdef CONFIG_AURIX_SMU
+FAR struct aurix_smu_lowerhalf_s *tc4x_smu_lowerhalf(void);
+FAR struct aurix_smu_lowerhalf_s *tc4x_smu1_lowerhalf(void);
+int aurix_smu_register(const char *path,
+                       FAR struct aurix_smu_lowerhalf_s *lower);
+#endif
+
 #ifdef CONFIG_TC4XX_I2C
 #include "tc4xx_i2c.h"
 #endif
@@ -252,6 +263,28 @@ int board_app_initialize(uintptr_t arg)
     }
 #endif
 
+#ifdef CONFIG_TC4X_SMU
+  ret = tc4x_smu_initialize();
+  if (ret < 0)
+    {
+      _err("ERROR: tc4x_smu_initialize failed: %d\n", ret);
+    }
+#endif
+
+#ifdef CONFIG_AURIX_SMU
+  ret = aurix_smu_register("/dev/smu0", tc4x_smu_lowerhalf());
+  if (ret < 0)
+    {
+      _err("ERROR: aurix_smu_register failed: %d\n", ret);
+    }
+
+  ret = aurix_smu_register("/dev/smu1", tc4x_smu1_lowerhalf());
+  if (ret < 0)
+    {
+      _err("ERROR: aurix_smu_register smu1 failed: %d\n", ret);
+    }
+#endif
+
 #ifdef CONFIG_TC4XX_I2C
   ret = tc4xx_i2c_bringup();
   if (ret < 0)
@@ -352,3 +385,10 @@ int board_app_initialize(uintptr_t arg)
 
   return ret;
 }
+
+#ifdef CONFIG_BOARD_LATE_INITIALIZE
+void board_late_initialize(void)
+{
+  board_app_initialize(0);
+}
+#endif

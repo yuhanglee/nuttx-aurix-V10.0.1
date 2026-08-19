@@ -43,6 +43,7 @@
 #include "tricore_internal.h"
 #include "hardware/tc4x_smu.h"
 #include "hardware/tc4x_wdt.h"
+#include "tricore_smu_common.h"
 
 #ifdef CONFIG_TC4X_SMU_IRQ
 #  include <arch/irq.h>
@@ -78,8 +79,9 @@
 
 #ifdef CONFIG_TC4X_SMU_IRQ
 
-static tc4x_smu_alarm_cb_t g_smu_callback;
-static void                *g_smu_callback_arg;
+/* Callback pointer stored in tricore_smu_common; only the registration
+ * wrapper lives here to preserve the tc4x_smu_alarm_cb_t public type.
+ */
 
 #endif /* CONFIG_TC4X_SMU_IRQ */
 
@@ -92,13 +94,9 @@ static inline uintptr_t smu_base(uint8_t inst)
   return TC4X_SMU_SAFE_BASE(inst);
 }
 
-static void smu_write_cmd(uint8_t inst, uint8_t cmd, uint8_t arg)
+static inline void smu_write_cmd(uint8_t inst, uint8_t cmd, uint8_t arg)
 {
-  uint32_t val;
-
-  val = ((uint32_t)cmd & SMU_CMD_CMD_MASK) |
-        (((uint32_t)arg << SMU_CMD_ARG_SHIFT) & SMU_CMD_ARG_MASK);
-  putreg32(val, smu_base(inst) + TC4X_SMU_CMD_OFFSET);
+  aurix_smu_write_cmd(smu_base(inst) + TC4X_SMU_CMD_OFFSET, cmd, arg);
 }
 
 static void tc4x_smu_unlock_inline(uint8_t inst)
@@ -120,11 +118,7 @@ static int tc4x_smu_start_cmd(uint8_t inst)
 
 static bool tc4x_smu_in_fault_state_inline(uint8_t inst)
 {
-  uint32_t ssm;
-
-  ssm = (getreg32(smu_base(inst) + TC4X_SMU_DBG_OFFSET) &
-         SMU_DBG_SSM_MASK) >> SMU_DBG_SSM_SHIFT;
-  return ssm == SMU_DBG_SSM_FAULT;
+  return aurix_smu_in_fault_state(smu_base(inst) + TC4X_SMU_DBG_OFFSET);
 }
 
 /****************************************************************************
@@ -310,28 +304,22 @@ int tc4x_smu_config_alarm(uint8_t inst, uint8_t group, uint8_t alarm,
 
 int tc4x_smu_rt_stop(uint8_t inst, uint8_t rt_num)
 {
-  if (inst >= TC4X_SMU_NSAFE || rt_num > 1u)
+  if (inst >= TC4X_SMU_NSAFE)
     {
       return -EINVAL;
     }
 
-  smu_write_cmd(inst, SMU_CMD_RTSTOP, rt_num);
-  return OK;
+  return aurix_smu_rt_stop(smu_base(inst) + TC4X_SMU_CMD_OFFSET, rt_num);
 }
 
 bool tc4x_smu_rt_missed(uint8_t inst, uint8_t rt_num)
 {
-  uint32_t sts;
-  uint32_t bit;
-
   if (inst >= TC4X_SMU_NSAFE || rt_num > 1u)
     {
       return false;
     }
 
-  bit = (rt_num == 0u) ? SMU_STS_RTME0 : SMU_STS_RTME1;
-  sts = getreg32(smu_base(inst) + TC4X_SMU_STS_OFFSET);
-  return (sts & bit) != 0u;
+  return aurix_smu_rt_missed(smu_base(inst) + TC4X_SMU_STS_OFFSET, rt_num);
 }
 
 /* Enable or disable Recovery Timer RT0 or RT1 via RTC.RTnE. */
@@ -379,13 +367,7 @@ int tc4x_smu_rt_enable(uint8_t inst, uint8_t rt_num, bool enable)
 
 int tc4x_smu_register_callback(tc4x_smu_alarm_cb_t callback, void *arg)
 {
-  irqstate_t flags;
-
-  flags = enter_critical_section();
-  g_smu_callback     = callback;
-  g_smu_callback_arg = arg;
-  leave_critical_section(flags);
-  return OK;
+  return aurix_smu_register_cb((void (*)(void *))callback, arg);
 }
 
 #endif /* CONFIG_TC4X_SMU_IRQ */
@@ -394,37 +376,57 @@ int tc4x_smu_register_callback(tc4x_smu_alarm_cb_t callback, void *arg)
  * Private Functions -- Bulk alarm clear (used at init)
  ****************************************************************************/
 
-/* Returns -EPERM if ASCE is rejected (SMU still in START state on cold boot). */
+/* Helper functions for aurix_smu_clear_all_alarms callback interface */
+
+static uint32_t tc4x_clear_get_status(uint8_t group, void *arg)
+{
+  uint8_t inst = (uintptr_t)arg;
+  return tc4x_smu_get_alarm_status(inst, group);
+}
+
+static void tc4x_clear_write_aexclr(uint32_t mask, void *arg)
+{
+  uint8_t inst = (uintptr_t)arg;
+  putreg32(mask, smu_base(inst) + TC4X_SMU_AEXCLR_OFFSET);
+}
+
+static int tc4x_clear_write_cmd(uint8_t cmd, uint8_t cmdarg, void *arg)
+{
+  uint8_t inst = (uintptr_t)arg;
+  smu_write_cmd(inst, cmd, cmdarg);
+  return OK;
+}
+
+static uint32_t tc4x_clear_read_sts(void *arg)
+{
+  uint8_t inst = (uintptr_t)arg;
+  return getreg32(smu_base(inst) + TC4X_SMU_STS_OFFSET);
+}
+
+static void tc4x_clear_write_status(uint32_t mask, uint8_t group, void *arg)
+{
+  uint8_t inst = (uintptr_t)arg;
+  putreg32(mask, smu_base(inst) + TC4X_SMU_AGSF_STS_OFFSET(group));
+}
+
+/* Clear all latched alarm bits.
+ * Returns -EPERM if ASCE is rejected (SMU still in START state).
+ */
+
 static int smu_clear_all_alarms(uint8_t inst)
 {
-  uintptr_t base = smu_base(inst);
-  uint8_t   group;
-  uint32_t  status;
-  uint32_t  sts;
-
-  for (group = 0u; group < TC4X_SMU_NGROUPS; group++)
+  aurix_smu_clear_all_ops_t ops =
     {
-      status = tc4x_smu_get_alarm_status(inst, group);
-      if (status == 0u)
-        {
-          continue;
-        }
+      .ngroups = TC4X_SMU_NGROUPS,
+      .get_status = tc4x_clear_get_status,
+      .write_aexclr = tc4x_clear_write_aexclr,
+      .write_cmd = tc4x_clear_write_cmd,
+      .read_sts = tc4x_clear_read_sts,
+      .write_status = tc4x_clear_write_status,
+      .arg = (void *)(uintptr_t)inst,
+    };
 
-      /* Clear AEX so alarms can re-latch after startup. */
-
-      putreg32(status, base + TC4X_SMU_AEXCLR_OFFSET);
-
-      smu_write_cmd(inst, SMU_CMD_ASCE, 0u);
-      sts = getreg32(base + TC4X_SMU_STS_OFFSET);
-      if (!(sts & SMU_STS_ASCE))
-        {
-          return -EPERM;
-        }
-
-      putreg32(status, base + TC4X_SMU_AGSF_STS_OFFSET(group));
-    }
-
-  return OK;
+  return aurix_smu_clear_all_alarms(&ops);
 }
 
 /****************************************************************************
@@ -433,22 +435,30 @@ static int smu_clear_all_alarms(uint8_t inst)
 
 #ifdef CONFIG_TC4X_SMU_IRQ
 
+/* Determine which SAFE instance triggered the IRQ. */
+static uint8_t tc4x_irq_to_instance(int irq)
+{
+  if (irq >= TC4X_IRQ_SMU_SAFE0_IGCS0 && irq <= TC4X_IRQ_SMU_SAFE0_IGCS2)
+    {
+      return 0u;
+    }
+  if (irq >= TC4X_IRQ_SMU_SAFE1_IGCS0 && irq <= TC4X_IRQ_SMU_SAFE1_IGCS2)
+    {
+      return 1u;
+    }
+  return TC4X_SMU_DEFAULT_INST;
+}
+
 static int tc4x_smu_irq_handler(int irq, void *context, void *arg)
 {
-  UNUSED(irq);
+  uint8_t inst;
   UNUSED(context);
   UNUSED(arg);
 
-  /* Stop RTs before callback; RTStop is a no-op if not running. */
-
-  smu_write_cmd(TC4X_SMU_DEFAULT_INST, SMU_CMD_RTSTOP, 0u);
-  smu_write_cmd(TC4X_SMU_DEFAULT_INST, SMU_CMD_RTSTOP, 1u);
-
-  if (g_smu_callback != NULL)
-    {
-      g_smu_callback(g_smu_callback_arg);
-    }
-
+  inst = tc4x_irq_to_instance(irq);
+  smu_write_cmd(inst, SMU_CMD_RTSTOP, 0u);
+  smu_write_cmd(inst, SMU_CMD_RTSTOP, 1u);
+  aurix_smu_invoke_cb();
   return OK;
 }
 
