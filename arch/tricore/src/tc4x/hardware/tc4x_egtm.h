@@ -50,9 +50,13 @@
 #define EGTM_CMU_GCLK_NUM (EGTM_BASE + 0x00084u)
 #define EGTM_CMU_GCLK_DEN (EGTM_BASE + 0x00088u)
 
+#define EGTM_CMU_CLKX_CTRL(x)   (EGTM_BASE + 0x0008Cu + (x) * 4u)
+
 #define CMU_CLK_EN_CFGCMU (0x2u << 0u)
 #define CMU_CLK_EN_FXCLK  (0x2u << 22u)
 #define CMU_CLK_EN_CFGCMU_FXCLK (CMU_CLK_EN_CFGCMU | CMU_CLK_EN_FXCLK)
+#define CMU_CLK_EN_CLK(x)       (0x2u << (2u + (x) * 2u))
+#define CMU_CLK_DIS_CLK(x)      (0x1u << (2u + (x) * 2u))
 
 /* TOM channels 0-15 per cluster */
 
@@ -94,12 +98,43 @@
 #define TGC_CH_DISABLE(ch)       (0x1u << (((ch) & 0x7u) * 2u))
 #define TGC_GLB_CTRL_HOST_TRIG   BIT(0)
 
+#define EGTM_ATOM_CH_BASE(cl, ch)      (EGTM_CLS_BASE(cl) + 0x01800u + (ch) * 0x80u)
+#define EGTM_ATOM_CH_CTRL(cl, ch)       (EGTM_ATOM_CH_BASE(cl, ch) + 0x04u)
+#define EGTM_ATOM_CH_SR0(cl, ch)        (EGTM_ATOM_CH_BASE(cl, ch) + 0x08u)
+#define EGTM_ATOM_CH_SR1(cl, ch)        (EGTM_ATOM_CH_BASE(cl, ch) + 0x0Cu)
+#define EGTM_ATOM_CH_CM0(cl, ch)        (EGTM_ATOM_CH_BASE(cl, ch) + 0x10u)
+#define EGTM_ATOM_CH_CN0(cl, ch)        (EGTM_ATOM_CH_BASE(cl, ch) + 0x18u)
+#define EGTM_ATOM_CH_IRQ_NOTIFY(cl, ch) (EGTM_ATOM_CH_BASE(cl, ch) + 0x20u)
+#define EGTM_ATOM_CH_IRQ_EN(cl, ch)     (EGTM_ATOM_CH_BASE(cl, ch) + 0x24u)
+#define EGTM_ATOM_CH_IRQ_MODE(cl, ch)   (EGTM_ATOM_CH_BASE(cl, ch) + 0x2Cu)
+#define EGTM_ATOM_CH_CTRL_SR(cl, ch)    (EGTM_ATOM_CH_BASE(cl, ch) + 0x34u)
+
+#define ATOM_CTRL_MODE_SOMP      0x2u
+#define ATOM_CTRL_CLK_SRC_SHIFT  12u
+
+#define ATOM_IRQ_EN_CCU0TC       BIT(0)
+
+#define ATOM_IRQ_MODE_PULSE      0x1u
+
+#define EGTM_ATOM_AGC_GLB_CTRL(cl)     (EGTM_CLS_BASE(cl) + 0x01C40u)
+#define EGTM_ATOM_AGC_ENDIS_CTRL(cl)   (EGTM_CLS_BASE(cl) + 0x01C44u)
+#define EGTM_ATOM_AGC_OUTEN_CTRL(cl)   (EGTM_CLS_BASE(cl) + 0x01C50u)
+#define EGTM_ATOM_AGC_FUPD_CTRL(cl)    (EGTM_CLS_BASE(cl) + 0x01C58u)
+
+#define AGC_CH_ENABLE(ch)              (0x2u << ((ch) * 2u))
+#define AGC_CH_DISABLE(ch)             (0x1u << ((ch) * 2u))
+#define AGC_GLB_CTRL_HOST_TRIG         BIT(0)
+
+#define AGC_GLB_CTRL_UPEN_EN(ch)       (0x2u << (16u + (ch) * 2u))
+
 /* Per-cluster ICM channel-interrupt group registers */
 
 #define EGTM_ICM_IRQG_TOM_CI(cl, g)  (EGTM_CLS_BASE(cl) + 0x005A0u + (g) * 4u)
+#define EGTM_ICM_IRQG_ATOM_CI(cl)     (EGTM_CLS_BASE(cl) + 0x005B0u)
 
 #define EGTM_NCLUSTERS      3u
 #define EGTM_TOM_NCHANNELS  16u
+#define EGTM_ATOM_NCHANNELS 8u
 
 /* TOUTSEL: 6 x 5-bit SEL fields per register. SEL field x of
  * TOUTSEL[n] drives pad TOUT(n*6 + x).

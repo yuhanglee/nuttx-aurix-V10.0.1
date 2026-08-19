@@ -44,6 +44,7 @@ struct egtm_ch_s
 /* Per-(cluster, channel) state */
 
 static struct egtm_ch_s g_ch[EGTM_NCLUSTERS][EGTM_TOM_NCHANNELS];
+static struct egtm_ch_s g_atom_ch[EGTM_NCLUSTERS][EGTM_ATOM_NCHANNELS];
 
 /* ISR context packs cluster (high byte) and channel (low byte) */
 
@@ -54,6 +55,29 @@ static struct egtm_ch_s g_ch[EGTM_NCLUSTERS][EGTM_TOM_NCHANNELS];
 /****************************************************************************
  * Private Functions
  ****************************************************************************/
+
+/****************************************************************************
+ * Name: egtm_cmu_clk_enable
+ *
+ * Description:
+ *   Enable CMU_CLK[x] with the given GCLK divider under PROTE.
+ *
+ ****************************************************************************/
+
+static void egtm_cmu_clk_enable(uint8_t cmu_clk, uint32_t div)
+{
+  putreg32(PROT_UNLOCK, EGTM_PROTSE);
+  putreg32(PROT_UNLOCK, EGTM_CTRL_PROTE);
+
+  /* CLKx_CTRL must only be written while the clock resolution is disabled. */
+
+  putreg32(CMU_CLK_DIS_CLK(cmu_clk), EGTM_CMU_CLK_EN);
+  putreg32(div & 0xFFFFFFu, EGTM_CMU_CLKX_CTRL(cmu_clk));
+  putreg32(CMU_CLK_EN_CLK(cmu_clk),  EGTM_CMU_CLK_EN);
+
+  putreg32(PROT_LOCK_RUN, EGTM_CTRL_PROTE);
+  putreg32(PROT_LOCK_RUN, EGTM_PROTSE);
+}
 
 /****************************************************************************
  * Name: egtm_clc_enable
@@ -113,6 +137,53 @@ static void egtm_ch_disable(uint8_t cl, uint8_t ch)
   putreg32(TGC_CH_DISABLE(ch), EGTM_TOM_TGC_ENDIS_CTRL(cl, g));
   putreg32(TGC_CH_DISABLE(ch), EGTM_TOM_TGC_OUTEN_CTRL(cl, g));
   putreg32(TGC_GLB_CTRL_HOST_TRIG, EGTM_TOM_TGC_GLB_CTRL(cl, g));
+}
+
+/****************************************************************************
+ * Name: egtm_atom_ch_disable
+ *
+ * Description:
+ *   Disable ATOM channel <ch> in cluster <cl> at the AGC layer.
+ *
+ ****************************************************************************/
+
+static void egtm_atom_ch_disable(uint8_t cl, uint8_t ch)
+{
+  putreg32(AGC_CH_DISABLE(ch), EGTM_ATOM_AGC_ENDIS_CTRL(cl));
+  putreg32(AGC_CH_DISABLE(ch), EGTM_ATOM_AGC_OUTEN_CTRL(cl));
+  putreg32(AGC_GLB_CTRL_HOST_TRIG, EGTM_ATOM_AGC_GLB_CTRL(cl));
+}
+
+/****************************************************************************
+ * Name: egtm_atom_isr
+ *
+ * Description:
+ *   ATOM channel ISR: ack interrupts, run auto-stop, invoke user callback.
+ *
+ ****************************************************************************/
+
+static int egtm_atom_isr(int irq, void *context, void *arg)
+{
+  uint8_t  cl = EGTM_ISR_CTX_CL(arg);
+  uint8_t  ch = EGTM_ISR_CTX_CH(arg);
+  uint32_t notify;
+
+  (void)getreg32(EGTM_ICM_IRQG_ATOM_CI(cl));
+
+  notify = getreg32(EGTM_ATOM_CH_IRQ_NOTIFY(cl, ch));
+  putreg32(notify, EGTM_ATOM_CH_IRQ_NOTIFY(cl, ch));
+
+  if (g_atom_ch[cl][ch].remaining != 0 && --g_atom_ch[cl][ch].remaining == 0)
+    {
+      egtm_atom_ch_disable(cl, ch);
+    }
+
+  if (g_atom_ch[cl][ch].cb != NULL)
+    {
+      g_atom_ch[cl][ch].cb(irq, context, arg);
+    }
+
+  return OK;
 }
 
 /****************************************************************************
@@ -267,4 +338,96 @@ void tc4x_egtm_route_tout(uint16_t tout_n, uint8_t sel_code)
   DEBUGASSERT(sel_code <= 0x1Fu);
   modreg32((uint32_t)sel_code << TOUTSEL_SHIFT(x), TOUTSEL_MASK(x),
            EGTM_TOUTSEL(tout_n / 6u));
+}
+
+/****************************************************************************
+ * Name: tc4x_egtm_atom_setup
+ *
+ * Description:
+ *   Configure and start ATOM channel <ch> of cluster <cl> as a PWM output
+ *   in SOMP mode. cmu_clk selects CMU_CLK[0..7]; cmu_div sets GCLK divider
+ *   (tick = GCLK / (cmu_div + 1)). SR0/SR1 are 24-bit.
+ *
+ ****************************************************************************/
+
+void tc4x_egtm_atom_setup(uint8_t cl, uint8_t ch, uint8_t cmu_clk,
+                           uint32_t cmu_div, uint32_t period_ticks,
+                           uint32_t duty_ticks, int irq, xcpt_t cb,
+                           uint32_t stop_after_n)
+{
+  DEBUGASSERT(cl < EGTM_NCLUSTERS);
+  DEBUGASSERT(ch < EGTM_ATOM_NCHANNELS);
+  DEBUGASSERT(cmu_clk < 8u);
+
+  g_atom_ch[cl][ch].cb        = cb;
+  g_atom_ch[cl][ch].remaining = stop_after_n;
+
+  egtm_atom_ch_disable(cl, ch);
+  egtm_cmu_clk_enable(cmu_clk, cmu_div);
+
+  putreg32(ATOM_CTRL_MODE_SOMP |
+           ((uint32_t)cmu_clk << ATOM_CTRL_CLK_SRC_SHIFT),
+           EGTM_ATOM_CH_CTRL_SR(cl, ch));
+  putreg32(0u, EGTM_ATOM_CH_SR0(cl, ch));
+  putreg32(0u, EGTM_ATOM_CH_CM0(cl, ch));
+  putreg32(AGC_GLB_CTRL_UPEN_EN(ch), EGTM_ATOM_AGC_GLB_CTRL(cl));
+
+  putreg32(ATOM_CTRL_MODE_SOMP |
+           ((uint32_t)cmu_clk << ATOM_CTRL_CLK_SRC_SHIFT),
+           EGTM_ATOM_CH_CTRL(cl, ch));
+
+  putreg32(period_ticks & 0xFFFFFFu, EGTM_ATOM_CH_SR0(cl, ch));
+  putreg32(duty_ticks   & 0xFFFFFFu, EGTM_ATOM_CH_SR1(cl, ch));
+  putreg32(0u,                        EGTM_ATOM_CH_CN0(cl, ch));
+
+  putreg32(AGC_GLB_CTRL_UPEN_EN(ch), EGTM_ATOM_AGC_GLB_CTRL(cl));
+
+  if (irq >= 0)
+    {
+      putreg32(ATOM_IRQ_MODE_PULSE, EGTM_ATOM_CH_IRQ_MODE(cl, ch));
+      putreg32(ATOM_IRQ_EN_CCU0TC,  EGTM_ATOM_CH_IRQ_EN(cl, ch));
+
+      irq_attach(irq, egtm_atom_isr, (void *)EGTM_ISR_CTX_PACK(cl, ch));
+      up_enable_irq(irq);
+    }
+
+  putreg32(AGC_CH_ENABLE(ch), EGTM_ATOM_AGC_FUPD_CTRL(cl));
+  putreg32(AGC_GLB_CTRL_HOST_TRIG, EGTM_ATOM_AGC_GLB_CTRL(cl));
+  putreg32(AGC_CH_ENABLE(ch), EGTM_ATOM_AGC_ENDIS_CTRL(cl));
+  putreg32(AGC_CH_ENABLE(ch), EGTM_ATOM_AGC_OUTEN_CTRL(cl));
+  putreg32(AGC_GLB_CTRL_HOST_TRIG, EGTM_ATOM_AGC_GLB_CTRL(cl));
+}
+
+/****************************************************************************
+ * Name: tc4x_egtm_atom_update
+ *
+ * Description:
+ *   Update duty (SR1) on a running ATOM channel and commit via HOST_TRIG.
+ *
+ ****************************************************************************/
+
+void tc4x_egtm_atom_update(uint8_t cl, uint8_t ch, uint32_t duty_ticks)
+{
+  DEBUGASSERT(cl < EGTM_NCLUSTERS);
+  DEBUGASSERT(ch < EGTM_ATOM_NCHANNELS);
+
+  putreg32(duty_ticks & 0xFFFFFFu, EGTM_ATOM_CH_SR1(cl, ch));
+  putreg32(AGC_GLB_CTRL_HOST_TRIG, EGTM_ATOM_AGC_GLB_CTRL(cl));
+}
+
+/****************************************************************************
+ * Name: tc4x_egtm_atom_stop
+ *
+ * Description:
+ *   Stop a running ATOM channel and disable its output.
+ *
+ ****************************************************************************/
+
+void tc4x_egtm_atom_stop(uint8_t cl, uint8_t ch)
+{
+  DEBUGASSERT(cl < EGTM_NCLUSTERS);
+  DEBUGASSERT(ch < EGTM_ATOM_NCHANNELS);
+
+  g_atom_ch[cl][ch].remaining = 0;
+  egtm_atom_ch_disable(cl, ch);
 }

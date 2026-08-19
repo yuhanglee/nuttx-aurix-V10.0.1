@@ -44,6 +44,16 @@ void tc4x_egtm_pwm_setup(uint8_t cl, uint8_t ch, uint8_t fxclk_sel,
 void tc4x_egtm_pwm_update(uint8_t cl, uint8_t ch, uint32_t duty_ticks);
 void tc4x_egtm_pwm_stop(uint8_t cl, uint8_t ch);
 
+/* Configure and start an ATOM channel in SOMP PWM mode. */
+
+void tc4x_egtm_atom_setup(uint8_t cl, uint8_t ch, uint8_t cmu_clk,
+                           uint32_t cmu_div, uint32_t period_ticks,
+                           uint32_t duty_ticks, int irq, xcpt_t cb,
+                           uint32_t stop_after_n);
+
+void tc4x_egtm_atom_update(uint8_t cl, uint8_t ch, uint32_t duty_ticks);
+void tc4x_egtm_atom_stop(uint8_t cl, uint8_t ch);
+
 /* Route pad TOUT<tout_n> to source <sel_code>. */
 
 void tc4x_egtm_route_tout(uint16_t tout_n, uint8_t sel_code);
