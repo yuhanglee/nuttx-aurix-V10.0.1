@@ -52,6 +52,7 @@
 #include "tricore_internal.h"
 #include "hardware/tc3x_smu.h"
 #include "hardware/tc3x_wdt.h"
+#include "tricore_smu_common.h"
 
 #ifdef CONFIG_TC3X_SMU_IRQ
 #  include <arch/irq.h>
@@ -68,48 +69,23 @@
 #define SMU_AGC_IGCS2_ROUTE  0x4u
 
 /****************************************************************************
- * Private Data
- ****************************************************************************/
-
-#ifdef CONFIG_TC3X_SMU_IRQ
-
-/* Per-device alarm callback and its user argument. */
-
-static tc3x_smu_alarm_cb_t g_smu_callback;
-static void                *g_smu_callback_arg;
-
-#endif /* CONFIG_TC3X_SMU_IRQ */
-
-/****************************************************************************
  * Private Functions
  ****************************************************************************/
 
 extern void aurix_safety_endinit_enable(bool enable);
 
-/* Write a command and argument to the SMU CMD register. */
+/* Thin wrapper so call sites can keep the flat smu_write_cmd() syntax. */
 
-static void smu_write_cmd(uint8_t cmd, uint8_t arg)
+static inline void smu_write_cmd(uint8_t cmd, uint8_t arg)
 {
-  uint32_t val;
-
-  val = ((uint32_t)cmd & SMU_CMD_CMD_MASK) |
-        (((uint32_t)arg << SMU_CMD_ARG_SHIFT) & SMU_CMD_ARG_MASK);
-  putreg32(val, TC3X_SMU_CORE_BASE + TC3X_SMU_CMD_OFFSET);
+  aurix_smu_write_cmd(TC3X_SMU_CORE_BASE + TC3X_SMU_CMD_OFFSET, cmd, arg);
 }
 
 #ifdef CONFIG_TC3X_SMU_IRQ
 
-/* Register the device-level alarm callback. */
-
 int tc3x_smu_register_callback(tc3x_smu_alarm_cb_t callback, void *arg)
 {
-  irqstate_t flags;
-
-  flags = enter_critical_section();
-  g_smu_callback     = callback;
-  g_smu_callback_arg = arg;
-  leave_critical_section(flags);
-  return OK;
+  return aurix_smu_register_cb((void (*)(void *))callback, arg);
 }
 
 #endif /* CONFIG_TC3X_SMU_IRQ */
@@ -143,15 +119,9 @@ static int tc3x_smu_start(void)
   return OK;
 }
 
-/* Return true if the SMU state machine is in FAULT state. */
-
-static bool tc3x_smu_in_fault_state(void)
+static inline bool tc3x_smu_in_fault_state(void)
 {
-  uint32_t ssm;
-
-  ssm = (getreg32(TC3X_SMU_CORE_BASE + TC3X_SMU_DBG_OFFSET) &
-         SMU_DBG_SSM_MASK) >> SMU_DBG_SSM_SHIFT;
-  return ssm == SMU_DBG_SSM_FAULT;
+  return aurix_smu_in_fault_state(TC3X_SMU_CORE_BASE + TC3X_SMU_DBG_OFFSET);
 }
 
 /* Return the 32-bit AGi alarm status register for the given group. */
@@ -268,71 +238,67 @@ static int tc3x_smu_config_alarm(uint8_t group, uint8_t alarm, uint8_t react)
   return OK;
 }
 
-/* Send SMU_RTStop() to acknowledge the Recovery Timer. */
-
 int tc3x_smu_rt_stop(uint8_t rt_num)
 {
-  smu_write_cmd(SMU_CMD_RTSTOP, rt_num);
+  return aurix_smu_rt_stop(TC3X_SMU_CORE_BASE + TC3X_SMU_CMD_OFFSET,
+                            rt_num);
+}
+
+static inline bool tc3x_smu_rt_missed(uint8_t rt_num)
+{
+  return aurix_smu_rt_missed(TC3X_SMU_CORE_BASE + TC3X_SMU_STS_OFFSET,
+                              rt_num);
+}
+
+/* Helper functions for aurix_smu_clear_all_alarms callback interface */
+
+static uint32_t tc3x_clear_get_status(uint8_t group, void *arg)
+{
+  UNUSED(arg);
+  return tc3x_smu_get_alarm_status(group);
+}
+
+static void tc3x_clear_write_aexclr(uint32_t mask, void *arg)
+{
+  UNUSED(arg);
+  putreg32(mask, TC3X_SMU_CORE_BASE + TC3X_SMU_AEXCLR_OFFSET);
+}
+
+static int tc3x_clear_write_cmd(uint8_t cmd, uint8_t cmdarg, void *arg)
+{
+  UNUSED(arg);
+  smu_write_cmd(cmd, cmdarg);
   return OK;
 }
 
-/* Return true if the RT expired without being acknowledged
- * (STS.RTMEn set).
- */
-
-static bool tc3x_smu_rt_missed(uint8_t rt_num)
+static uint32_t tc3x_clear_read_sts(void *arg)
 {
-  uint32_t sts;
-  uint32_t bit;
-
-  if (rt_num > 1u)
-    {
-      return false;
-    }
-
-  bit = (rt_num == 0u) ? SMU_STS_RTME0 : SMU_STS_RTME1;
-  sts = getreg32(TC3X_SMU_CORE_BASE + TC3X_SMU_STS_OFFSET);
-  return (sts & bit) != 0u;
+  UNUSED(arg);
+  return getreg32(TC3X_SMU_CORE_BASE + TC3X_SMU_STS_OFFSET);
 }
 
-/* Clear all latched alarm bits across all 12 groups.
- * Pulse-type alarms clear after reset; level-type alarms (e.g. SRAM ECC)
- * cannot clear while the hardware error condition persists.
- * Returns -EPERM if ASCE is rejected (alarm input still asserted).
- */
+static void tc3x_clear_write_status(uint32_t mask, uint8_t group, void *arg)
+{
+  UNUSED(arg);
+  putreg32(mask, TC3X_SMU_CORE_BASE + TC3X_SMU_AG_OFFSET(group));
+}
+
+/* Clear all latched alarm bits across all 12 groups. */
 
 static int smu_clear_all_alarms(void)
 {
-  uint8_t  group;
-  uint32_t status;
-  uint32_t sts;
-
-  for (group = 0u; group < TC3X_SMU_NGROUPS; group++)
+  aurix_smu_clear_all_ops_t ops =
     {
-      status = tc3x_smu_get_alarm_status(group);
-      if (status == 0u)
-        {
-          continue;
-        }
+      .ngroups = TC3X_SMU_NGROUPS,
+      .get_status = tc3x_clear_get_status,
+      .write_aexclr = tc3x_clear_write_aexclr,
+      .write_cmd = tc3x_clear_write_cmd,
+      .read_sts = tc3x_clear_read_sts,
+      .write_status = tc3x_clear_write_status,
+      .arg = NULL,
+    };
 
-      /* Clear AEX bits; alarms can re-latch after startup. */
-
-      putreg32(status, TC3X_SMU_CORE_BASE + TC3X_SMU_AEXCLR_OFFSET);
-
-      smu_write_cmd(SMU_CMD_ASCE, 0u);
-      sts = getreg32(TC3X_SMU_CORE_BASE + TC3X_SMU_STS_OFFSET);
-      if (!(sts & SMU_STS_ASCE))
-        {
-          /* ASCE command rejected -- SMU is in FAULT state. */
-
-          return -EPERM;
-        }
-
-      putreg32(status,
-               TC3X_SMU_CORE_BASE + TC3X_SMU_AG_OFFSET(group));
-    }
-
-  return OK;
+  return aurix_smu_clear_all_alarms(&ops);
 }
 
 /* Inject a software alarm by global index (group * 32 + bit).
@@ -351,11 +317,7 @@ static int tc3x_smu_emulate_alarm(uint8_t alarm_idx)
 
 static int tc3x_smu_irq_handler(int irq, void *context, void *arg)
 {
-  if (g_smu_callback != NULL)
-    {
-      g_smu_callback(g_smu_callback_arg);
-    }
-
+  aurix_smu_invoke_cb();
   return OK;
 }
 

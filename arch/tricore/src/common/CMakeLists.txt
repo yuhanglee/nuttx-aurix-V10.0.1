@@ -66,6 +66,10 @@ if(CONFIG_ARCH_HAVE_FPU)
   list(APPEND SRCS tricore_fpu.c)
 endif()
 
+if(CONFIG_TC3X_SMU OR CONFIG_TC4X_SMU)
+  list(APPEND SRCS tricore_smu_common.c)
+endif()
+
 target_sources(arch PRIVATE ${SRCS})
 target_sources(nuttx PRIVATE tricore_doirq.c tricore_head.S)
 target_include_directories(

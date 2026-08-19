@@ -41,6 +41,17 @@
 #include "hardware/tc4x_wdt.h"
 #endif
 
+#ifdef CONFIG_TC4X_SMU
+#include "hardware/tc4x_smu.h"
+#endif
+
+#ifdef CONFIG_AURIX_SMU
+FAR struct aurix_smu_lowerhalf_s *tc4x_smu_lowerhalf(void);
+FAR struct aurix_smu_lowerhalf_s *tc4x_smu1_lowerhalf(void);
+int aurix_smu_register(const char *path,
+                       FAR struct aurix_smu_lowerhalf_s *lower);
+#endif
+
 #ifdef CONFIG_TC4X_I2C
 #include "tc4x7_i2c.h"
 #endif
@@ -393,6 +404,28 @@ void board_late_initialize(void)
   if (ret < 0)
     {
       _err("ATOM PWM bringup failed: %d\n", ret);
+    }
+#endif
+
+#ifdef CONFIG_TC4X_SMU
+  ret = tc4x_smu_initialize();
+  if (ret < 0)
+    {
+      _err("ERROR: tc4x_smu_initialize failed: %d\n", ret);
+    }
+#endif
+
+#ifdef CONFIG_AURIX_SMU
+  ret = aurix_smu_register("/dev/smu0", tc4x_smu_lowerhalf());
+  if (ret < 0)
+    {
+      _err("ERROR: aurix_smu_register failed: %d\n", ret);
+    }
+
+  ret = aurix_smu_register("/dev/smu1", tc4x_smu1_lowerhalf());
+  if (ret < 0)
+    {
+      _err("ERROR: aurix_smu_register smu1 failed: %d\n", ret);
     }
 #endif
   UNUSED(ret);
