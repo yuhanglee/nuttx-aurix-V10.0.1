@@ -201,7 +201,7 @@ static int tc4d7_pwm_bringup(void)
 
   for (i = 0; i < sizeof(g_tc4d7_pwm_map) / sizeof(g_tc4d7_pwm_map[0]); i++)
     {
-      ret = tc4xx_egtm_pwm_register(g_tc4d7_pwm_map[i].minor,
+      ret = tc4xx_egtm_pwm_register(g_tc4d7_pwm_map[i].minor, false,
                                     g_tc4d7_pwm_map[i].cluster,
                                     g_tc4d7_pwm_map[i].ch,
                                     g_tc4d7_pwm_map[i].pin,
