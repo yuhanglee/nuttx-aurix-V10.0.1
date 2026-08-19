@@ -31,7 +31,7 @@ config BOARD_USER_LED_GPIO
 
 if TC4X_EGTM_PWM_LOWERHALF
 
-menu "TC4D7-Lite PWM channels to register"
+menu "TC4D7-Lite TOM PWM channels"
 
 config TC4D7_PWM_ANY
 	bool
@@ -87,6 +87,78 @@ config TC4D7_PWM_CH11
 config TC4D7_PWM_CH12
 	bool "/dev/pwm12 = P03.4  -> TOM2_10 (TOUT275, sel 0x15) [CLS2]"
 	select TC4D7_PWM_ANY
+
+endmenu
+
+menu "TC4D7-Lite ATOM PWM channels"
+
+config TC4D7_ATOM_ANY
+	bool
+
+config TC4D7_ATOM_CH0
+	bool "/dev/pwm13 = P00.12 -> ATOM0_2 (TOUT21, sel 0x01, inverted) [ATOM CLS0]"
+	select TC4D7_ATOM_ANY
+
+
+config TC4D7_ATOM_CH1
+	bool "/dev/pwm14 = P00.0  -> ATOM0_0 (TOUT9, sel 0x12) [ATOM CLS0]"
+	depends on !TC4D7_PWM_CH0
+	select TC4D7_ATOM_ANY
+
+config TC4D7_ATOM_CH2
+	bool "/dev/pwm15 = P00.1  -> ATOM0_1 (TOUT10, sel 0x12) [ATOM CLS0]"
+	depends on !TC4D7_PWM_CH1
+	select TC4D7_ATOM_ANY
+
+config TC4D7_ATOM_CH3
+	bool "/dev/pwm16 = P00.3  -> ATOM0_2 (TOUT12, sel 0x12) [ATOM CLS0]"
+	depends on !TC4D7_PWM_CH3 && !TC4D7_ATOM_CH0
+	select TC4D7_ATOM_ANY
+
+config TC4D7_ATOM_CH4
+	bool "/dev/pwm17 = P00.4  -> ATOM0_3 (TOUT13, sel 0x12) [ATOM CLS0]"
+	depends on !TC4D7_PWM_CH4
+	select TC4D7_ATOM_ANY
+
+config TC4D7_ATOM_CH5
+	bool "/dev/pwm18 = P00.5  -> ATOM0_4 (TOUT14, sel 0x12) [ATOM CLS0]"
+	depends on !TC4D7_PWM_CH5
+	select TC4D7_ATOM_ANY
+
+config TC4D7_ATOM_CH6
+	bool "/dev/pwm19 = P00.6  -> ATOM0_5 (TOUT15, sel 0x12) [ATOM CLS0]"
+	depends on !TC4D7_PWM_CH6
+	select TC4D7_ATOM_ANY
+
+config TC4D7_ATOM_CH7
+	bool "/dev/pwm20 = P00.7  -> ATOM0_6 (TOUT16, sel 0x12) [ATOM CLS0]"
+	depends on !TC4D7_PWM_CH7
+	select TC4D7_ATOM_ANY
+
+config TC4D7_ATOM_CH8
+	bool "/dev/pwm21 = P00.8  -> ATOM0_7 (TOUT17, sel 0x12) [ATOM CLS0]"
+	depends on !TC4D7_PWM_CH8
+	select TC4D7_ATOM_ANY
+
+config TC4D7_ATOM_CH9
+	bool "/dev/pwm22 = P03.3 -> ATOM1_1 (TOUT274, sel 0x02, inverted) [ATOM CLS1]"
+	depends on !TC4D7_PWM_CH11
+	select TC4D7_ATOM_ANY
+
+config TC4D7_ATOM_CH10
+	bool "/dev/pwm23 = P03.4 -> ATOM1_1 (TOUT275, sel 0x02) [ATOM CLS1]"
+	depends on !TC4D7_PWM_CH12 && !TC4D7_ATOM_CH9
+	select TC4D7_ATOM_ANY
+
+config TC4D7_ATOM_CH11
+	bool "/dev/pwm24 = P03.3 -> ATOM2_1 (TOUT274, sel 0x03) [ATOM CLS2]"
+	depends on !TC4D7_PWM_CH11 && !TC4D7_ATOM_CH9
+	select TC4D7_ATOM_ANY
+
+config TC4D7_ATOM_CH12
+	bool "/dev/pwm25 = P03.4 -> ATOM2_1 (TOUT275, sel 0x03, inverted) [ATOM CLS2]"
+	depends on !TC4D7_PWM_CH12 && !TC4D7_ATOM_CH10
+	select TC4D7_ATOM_ANY
 
 endmenu
 
