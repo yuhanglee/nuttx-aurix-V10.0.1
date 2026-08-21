@@ -46,3 +46,8 @@ endif
 ifeq ($(CONFIG_TC4XX_EGTM_PWM_LOWERHALF),y)
 CHIP_CSRCS += tc4xx_egtm_pwm.c
 endif
+
+# GPT12 PWM
+ifneq ($(filter y, $(CONFIG_TC4XX_GPT1_PWM) $(CONFIG_TC4XX_GPT2_PWM)),)
+CHIP_CSRCS += tc4xx_gpt12_pwm.c
+endif
