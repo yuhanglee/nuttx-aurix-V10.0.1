@@ -57,6 +57,10 @@ ifeq ($(CONFIG_SPINLOCK),y)
   CMN_CSRCS += tricore_testset.c
 endif
 
+ifneq ($(filter y, $(CONFIG_TC3X_GPT1_PWM) $(CONFIG_TC3X_GPT2_PWM) $(CONFIG_TC4X_GPT1_PWM) $(CONFIG_TC4X_GPT2_PWM)),)
+  CMN_CSRCS += tricore_gpt12_pwm.c
+endif
+
 ifeq ($(CONFIG_ARCH_USE_MPU),y)
   CMN_CSRCS += tricore_mpu.c
 endif

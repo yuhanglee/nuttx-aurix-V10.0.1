@@ -489,3 +489,53 @@ config TC4X_EGTM_PWM_GCLK_DEN
 endif # TC4X_EGTM_PWM_LOWERHALF
 
 endif # TC4X_EGTM_PWM
+
+# GPT12 PWM — shared instance base address
+config TC4X_GPT120_BASE
+	hex "GPT12 instance base address"
+	default 0xF0020000
+	depends on TC4X_GPT1_PWM || TC4X_GPT2_PWM
+	---help---
+		Base address of the GPT12 instance used for PWM.
+		GPT120=0xF0020000, GPT121=0xF0020200,
+		GPT122=0xF0020400, GPT123=0xF0020600.
+
+# GPT12 PWM (GPT1 block: T2/T3/T4)
+menuconfig TC4X_GPT1_PWM
+	bool "TC4xx GPT1 PWM output (T2/T3/T4)"
+	default n
+	depends on PWM
+	---help---
+		Enable GPT1-block PWM on /dev/pwm0.
+		Uses T3 as core timer, T2/T4 for high/low-phase reload.
+
+if TC4X_GPT1_PWM
+
+config TC4X_GPT1_PWM_T3_SRN
+	int "GPT12 T3 overflow SRN index"
+	default 1410
+	---help---
+		NuttX IRQ number for the T3 overflow interrupt.
+		GPT120=1410, GPT121=1416, GPT122=1422, GPT123=1428.
+
+endif # TC4X_GPT1_PWM
+
+# GPT12 PWM (GPT2 block: T6/CAPREL)
+menuconfig TC4X_GPT2_PWM
+	bool "TC4xx GPT2 PWM output (T6/CAPREL)"
+	default n
+	depends on PWM
+	---help---
+		Enable GPT2-block PWM on /dev/pwm1.
+		Uses T6 as core timer with CAPREL reload on overflow.
+
+if TC4X_GPT2_PWM
+
+config TC4X_GPT2_PWM_T6_SRN
+	int "GPT12 T6 overflow SRN index"
+	default 1413
+	---help---
+		NuttX IRQ number for the T6 overflow interrupt.
+		GPT120=1413, GPT121=1419, GPT122=1425, GPT123=1431.
+
+endif # TC4X_GPT2_PWM

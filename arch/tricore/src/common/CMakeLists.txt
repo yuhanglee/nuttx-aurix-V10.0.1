@@ -54,6 +54,10 @@ if(CONFIG_SPINLOCK)
   list(APPEND SRCS tricore_testset.c)
 endif()
 
+if(CONFIG_TC3X_GPT1_PWM OR CONFIG_TC3X_GPT2_PWM OR CONFIG_TC4X_GPT1_PWM OR CONFIG_TC4X_GPT2_PWM)
+  list(APPEND SRCS tricore_gpt12_pwm.c)
+endif()
+
 if(CONFIG_ARCH_USE_MPU)
   list(APPEND SRCS tricore_mpu.c)
 endif()
