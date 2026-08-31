@@ -722,3 +722,39 @@ config TC4XX_GPT2_PWM_T6_SRN
 endif # TC4XX_GPT2_PWM
 
 endmenu
+
+# DMA
+menuconfig TC4XX_DMA
+	bool "TC4xx SDMA controller driver"
+	default n
+	select DMA
+	---help---
+		Enable the Infineon Aurix TC4xx SDMA controller, exposed through
+		the generic NuttX DMA framework (include/nuttx/dma/dma.h).
+		Consumers acquire a channel with DMA_GET_CHAN() and drive it via
+		DMA_CONFIG()/DMA_START().  This step supports memory-to-memory
+		transfers only.
+
+if TC4XX_DMA
+
+config TC4XX_DMA_NCHANNELS
+	int "Number of DMA channels exposed"
+	default 8
+	range 1 128
+	---help---
+		How many of the 128 hardware DMA channels are made available
+		through the framework.  Channels are addressed by their absolute
+		hardware number (0..N-1), so this must be larger than the highest
+		channel number any consumer uses.
+
+config TC4XX_DMA_IRQ_BASE
+	int "DMA channel-0 transaction-end IRQ (SRN) number (0 = polled)"
+	default 460
+	---help---
+		Interrupt-router service-request-node index of DMA0 channel 0's
+		transaction-end interrupt.  Channel c uses IRQ_BASE + c.  The
+		default 460 is the TC4Dx value (dma0 channel-0 = SRN 460).  Set to
+		0 to run the memory-to-memory path synchronously (polled), which
+		needs no interrupt-router wiring.
+
+endif # TC4XX_DMA

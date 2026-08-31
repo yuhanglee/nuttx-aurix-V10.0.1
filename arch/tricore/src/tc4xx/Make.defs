@@ -14,6 +14,10 @@ ifeq ($(CONFIG_TC4XX_I2C),y)
 CHIP_CSRCS += tc4xx_i2c.c
 endif
 
+ifeq ($(CONFIG_TC4XX_DMA),y)
+CHIP_CSRCS += tc4xx_dma.c
+endif
+
 ifeq ($(CONFIG_TC4XX_GETH),y)
 CHIP_CSRCS += tc4x_geth.c
 ifeq ($(CONFIG_TRICORE_GETH_IF_SGMII),y)

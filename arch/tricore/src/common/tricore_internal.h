@@ -193,6 +193,13 @@ uintptr_t *tricore_alloc_csa(uintptr_t pc, uintptr_t sp,
                              uintptr_t psw, bool irqsave);
 void tricore_reclaim_csa(uintptr_t pcxi);
 
+/* Route a peripheral service request to the DMA instead of a CPU: the SRC
+ * TOS selects the DMA service provider and SRPN selects the DMA channel the
+ * request triggers.  Defined in tricore_irq.c.
+ */
+
+void tricore_route_irq_to_dma(int irq, unsigned int channel);
+
 /* Low level serial output **************************************************/
 #if 0
 void tricore_lowputc(char ch);
