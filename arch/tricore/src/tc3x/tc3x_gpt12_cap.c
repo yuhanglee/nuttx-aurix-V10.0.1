@@ -57,15 +57,15 @@
 struct tc3x_gpt12_cap_s
 {
   struct cap_lowerhalf_s  base;
-  volatile uint32_t       freq_hz;      /* Measured frequency in Hz */
-  volatile uint8_t        duty_pct;     /* Duty cycle  */
-  volatile uint32_t       edges;        /* Complete period measurements */
+  uint32_t                freq_hz;      /* Measured frequency in Hz */
+  uint8_t                 duty_pct;     /* Duty cycle  */
+  uint32_t                edges;        /* Complete period measurements */
 
   /* Three-point capture state machine (shared by GPT1 and GPT2 paths) */
 
-  volatile uint8_t        cap_state;    /* CAP_STATE_* */
-  volatile uint16_t       t1;           /* Timestamp at first edge */
-  volatile uint16_t       t2;           /* Timestamp at second edge */
+  uint8_t                 cap_state;    /* CAP_STATE_* */
+  uint16_t                t1;           /* Timestamp at first edge */
+  uint16_t                t2;           /* Timestamp at second edge */
 
   bool                    running;      /* True between start() and stop() */
   bool                    gpt1;         /* True = GPT1 path (T2/T4); false = GPT2 (T5) */
@@ -190,14 +190,12 @@ static int gpt12_cap_clk_enable(void)
  * Private Function Prototypes (shared)
  ****************************************************************************/
 
-static int gpt12_cap_start(FAR struct cap_lowerhalf_s *lower);
-static int gpt12_cap_stop(FAR struct cap_lowerhalf_s *lower);
-static int gpt12_gpt2_cap_start_hw(FAR struct tc3x_gpt12_cap_s *priv);
-static int gpt12_gpt2_cap_stop_hw(FAR struct tc3x_gpt12_cap_s *priv);
-static int gpt12_gpt1_cap_start_hw(FAR struct tc3x_gpt12_cap_s *priv);
-static int gpt12_gpt1_cap_stop_hw(FAR struct tc3x_gpt12_cap_s *priv);
-static int gpt12_cap_isr(int irq, FAR void *context,
-                          FAR void *arg);
+static int  gpt12_cap_start(FAR struct cap_lowerhalf_s *lower);
+static int  gpt12_cap_stop(FAR struct cap_lowerhalf_s *lower);
+static int  gpt12_cap_start_hw(FAR struct tc3x_gpt12_cap_s *priv);
+static int  gpt12_cap_stop_hw(FAR struct tc3x_gpt12_cap_s *priv);
+static int  gpt12_cap_isr(int irq, FAR void *context,
+                           FAR void *arg);
 
 /****************************************************************************
  * Private Data (shared)
@@ -282,17 +280,23 @@ static struct tc3x_gpt12_cap_s g_gpt12_cap0 =
 {
   .base.ops = &g_gpt12_cap_ops,
   .ct3      = false,
+  .srn      = CONFIG_TC3X_GPT2_CAP_CAPREL_SRN,
 };
 
 /* True while T5/CAPREL hardware is in use by any GPT2 capture channel */
 
 static bool g_gpt2_caprel_busy;
 
+#ifdef CONFIG_TC3X_GPT1_CAP
+static int g_gpt1_t3_users;
+#endif
+
 #ifdef CONFIG_TC3X_GPT2_CAP_T3IN
 static struct tc3x_gpt12_cap_s g_gpt12_t3in_cap =
 {
   .base.ops = &g_gpt12_cap_ops,
   .ct3      = true,
+  .srn      = CONFIG_TC3X_GPT2_CAP_CAPREL_SRN,
 };
 #endif
 
@@ -425,14 +429,10 @@ static int gpt12_cap_isr(int irq, FAR void *context,
 }
 
 /****************************************************************************
- * Name: gpt12_gpt2_cap_start_hw
- *
- *   Start T5/CAPREL capture.  Returns -EBUSY if T6 PWM is active or
- *   another GPT2 capture channel already holds CAPREL.
- *
- ****************************************************************************/
+ * Name: gpt12_cap_start_hw
+ ***************************************************************************/
 
-static int gpt12_gpt2_cap_start_hw(FAR struct tc3x_gpt12_cap_s *priv)
+static int gpt12_cap_start_hw(FAR struct tc3x_gpt12_cap_s *priv)
 {
   irqstate_t flags;
   int        ret;
@@ -442,83 +442,120 @@ static int gpt12_gpt2_cap_start_hw(FAR struct tc3x_gpt12_cap_s *priv)
       return OK;
     }
 
-  /* CAPREL is shared with GPT2 T6 reload.  Refuse to start if T6 is
-   * already counting.
-   */
-
-  if (getreg32(GPT12_REG(GPT12_T6CON_OFFSET)) & GPT12_T6CON_T6R)
+#ifdef CONFIG_TC3X_GPT1_CAP
+  if (priv->gpt1)
     {
-      cperr("ERROR: T6 is running; T5 capture and GPT2 PWM "
-            "cannot be active simultaneously\n");
-      return -EBUSY;
+      if ((getreg32(GPT12_REG(GPT12_T3CON_OFFSET)) & GPT12_T3CON_T3R) &&
+          ((getreg32(GPT12_REG(GPT12_T2CON_OFFSET)) & GPT12_TXCON_TXM_MASK)
+           == GPT12_TXCON_TXM_RELOAD))
+        {
+          cperr("ERROR: GPT1 PWM active; capture cannot start\n");
+          return -EBUSY;
+        }
+    }
+  else
+#endif
+    {
+#ifdef CONFIG_TC3X_GPT2_CAP
+      if (getreg32(GPT12_REG(GPT12_T6CON_OFFSET)) & GPT12_T6CON_T6R)
+        {
+          cperr("ERROR: T6 is running; T5 capture and GPT2 PWM "
+                "cannot be active simultaneously\n");
+          return -EBUSY;
+        }
+#endif
     }
 
   flags = enter_critical_section();
 
-  /* Refuse if another GPT2 capture channel already holds T5/CAPREL */
-
-  if (g_gpt2_caprel_busy)
+#ifdef CONFIG_TC3X_GPT2_CAP
+  if (!priv->gpt1 && g_gpt2_caprel_busy)
     {
       leave_critical_section(flags);
-      cperr("ERROR: CAPREL already in use by another GPT2 capture "
-            "channel\n");
+      cperr("ERROR: CAPREL already in use by another GPT2 capture channel\n");
       return -EBUSY;
     }
+#endif
 
   gpt12_cap_reset_state(priv);
 
-  /* Select capture trigger source: CT3=0 for CAPIN, CT3=1 for T3IN.
-   * This must be done before enabling T5SC capture in T5CON.
-   */
+#ifdef CONFIG_TC3X_GPT1_CAP
+  if (priv->gpt1)
+    {
+      modreg32(GPT12_TXCON_TXM_CAPTURE
+               | ((GPT12_TXCON_TXI_PIN_POS << GPT12_TXCON_TXI_SHIFT)
+                  & GPT12_TXCON_TXI_MASK),
+               GPT12_TXCON_TXM_MASK | GPT12_TXCON_TXI_MASK,
+               GPT12_REG(priv->con_offset));
 
-  modreg32(priv->ct3 ? GPT12_T5CON_CT3 : 0u,
-           GPT12_T5CON_CT3,
-           GPT12_REG(GPT12_T5CON_OFFSET));
+      if (g_gpt1_t3_users == 0)
+        {
+          putreg32(0u, GPT12_REG(GPT12_T3_OFFSET));
+          putreg32(GPT12_T3CON_T3M_TIMER
+                   | GPT12_T3CON_BPS1_DIV4
+                   | (((CONFIG_TC3X_GPT1_CAP_T3I + 4u) << GPT12_T3CON_T3I_SHIFT)
+                      & GPT12_T3CON_T3I_MASK)
+                   | GPT12_T3CON_T3R,
+                   GPT12_REG(GPT12_T3CON_OFFSET));
+        }
+    }
+  else
+#endif
+    {
+#ifdef CONFIG_TC3X_GPT2_CAP
+      modreg32(priv->ct3 ? GPT12_T5CON_CT3 : 0u,
+               GPT12_T5CON_CT3,
+               GPT12_REG(GPT12_T5CON_OFFSET));
 
-  /* Set capture edge and zero counters.
-   * CAPIN (ct3=false): start on rising edge; ISR toggles CI each capture.
-   * T3IN  (ct3=true):  CI_BOTH so every edge fires without mid-stream
-   *   CI switching; edge direction is resolved by reading the GPIO in ISR.
-   */
+      modreg32(priv->ct3 ? GPT12_T5CON_CI_BOTH : GPT12_T5CON_CI_RISING,
+               GPT12_T5CON_CI_MASK,
+               GPT12_REG(GPT12_T5CON_OFFSET));
+      putreg32(0u, GPT12_REG(GPT12_T5_OFFSET));
+      putreg32(0u, GPT12_REG(GPT12_CAPREL_OFFSET));
+#endif
+    }
 
-  modreg32(priv->ct3 ? GPT12_T5CON_CI_BOTH : GPT12_T5CON_CI_RISING,
-           GPT12_T5CON_CI_MASK,
-           GPT12_REG(GPT12_T5CON_OFFSET));
-  putreg32(0u, GPT12_REG(GPT12_T5_OFFSET));
-  putreg32(0u, GPT12_REG(GPT12_CAPREL_OFFSET));
-
-  /* Attach and enable the CAPREL interrupt */
-
-  ret = irq_attach(CONFIG_TC3X_GPT2_CAP_CAPREL_SRN,
-                   gpt12_cap_isr, priv);
+  ret = irq_attach(priv->srn, gpt12_cap_isr, priv);
   if (ret < 0)
     {
+#ifdef CONFIG_TC3X_GPT1_CAP
+      if (priv->gpt1 && g_gpt1_t3_users == 0)
+        {
+          modreg32(0, GPT12_T3CON_T3R, GPT12_REG(GPT12_T3CON_OFFSET));
+        }
+#endif
       leave_critical_section(flags);
       cperr("ERROR: irq_attach failed: %d\n", ret);
       return ret;
     }
 
-  up_enable_irq(CONFIG_TC3X_GPT2_CAP_CAPREL_SRN);
+  up_enable_irq(priv->srn);
 
-  /* Start T5 */
+#ifdef CONFIG_TC3X_GPT1_CAP
+  if (priv->gpt1)
+    {
+      g_gpt1_t3_users++;
+    }
+  else
+#endif
+    {
+#ifdef CONFIG_TC3X_GPT2_CAP
+      modreg32(GPT12_T5CON_T5R, GPT12_T5CON_T5R,
+               GPT12_REG(GPT12_T5CON_OFFSET));
+      g_gpt2_caprel_busy = true;
+#endif
+    }
 
-  modreg32(GPT12_T5CON_T5R, GPT12_T5CON_T5R,
-           GPT12_REG(GPT12_T5CON_OFFSET));
-
-  g_gpt2_caprel_busy = true;
-  priv->running      = true;
+  priv->running = true;
   leave_critical_section(flags);
   return OK;
 }
 
 /****************************************************************************
- * Name: gpt12_gpt2_cap_stop_hw
- *
- *   Halt T5 and disable the CAPREL interrupt.
- *
- ****************************************************************************/
+ * Name: gpt12_cap_stop_hw
+ ***************************************************************************/
 
-static int gpt12_gpt2_cap_stop_hw(FAR struct tc3x_gpt12_cap_s *priv)
+static int gpt12_cap_stop_hw(FAR struct tc3x_gpt12_cap_s *priv)
 {
   irqstate_t flags;
 
@@ -529,16 +566,29 @@ static int gpt12_gpt2_cap_stop_hw(FAR struct tc3x_gpt12_cap_s *priv)
 
   flags = enter_critical_section();
 
-  modreg32(0, GPT12_T5CON_T5R, GPT12_REG(GPT12_T5CON_OFFSET));
+  up_disable_irq(priv->srn);
+  irq_detach(priv->srn);
 
-  /* Disable and detach the CAPREL interrupt */
+#ifdef CONFIG_TC3X_GPT1_CAP
+  if (priv->gpt1)
+    {
+      g_gpt1_t3_users--;
+      if (g_gpt1_t3_users == 0)
+        {
+          modreg32(0, GPT12_T3CON_T3R, GPT12_REG(GPT12_T3CON_OFFSET));
+        }
+    }
+  else
+#endif
+    {
+#ifdef CONFIG_TC3X_GPT2_CAP
+      modreg32(0, GPT12_T5CON_T5R, GPT12_REG(GPT12_T5CON_OFFSET));
+      g_gpt2_caprel_busy = false;
+#endif
+    }
 
-  up_disable_irq(CONFIG_TC3X_GPT2_CAP_CAPREL_SRN);
-  irq_detach(CONFIG_TC3X_GPT2_CAP_CAPREL_SRN);
-
-  priv->cap_state    = CAP_STATE_IDLE;
-  g_gpt2_caprel_busy = false;
-  priv->running      = false;
+  priv->cap_state = CAP_STATE_IDLE;
+  priv->running   = false;
 
   leave_critical_section(flags);
   return OK;
@@ -637,10 +687,6 @@ static int gpt12_t3in_register(int minor)
  * Private Data (GPT1 capture)
  ****************************************************************************/
 
-/* Number of currently-active GPT1 capture channels */
-
-static int g_gpt1_t3_users;
-
 #ifdef CONFIG_TC3X_GPT1_CAP_T2
 static struct tc3x_gpt12_cap_s g_gpt1_t2_cap =
 {
@@ -672,129 +718,6 @@ static struct tc3x_gpt12_cap_s g_gpt1_t4_cap =
   .pisel_val  = (uint32_t)CONFIG_TC3X_GPT1_CAP_T4IN_SEL << GPT12_PISEL_IST4IN_SHIFT,
 };
 #endif
-
-/****************************************************************************
- * Private Functions (GPT1 capture)
- ****************************************************************************/
-
-
-
-/****************************************************************************
- * Name: gpt12_gpt1_cap_start_hw
- *
- *   GPT1 hardware-specific start: configure T3 timebase and TxIN capture.
- *   Called by the unified gpt12_cap_start() dispatcher.
- *
- ****************************************************************************/
-
-static int gpt12_gpt1_cap_start_hw(FAR struct tc3x_gpt12_cap_s *priv)
-{
-  irqstate_t flags;
-  int        ret;
-
-  if (priv->running)
-    {
-      return OK;
-    }
-
-  /* Refuse if GPT1 PWM owns T3 */
-
-  if ((getreg32(GPT12_REG(GPT12_T3CON_OFFSET)) & GPT12_T3CON_T3R) &&
-      ((getreg32(GPT12_REG(GPT12_T2CON_OFFSET)) & GPT12_TXCON_TXM_MASK)
-       == GPT12_TXCON_TXM_RELOAD))
-    {
-      cperr("ERROR: GPT1 PWM active; capture cannot start\n");
-      return -EBUSY;
-    }
-
-  flags = enter_critical_section();
-
-  gpt12_cap_reset_state(priv);
-
-  /* Restore TxCON to Capture mode; GPT1 PWM may have left it in Reload. */
-
-  modreg32(GPT12_TXCON_TXM_CAPTURE
-           | ((GPT12_TXCON_TXI_PIN_POS << GPT12_TXCON_TXI_SHIFT)
-              & GPT12_TXCON_TXI_MASK),
-           GPT12_TXCON_TXM_MASK | GPT12_TXCON_TXI_MASK,
-           GPT12_REG(priv->con_offset));
-
-  /* Start T3 on first use; write full T3CON to restore clock config after
-   * a GPT1 PWM session may have overwritten it.
-   */
-
-  if (g_gpt1_t3_users == 0)
-    {
-      putreg32(0u, GPT12_REG(GPT12_T3_OFFSET));
-      putreg32(GPT12_T3CON_T3M_TIMER
-               | GPT12_T3CON_BPS1_DIV4
-               | (((CONFIG_TC3X_GPT1_CAP_T3I + 4u) << GPT12_T3CON_T3I_SHIFT)
-                  & GPT12_T3CON_T3I_MASK)
-               | GPT12_T3CON_T3R,
-               GPT12_REG(GPT12_T3CON_OFFSET));
-    }
-
-  /* Attach and enable the TxIN capture interrupt */
-
-  ret = irq_attach(priv->srn, gpt12_cap_isr, priv);
-  if (ret < 0)
-    {
-      if (g_gpt1_t3_users == 0)
-        {
-          modreg32(0, GPT12_T3CON_T3R, GPT12_REG(GPT12_T3CON_OFFSET));
-        }
-
-      leave_critical_section(flags);
-      cperr("ERROR: irq_attach(Tx cap) failed: %d\n", ret);
-      return ret;
-    }
-
-  up_enable_irq(priv->srn);
-  g_gpt1_t3_users++;
-  priv->running = true;
-
-  leave_critical_section(flags);
-  return OK;
-}
-
-/****************************************************************************
- * Name: gpt12_gpt1_cap_stop_hw
- *
- *   GPT1 hardware-specific stop.  Called by the unified gpt12_cap_stop().
- *
- ****************************************************************************/
-
-static int gpt12_gpt1_cap_stop_hw(FAR struct tc3x_gpt12_cap_s *priv)
-{
-  irqstate_t flags;
-
-  if (!priv->running)
-    {
-      return OK;
-    }
-
-  flags = enter_critical_section();
-
-  /* Disable and detach the TxIN capture interrupt */
-
-  up_disable_irq(priv->srn);
-  irq_detach(priv->srn);
-
-  /* Halt T3 when the last active channel stops */
-
-  g_gpt1_t3_users--;
-
-  if (g_gpt1_t3_users == 0)
-    {
-      modreg32(0, GPT12_T3CON_T3R, GPT12_REG(GPT12_T3CON_OFFSET));
-    }
-
-  priv->cap_state = CAP_STATE_IDLE;
-  priv->running   = false;
-
-  leave_critical_section(flags);
-  return OK;
-}
 
 /****************************************************************************
  * Public Functions (GPT1 capture)
@@ -865,7 +788,7 @@ static int gpt12_gpt1_cap_register(int minor)
 /****************************************************************************
  * Name: gpt12_cap_start
  *
- *   ops.start() dispatcher: routes to GPT1 or GPT2 path via priv->gpt1.
+ *   ops.start() entry point.
  *
  ****************************************************************************/
 
@@ -874,24 +797,13 @@ static int gpt12_cap_start(FAR struct cap_lowerhalf_s *lower)
   FAR struct tc3x_gpt12_cap_s *priv =
     (FAR struct tc3x_gpt12_cap_s *)lower;
 
-#ifdef CONFIG_TC3X_GPT1_CAP
-  if (priv->gpt1)
-    {
-      return gpt12_gpt1_cap_start_hw(priv);
-    }
-#endif
-
-#ifdef CONFIG_TC3X_GPT2_CAP
-  return gpt12_gpt2_cap_start_hw(priv);
-#else
-  return -ENODEV;
-#endif
+  return gpt12_cap_start_hw(priv);
 }
 
 /****************************************************************************
  * Name: gpt12_cap_stop
  *
- *   ops.stop() dispatcher: mirrors gpt12_cap_start().
+ *   ops.stop() entry point.
  *
  ****************************************************************************/
 
@@ -900,18 +812,7 @@ static int gpt12_cap_stop(FAR struct cap_lowerhalf_s *lower)
   FAR struct tc3x_gpt12_cap_s *priv =
     (FAR struct tc3x_gpt12_cap_s *)lower;
 
-#ifdef CONFIG_TC3X_GPT1_CAP
-  if (priv->gpt1)
-    {
-      return gpt12_gpt1_cap_stop_hw(priv);
-    }
-#endif
-
-#ifdef CONFIG_TC3X_GPT2_CAP
-  return gpt12_gpt2_cap_stop_hw(priv);
-#else
-  return -ENODEV;
-#endif
+  return gpt12_cap_stop_hw(priv);
 }
 
 /****************************************************************************
