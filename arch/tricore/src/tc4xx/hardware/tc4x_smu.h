@@ -28,9 +28,10 @@
  ****************************************************************************/
 
 #include <nuttx/bits.h>
-#ifdef CONFIG_AURIX_SMU
-#  include <nuttx/misc/aurix_smu.h>
-#endif
+
+/* Forward declaration */
+
+struct aurix_smu_lowerhalf_s;
 
 /****************************************************************************
  * Base addresses
