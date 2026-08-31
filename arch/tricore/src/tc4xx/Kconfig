@@ -647,6 +647,7 @@ config TC4XX_EGTM_PWM_LOWERHALF
 	bool "Register NuttX standard PWM driver (/dev/pwmN)"
 	default n
 	select PWM
+	select ARCH_HAVE_PWM_MULTICHAN
 	---help---
 		Wraps the eGTM HAL behind the NuttX pwm_ops_s vtable so the
 		channels are reachable via the upper-half PWM character
@@ -683,6 +684,7 @@ menuconfig TC4XX_GPT1_PWM
 	bool "TC4xx GPT1 PWM output (T2/T3/T4)"
 	default n
 	depends on PWM
+	select ARCH_HAVE_PWM_MULTICHAN
 	---help---
 		Enable GPT1-block PWM on /dev/pwm0.
 		Uses T3 as core timer, T2/T4 for high/low-phase reload.
@@ -703,6 +705,7 @@ menuconfig TC4XX_GPT2_PWM
 	bool "TC4xx GPT2 PWM output (T6/CAPREL)"
 	default n
 	depends on PWM
+	select ARCH_HAVE_PWM_MULTICHAN
 	---help---
 		Enable GPT2-block PWM on /dev/pwm1.
 		Uses T6 as core timer with CAPREL reload on overflow.

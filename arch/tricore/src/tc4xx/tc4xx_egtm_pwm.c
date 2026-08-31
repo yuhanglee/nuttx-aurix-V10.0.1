@@ -39,6 +39,16 @@
 #define TC4XX_PWM_MAX_MINORS \
   (EGTM_NCLUSTERS * (EGTM_TOM_NCHANNELS + EGTM_ATOM_NCHANNELS))
 
+/* The pwm example enables CONFIG_PWM_MULTICHAN; read the duty from the
+ * first channel in that case, otherwise from the single channel field.
+ */
+
+#ifdef CONFIG_PWM_MULTICHAN
+#  define PWM_DUTY(info) ((info)->channels[0].duty)
+#else
+#  define PWM_DUTY(info) ((info)->duty)
+#endif
+
 /****************************************************************************
  * Private Types
  ****************************************************************************/
@@ -162,7 +172,7 @@ static int tc4xx_pwm_start(FAR struct pwm_lowerhalf_s *dev,
           return -ERANGE;
         }
 
-      duty = (uint32_t)(((uint64_t)period * (uint32_t)info->duty) >> 16);
+      duty = (uint32_t)(((uint64_t)period * (uint32_t)PWM_DUTY(info)) >> 16);
       duty = period - duty;
       tc4xx_egtm_atom_setup(p->cluster, p->ch, 0, cmu_div,
                             period, duty, -1, NULL, 0);
@@ -176,7 +186,7 @@ static int tc4xx_pwm_start(FAR struct pwm_lowerhalf_s *dev,
           return -ERANGE;
         }
 
-      duty = ((uint64_t)period * (uint32_t)info->duty) >> 16;
+      duty = ((uint64_t)period * (uint32_t)PWM_DUTY(info)) >> 16;
       tc4xx_egtm_pwm_setup(p->cluster, p->ch, 0, period, duty, -1, NULL, 0);
     }
 

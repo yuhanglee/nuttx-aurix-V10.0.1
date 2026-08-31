@@ -42,6 +42,20 @@
 extern void aurix_cpu_endinit_enable(bool enable);
 
 /****************************************************************************
+ * Pre-processor Definitions
+ ****************************************************************************/
+
+/* The pwm example enables CONFIG_PWM_MULTICHAN; read the duty from the
+ * first channel in that case, otherwise from the single channel field.
+ */
+
+#ifdef CONFIG_PWM_MULTICHAN
+#  define PWM_DUTY(info) ((info)->channels[0].duty)
+#else
+#  define PWM_DUTY(info) ((info)->duty)
+#endif
+
+/****************************************************************************
  * Private Function Prototypes
  ****************************************************************************/
 
@@ -299,7 +313,7 @@ int gpt12_pwm_start(FAR struct pwm_lowerhalf_s *dev,
       return ret;
     }
 
-  gpt12_calc_ticks(period_ticks, (uint32_t)info->duty,
+  gpt12_calc_ticks(period_ticks, (uint32_t)PWM_DUTY(info),
                    &high_ticks, &low_ticks);
 
   pwminfo("GPT12 block=%d freq=%lu period=%lu high=%lu low=%lu"

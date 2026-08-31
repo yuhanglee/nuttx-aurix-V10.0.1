@@ -252,6 +252,7 @@ menuconfig TC3XX_GPT1_PWM
 	bool "TC3xx GPT1 PWM output (T2/T3/T4)"
 	default n
 	depends on PWM
+	select ARCH_HAVE_PWM_MULTICHAN
 	---help---
 		Enable the GPT1-block PWM lower-half driver.  Uses timers
 		T3 (core), T2, and T4 (auxiliaries) to generate a PWM signal on
@@ -287,6 +288,7 @@ menuconfig TC3XX_GPT2_PWM
 	bool "TC3xx GPT2 PWM output (T6/CAPREL)"
 	default n
 	depends on PWM
+	select ARCH_HAVE_PWM_MULTICHAN
 	---help---
 		Enable the GPT2-block PWM lower-half driver.  Uses timer T6
 		and the CAPREL register to generate a PWM signal on the T6OUT
