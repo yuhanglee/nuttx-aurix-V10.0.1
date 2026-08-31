@@ -28,6 +28,10 @@ CMN_ASRCS += tricore_trap.S
 CMN_CSRCS += tricore_allocateheap.c
 CMN_CSRCS += tricore_checkstack.c
 CMN_CSRCS += tricore_compiler.c
+
+ifneq ($(filter y,$(CONFIG_TC3XX_SMU) $(CONFIG_TC4X_SMU)),)
+CMN_CSRCS += tricore_smu_common.c
+endif
 CMN_CSRCS += tricore_createstack.c
 CMN_CSRCS += tricore_csa.c
 CMN_CSRCS += tricore_doirq.c

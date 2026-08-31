@@ -193,14 +193,15 @@ endif # DRVR_WRITEBUFFER || DRVR_READAHEAD
 endmenu # Buffering
 
 config AURIX_SMU
-	bool "Infineon AURIX TC3xx SMU upper-half driver"
+	bool "Infineon AURIX SMU upper-half driver"
 	default n
-	depends on ARCH_TRICORE && TC3XX_SMU
+	depends on ARCH_TRICORE && (TC3XX_SMU || TC4X_SMU)
 	---help---
-		Enable the upper-half character device driver for the AURIX TC3xx
-		Safety Management Unit (SMU_core).  The driver registers a device
-		node (e.g. /dev/smu0) that exposes alarm status, alarm reaction
-		configuration, lock/unlock, and Recovery Timer control via ioctl(2).
+		Enable the upper-half character device driver for the Infineon
+		AURIX Safety Management Unit (SMU).  Registers a /dev/smu0 node
+		exposing alarm status, reaction configuration, lock/unlock, and
+		Recovery Timer control via ioctl(2).
 
-		The lower-half hardware driver (tc3x_smu.c) must also be enabled via
-		CONFIG_TC3XX_SMU in the architecture Kconfig.
+		Requires a lower-half hardware driver: tc3x_smu.c for TC3xx or
+		tc4x_smu.c for TC4xx, enabled via CONFIG_TC3XX_SMU or
+		CONFIG_TC4X_SMU respectively.
