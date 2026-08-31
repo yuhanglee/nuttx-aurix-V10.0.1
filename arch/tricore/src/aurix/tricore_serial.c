@@ -39,6 +39,18 @@
 #include "tricore_internal.h"
 #include "tricore_asclin.h"
 
+#ifdef CONFIG_SERIAL_TXDMA
+#  include <nuttx/dma/dma.h>
+#  include <nuttx/cache.h>
+
+/* Arch DMA controller entry point (declared here to avoid the chip source
+ * include path).
+ */
+
+FAR struct dma_dev_s *tc4xx_dma_initialize(void);
+#  define aurix_dma_initialize tc4xx_dma_initialize
+#endif
+
 
 #ifndef CONFIG_TRICORE_ASCLINF_FREQUENCY
 #  if defined(CONFIG_ARCH_CHIP_FAMILY_TC4XX)
@@ -112,6 +124,16 @@ struct aurix_uart_config_s
   uint8_t   txirq;
   uint8_t   erirq;
   uint8_t   rx_alti;
+#ifdef CONFIG_SERIAL_TXDMA
+  bool      use_txdma;     /* Transmit through the DMA controller */
+  uint8_t   txdma_chan;    /* DMA channel used for transmit */
+#endif
+#ifdef CONFIG_SERIAL_RXDMA
+  bool      use_rxdma;     /* Receive through the DMA controller */
+  uint8_t   rxdma_chan;    /* DMA channel used for receive */
+  FAR char *dmarxbuf;      /* Circular DMA receive buffer */
+  size_t    dmarxsize;     /* Size of dmarxbuf (must be even) */
+#endif
 };
 
 struct aurix_uart_priv_s
@@ -119,6 +141,14 @@ struct aurix_uart_priv_s
   struct aurix_uart_config_s *config;
   bool      txint_enabled;
   bool      rxint_enabled;
+#ifdef CONFIG_SERIAL_TXDMA
+  FAR struct dma_chan_s *txdma;   /* TX DMA channel handle (NULL if unused) */
+#endif
+#ifdef CONFIG_SERIAL_RXDMA
+  FAR struct dma_chan_s *rxdma;   /* RX DMA channel handle (NULL if unused) */
+  size_t    dmarxhead;            /* Bytes the DMA has written (monotonic) */
+  size_t    dmarxtail;            /* Bytes drained to the upper half */
+#endif
 };
 
 
@@ -135,6 +165,17 @@ static void aurix_send(struct uart_dev_s *dev, int ch);
 static void aurix_txint(struct uart_dev_s *dev, bool enable);
 static bool aurix_txready(struct uart_dev_s *dev);
 static bool aurix_txempty(struct uart_dev_s *dev);
+
+#ifdef CONFIG_SERIAL_TXDMA
+static void aurix_dmasend(struct uart_dev_s *dev);
+static void aurix_dmatxavail(struct uart_dev_s *dev);
+static void aurix_dma_txint(struct uart_dev_s *dev, bool enable);
+#endif
+#ifdef CONFIG_SERIAL_RXDMA
+static void aurix_dmareceive(struct uart_dev_s *dev);
+static void aurix_dmarxfree(struct uart_dev_s *dev);
+static void aurix_dma_rxint(struct uart_dev_s *dev, bool enable);
+#endif
 
 static const struct uart_ops_s g_uart_ops =
 {
@@ -154,6 +195,47 @@ static const struct uart_ops_s g_uart_ops =
   .txready        = aurix_txready,
   .txempty        = aurix_txempty,
 };
+
+#if defined(CONFIG_SERIAL_TXDMA) || defined(CONFIG_SERIAL_RXDMA)
+/* Ops for a DMA UART: g_uart_ops plus the DMA send/receive hooks.  The serial
+ * upper half uses the DMA path when dmatxavail / dmarxfree are present.
+ */
+
+static const struct uart_ops_s g_uart_dma_ops =
+{
+  .setup          = aurix_setup,
+  .shutdown       = aurix_shutdown,
+  .attach         = aurix_attach,
+  .detach         = aurix_detach,
+  .ioctl          = aurix_ioctl,
+  .receive        = aurix_receive,
+#ifdef CONFIG_SERIAL_RXDMA
+  .rxint          = aurix_dma_rxint,
+#else
+  .rxint          = aurix_rxint,
+#endif
+  .rxavailable    = aurix_rxavailable,
+#ifdef CONFIG_SERIAL_IFLOWCONTROL
+  .rxflowcontrol  = NULL,
+#endif
+  .send           = aurix_send,
+#ifdef CONFIG_SERIAL_TXDMA
+  .txint          = aurix_dma_txint,
+#else
+  .txint          = aurix_txint,
+#endif
+  .txready        = aurix_txready,
+  .txempty        = aurix_txempty,
+#ifdef CONFIG_SERIAL_TXDMA
+  .dmasend        = aurix_dmasend,
+  .dmatxavail     = aurix_dmatxavail,
+#endif
+#ifdef CONFIG_SERIAL_RXDMA
+  .dmareceive     = aurix_dmareceive,
+  .dmarxfree      = aurix_dmarxfree,
+#endif
+};
+#endif
 
 #ifdef CONFIG_TRICORE_UART0
 
@@ -230,6 +312,11 @@ static uart_dev_t g_uart0port =
 
 #ifdef CONFIG_TRICORE_UART1
 
+#ifdef CONFIG_TRICORE_UART1_RXDMA
+static char g_uart1dmarxbuf[CONFIG_TRICORE_UART1_RXDMA_BUFSIZE]
+  __attribute__((aligned(4)));
+#endif
+
 static struct aurix_uart_config_s g_uart1_config =
 {
   .base           = TRICORE_ASCLIN_BASE(1),
@@ -254,6 +341,16 @@ static struct aurix_uart_config_s g_uart1_config =
   .erirq          = CONFIG_TRICORE_UART1_ERIRQ,
 
   .rx_alti        = ASCLIN_IOCR_ALTI_A,
+#ifdef CONFIG_TRICORE_UART1_TXDMA
+  .use_txdma      = true,
+  .txdma_chan     = CONFIG_TRICORE_UART1_TXDMA_CHAN,
+#endif
+#ifdef CONFIG_TRICORE_UART1_RXDMA
+  .use_rxdma      = true,
+  .rxdma_chan     = CONFIG_TRICORE_UART1_RXDMA_CHAN,
+  .dmarxbuf       = g_uart1dmarxbuf,
+  .dmarxsize      = CONFIG_TRICORE_UART1_RXDMA_BUFSIZE,
+#endif
 };
 
 static struct aurix_uart_priv_s g_uart1_priv =
@@ -281,7 +378,11 @@ static uart_dev_t g_uart1port =
     .size   = CONFIG_UART1_TXBUFSIZE,
     .buffer = g_uart1txbuffer,
   },
+#if defined(CONFIG_TRICORE_UART1_TXDMA) || defined(CONFIG_TRICORE_UART1_RXDMA)
+  .ops  = &g_uart_dma_ops,
+#else
   .ops  = &g_uart_ops,
+#endif
   .priv = &g_uart1_priv,
 };
 
@@ -532,11 +633,451 @@ static int aurix_asclin_init(const struct aurix_uart_config_s *cfg)
   return OK;
 }
 
-static int aurix_setup(struct uart_dev_s *dev)
+#ifdef CONFIG_SERIAL_TXDMA
+
+/****************************************************************************
+ * Name: aurix_dma_tx_done
+ *
+ * Description:
+ *   Transmit DMA completion callback (runs in DMA interrupt context).
+ *
+ ****************************************************************************/
+
+static void aurix_dma_tx_done(FAR struct dma_chan_s *chan,
+                              FAR void *arg, ssize_t len)
+{
+  struct uart_dev_s *dev = arg;
+
+  if (len > 0)
+    {
+      /* + 1 accounts for the first byte primed by the CPU in aurix_dmasend */
+
+      dev->dmatx.nbytes = len + 1;
+      uart_xmitchars_done(dev);
+      uart_xmitchars_dma(dev);
+    }
+  else
+    {
+      /* Transfer error: resend the current buffer */
+
+      aurix_dmasend(dev);
+    }
+}
+
+/****************************************************************************
+ * Name: aurix_dmasend
+ *
+ * Description:
+ *   Start a transmit DMA of dev->dmatx to the ASCLIN TXDATA register.  Each
+ *   TX-FIFO service request paces one byte out of the transmit buffer.
+ *
+ ****************************************************************************/
+
+static void aurix_dmasend(struct uart_dev_s *dev)
+{
+  struct aurix_uart_priv_s *priv = dev->priv;
+  const struct aurix_uart_config_s *cfg = priv->config;
+  FAR uint8_t *buffer = (FAR uint8_t *)dev->dmatx.buffer;
+  size_t length       = dev->dmatx.length;
+  uintptr_t txdata    = cfg->base + ASCLIN_TXDATA_OFFSET;
+
+  if (length == 0)
+    {
+      return;
+    }
+
+  if (length == 1)
+    {
+      /* Single byte: send it directly, no DMA transfer needed. */
+
+      aurix_serialout(cfg, ASCLIN_TXDATA_OFFSET, buffer[0]);
+      dev->dmatx.nbytes = 1;
+      uart_xmitchars_done(dev);
+      uart_xmitchars_dma(dev);
+      return;
+    }
+
+  /* Arm the DMA for buf[1..length-1] FIRST, then prime buf[0] via the CPU.
+   * The primed byte drains almost immediately and raises the TX-FIFO service
+   * request that paces the DMA; if we primed before arming, that very first
+   * request would be lost and the armed channel would wait forever (symptom:
+   * exactly one byte out, then a hang).
+   */
+
+  up_clean_dcache((uintptr_t)(buffer + 1), (uintptr_t)(buffer + length));
+
+  DMA_START(priv->txdma, aurix_dma_tx_done, dev,
+            txdata, (uintptr_t)(buffer + 1), length - 1);
+
+  aurix_serialout(cfg, ASCLIN_TXDATA_OFFSET, buffer[0]);
+}
+
+/****************************************************************************
+ * Name: aurix_dmatxavail
+ *
+ * Description:
+ *   Called when the transmit buffer has data; start a DMA if idle.
+ *
+ ****************************************************************************/
+
+static void aurix_dmatxavail(struct uart_dev_s *dev)
+{
+  irqstate_t flags = enter_critical_section();
+
+  if (dev->dmatx.length == 0)
+    {
+      uart_xmitchars_dma(dev);
+    }
+
+  leave_critical_section(flags);
+}
+
+/****************************************************************************
+ * Name: aurix_dma_txint
+ *
+ * Description:
+ *   Transmit-interrupt control for a DMA UART.  Transmit is DMA-driven, so
+ *   there is no CPU TX interrupt to toggle: the transfer is kicked by
+ *   dmatxavail and completes via the DMA callback (which posts xmitsem).
+ *   Must NOT call uart_xmitchars() (that would write TXDATA behind the DMA).
+ *
+ ****************************************************************************/
+
+static void aurix_dma_txint(struct uart_dev_s *dev, bool enable)
+{
+  UNUSED(dev);
+  UNUSED(enable);
+}
+
+/****************************************************************************
+ * Name: aurix_txdma_setup
+ *
+ * Description:
+ *   Acquire and configure the transmit DMA channel and route the ASCLIN TX
+ *   service request to it.  Idempotent; a no-op for non-DMA ports.
+ *
+ ****************************************************************************/
+
+static int aurix_txdma_setup(struct uart_dev_s *dev)
+{
+  struct aurix_uart_priv_s *priv = dev->priv;
+  const struct aurix_uart_config_s *cfg = priv->config;
+  FAR struct dma_dev_s *dmadev;
+  struct dma_config_s dmacfg;
+  int ret;
+
+  if (!cfg->use_txdma)
+    {
+      return OK;
+    }
+
+  /* Acquire and configure the DMA channel once. */
+
+  if (priv->txdma == NULL)
+    {
+      dmadev = aurix_dma_initialize();
+      if (dmadev == NULL)
+        {
+          return -ENODEV;
+        }
+
+      priv->txdma = DMA_GET_CHAN(dmadev, cfg->txdma_chan);
+      if (priv->txdma == NULL)
+        {
+          return -EBUSY;
+        }
+
+      memset(&dmacfg, 0, sizeof(dmacfg));
+      dmacfg.direction = DMA_MEM_TO_DEV;
+      dmacfg.src_width = 1;
+      dmacfg.dst_width = 1;
+
+      ret = DMA_CONFIG(priv->txdma, &dmacfg);
+      if (ret < 0)
+        {
+          return ret;
+        }
+    }
+
+  /* (Re)apply on every setup: aurix_shutdown() clears FLAGSENABLE (and thus
+   * TFLE) when the port is closed, so the TX-FIFO DMA request, the SRC->DMA
+   * routing and the APU write grant must be re-established each open.
+   *
+   * Route the ASCLIN TX service request to the DMA channel.
+   */
+
+  tricore_route_irq_to_dma(cfg->txirq, cfg->txdma_chan);
+
+#if defined(CONFIG_ARCH_CHIP_FAMILY_TC4XX)
+  /* TC4Dx: TXDATA is APU-P protected.  Grant the DMA master tag write access
+   * to the ASCLIN, otherwise the DMA write to TXDATA raises a destination
+   * access-protection error (RP.ERRSR.DER) and disarms the channel.  All
+   * master tags are enabled, matching the TC3xx ACCEN0 reset value.
+   */
+
+  putreg32(0xffffffffu, cfg->base + ASCLIN_ACCEN_WRA_OFFSET);
+  putreg32(0xffffffffu, cfg->base + ASCLIN_ACCEN_WRB_OFFSET);
+#endif
+
+  /* Enable the TX FIFO fill-level request so the peripheral paces the DMA. */
+
+  aurix_serialmod(cfg, ASCLIN_FLAGSENABLE_OFFSET,
+                  ASCLIN_FLAGSENABLE_TFLE, 0);
+
+  return OK;
+}
+#endif /* CONFIG_SERIAL_TXDMA */
+
+#ifdef CONFIG_SERIAL_RXDMA
+
+/****************************************************************************
+ * Name: aurix_rxdma_start
+ *
+ * Description:
+ *   Arm a single-shot receive DMA to fill one full RX buffer.  The ASCLIN RX
+ *   FIFO service request paces one byte per DMA transfer; the transaction
+ *   completes (and the callback fires) once dmarxsize bytes have arrived.
+ *
+ ****************************************************************************/
+
+static void aurix_dma_rx_done(FAR struct dma_chan_s *chan,
+                              FAR void *arg, ssize_t len);
+
+static void aurix_rxdma_start(struct uart_dev_s *dev)
+{
+  struct aurix_uart_priv_s *priv = dev->priv;
+  const struct aurix_uart_config_s *cfg = priv->config;
+  uintptr_t rxdata = cfg->base + ASCLIN_RXDATA_OFFSET;
+
+  priv->dmarxhead = 0;
+  priv->dmarxtail = 0;
+
+  up_invalidate_dcache((uintptr_t)cfg->dmarxbuf,
+                       (uintptr_t)cfg->dmarxbuf + cfg->dmarxsize);
+
+  /* Flush any stale bytes so the transfer starts on an empty RX FIFO. */
+
+  aurix_serialmod(cfg, ASCLIN_RXFIFOCON_OFFSET, ASCLIN_RXFIFOCON_FLUSH, 0);
+
+  /* Continuous double-buffer (ping-pong) receive: the DMA stays armed and
+   * drains the RX FIFO byte by byte into the two halves of dmarxbuf, raising
+   * the channel IRQ each time a half fills.  This avoids the single-shot
+   * FIFO-overflow that dropped bytes.
+   */
+
+  DMA_START_CYCLIC(priv->rxdma, aurix_dma_rx_done, dev,
+                   (uintptr_t)cfg->dmarxbuf, rxdata,
+                   cfg->dmarxsize, cfg->dmarxsize / 2);
+}
+
+/****************************************************************************
+ * Name: aurix_dma_rx_done
+ *
+ * Description:
+ *   Receive DMA completion (DMA interrupt context): one full buffer arrived.
+ *
+ ****************************************************************************/
+
+static void aurix_dma_rx_done(FAR struct dma_chan_s *chan,
+                              FAR void *arg, ssize_t len)
+{
+  struct uart_dev_s *dev = arg;
+  struct aurix_uart_priv_s *priv = dev->priv;
+
+  if (len > 0)
+    {
+      /* A half-buffer (period) just filled; advance the write pointer. */
+
+      priv->dmarxhead += (size_t)len;
+      uart_recvchars_dma(dev);
+    }
+}
+
+/****************************************************************************
+ * Name: aurix_dmareceive
+ *
+ * Description:
+ *   Copy received bytes from the DMA buffer to the upper half.  When the
+ *   buffer is fully drained, re-arm the next single-shot receive.
+ *
+ ****************************************************************************/
+
+static void aurix_dmareceive(struct uart_dev_s *dev)
+{
+  struct aurix_uart_priv_s *priv = dev->priv;
+  const struct aurix_uart_config_s *cfg = priv->config;
+  size_t length;
+  size_t offset;
+  FAR char *buffer;
+
+  if (priv->dmarxhead == priv->dmarxtail)
+    {
+      return;
+    }
+
+  length = priv->dmarxhead - priv->dmarxtail;
+  offset = priv->dmarxtail % cfg->dmarxsize;
+  buffer = cfg->dmarxbuf + offset;
+
+  /* Clamp to the wrap boundary of the circular buffer. */
+
+  if (offset + length > cfg->dmarxsize)
+    {
+      length = cfg->dmarxsize - offset;
+    }
+
+  if (length > dev->dmarx.length)
+    {
+      length = dev->dmarx.length;
+    }
+
+  up_invalidate_dcache((uintptr_t)buffer, (uintptr_t)buffer + length);
+  memcpy(dev->dmarx.buffer, buffer, length);
+  dev->dmarx.nbytes = length;
+  priv->dmarxtail += length;
+
+  uart_recvchars_done(dev);
+
+  if (priv->dmarxhead != priv->dmarxtail)
+    {
+      /* More buffered data (or a wrap remainder): keep draining. */
+
+      uart_recvchars_dma(dev);
+    }
+}
+
+/****************************************************************************
+ * Name: aurix_dmarxfree
+ *
+ * Description:
+ *   Called when the upper half has RX space; kick the receive if idle.
+ *
+ ****************************************************************************/
+
+static void aurix_dmarxfree(struct uart_dev_s *dev)
 {
   struct aurix_uart_priv_s *priv = dev->priv;
 
-  return aurix_asclin_init(priv->config);
+  if (priv->rxdma == NULL)
+    {
+      return;
+    }
+
+  if (dev->dmarx.length == 0)
+    {
+      uart_recvchars_dma(dev);
+    }
+}
+
+/****************************************************************************
+ * Name: aurix_dma_rxint
+ *
+ * Description:
+ *   Receive-interrupt control for a DMA UART.  Receive is DMA-driven and the
+ *   RX-FIFO service request (RFLE) must stay enabled continuously so the DMA
+ *   keeps being paced; it is set up once in aurix_rxdma_setup().  This must
+ *   NOT toggle RFLE the way the interrupt-mode aurix_rxint() does, or the
+ *   serial upper half (uart_enable/disablerxint) would stall the RX DMA.
+ *
+ ****************************************************************************/
+
+static void aurix_dma_rxint(struct uart_dev_s *dev, bool enable)
+{
+  UNUSED(dev);
+  UNUSED(enable);
+}
+
+/****************************************************************************
+ * Name: aurix_rxdma_setup
+ *
+ * Description:
+ *   Acquire/configure the receive DMA channel, route the ASCLIN RX service
+ *   request to it, and arm the first receive.  Idempotent per-open.
+ *
+ ****************************************************************************/
+
+static int aurix_rxdma_setup(struct uart_dev_s *dev)
+{
+  struct aurix_uart_priv_s *priv = dev->priv;
+  const struct aurix_uart_config_s *cfg = priv->config;
+  FAR struct dma_dev_s *dmadev;
+  struct dma_config_s dmacfg;
+  int ret;
+
+  if (!cfg->use_rxdma)
+    {
+      return OK;
+    }
+
+  if (priv->rxdma == NULL)
+    {
+      dmadev = aurix_dma_initialize();
+      if (dmadev == NULL)
+        {
+          return -ENODEV;
+        }
+
+      priv->rxdma = DMA_GET_CHAN(dmadev, cfg->rxdma_chan);
+      if (priv->rxdma == NULL)
+        {
+          return -EBUSY;
+        }
+
+      memset(&dmacfg, 0, sizeof(dmacfg));
+      dmacfg.direction = DMA_DEV_TO_MEM;
+      dmacfg.src_width = 1;
+      dmacfg.dst_width = 1;
+
+      ret = DMA_CONFIG(priv->rxdma, &dmacfg);
+      if (ret < 0)
+        {
+          return ret;
+        }
+    }
+
+  /* (Re)apply on every setup (aurix_shutdown clears FLAGSENABLE on close). */
+
+  tricore_route_irq_to_dma(cfg->rxirq, cfg->rxdma_chan);
+
+#if defined(CONFIG_ARCH_CHIP_FAMILY_TC4XX)
+  /* TC4Dx: grant the DMA read access to RXDATA (APU-P). */
+
+  putreg32(0xffffffffu, cfg->base + ASCLIN_ACCEN_RDA_OFFSET);
+  putreg32(0xffffffffu, cfg->base + ASCLIN_ACCEN_RDB_OFFSET);
+#endif
+
+  /* Enable the RX FIFO fill-level request so the peripheral paces the DMA. */
+
+  aurix_serialmod(cfg, ASCLIN_FLAGSENABLE_OFFSET,
+                  ASCLIN_FLAGSENABLE_RFLE, 0);
+
+  aurix_rxdma_start(dev);
+  return OK;
+}
+#endif /* CONFIG_SERIAL_RXDMA */
+
+static int aurix_setup(struct uart_dev_s *dev)
+{
+  struct aurix_uart_priv_s *priv = dev->priv;
+  int ret;
+
+  ret = aurix_asclin_init(priv->config);
+
+#ifdef CONFIG_SERIAL_TXDMA
+  if (ret == OK)
+    {
+      ret = aurix_txdma_setup(dev);
+    }
+#endif
+
+#ifdef CONFIG_SERIAL_RXDMA
+  if (ret == OK)
+    {
+      ret = aurix_rxdma_setup(dev);
+    }
+#endif
+
+  return ret;
 }
 
 static void aurix_shutdown(struct uart_dev_s *dev)
@@ -567,29 +1108,71 @@ static int aurix_attach(struct uart_dev_s *dev)
   const struct aurix_uart_config_s *cfg = priv->config;
   int ret;
 
-  ret = irq_attach(cfg->rxirq, aurix_interrupt, dev);
-  if (ret != OK)
+  /* A TX/RX service request routed to the DMA (in aurix_tx/rxdma_setup) must
+   * NOT be attached to a CPU; only the non-DMA directions and the error
+   * request use the CPU interrupt.
+   */
+
+#ifdef CONFIG_SERIAL_TXDMA
+  const bool txdma = cfg->use_txdma;
+#else
+  const bool txdma = false;
+#endif
+#ifdef CONFIG_SERIAL_RXDMA
+  const bool rxdma = cfg->use_rxdma;
+#else
+  const bool rxdma = false;
+#endif
+
+  if (!rxdma)
     {
-      return ret;
+      ret = irq_attach(cfg->rxirq, aurix_interrupt, dev);
+      if (ret != OK)
+        {
+          return ret;
+        }
     }
 
-  ret = irq_attach(cfg->txirq, aurix_interrupt, dev);
-  if (ret != OK)
+  if (!txdma)
     {
-      irq_detach(cfg->rxirq);
-      return ret;
+      ret = irq_attach(cfg->txirq, aurix_interrupt, dev);
+      if (ret != OK)
+        {
+          if (!rxdma)
+            {
+              irq_detach(cfg->rxirq);
+            }
+
+          return ret;
+        }
     }
 
   ret = irq_attach(cfg->erirq, aurix_interrupt, dev);
   if (ret != OK)
     {
-      irq_detach(cfg->rxirq);
-      irq_detach(cfg->txirq);
+      if (!rxdma)
+        {
+          irq_detach(cfg->rxirq);
+        }
+
+      if (!txdma)
+        {
+          irq_detach(cfg->txirq);
+        }
+
       return ret;
     }
 
-  up_enable_irq(cfg->rxirq);
-  up_enable_irq(cfg->txirq);
+  if (!rxdma)
+    {
+      up_enable_irq(cfg->rxirq);
+    }
+
+  if (!txdma)
+    {
+      up_enable_irq(cfg->txirq);
+    }
+
   up_enable_irq(cfg->erirq);
 
   return OK;
@@ -600,13 +1183,26 @@ static void aurix_detach(struct uart_dev_s *dev)
   struct aurix_uart_priv_s *priv = dev->priv;
   const struct aurix_uart_config_s *cfg = priv->config;
 
-  up_disable_irq(cfg->rxirq);
-  up_disable_irq(cfg->txirq);
   up_disable_irq(cfg->erirq);
-
-  irq_detach(cfg->rxirq);
-  irq_detach(cfg->txirq);
   irq_detach(cfg->erirq);
+
+  /* A TX/RX service request routed to the DMA (not a CPU) must be left alone. */
+
+#ifdef CONFIG_SERIAL_RXDMA
+  if (!cfg->use_rxdma)
+#endif
+    {
+      up_disable_irq(cfg->rxirq);
+      irq_detach(cfg->rxirq);
+    }
+
+#ifdef CONFIG_SERIAL_TXDMA
+  if (!cfg->use_txdma)
+#endif
+    {
+      up_disable_irq(cfg->txirq);
+      irq_detach(cfg->txirq);
+    }
 }
 
 static int aurix_interrupt(int irq, void *context, void *arg)

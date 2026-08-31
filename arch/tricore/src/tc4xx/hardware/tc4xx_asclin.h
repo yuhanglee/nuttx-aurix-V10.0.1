@@ -56,4 +56,16 @@
 #define ASCLIN_RXDATA_OFFSET        0x160
 #define ASCLIN_RXDATAD_OFFSET       0x180
 
+/* APU-P access protection (TC4Dx).  Peripheral registers such as TXDATA are
+ * APU-P protected; a DMA master must be granted write access via ACCEN_WRA
+ * (master tags 0-31) / ACCEN_WRB (tags 32-63) or its write to the peripheral
+ * raises a destination access-protection error (RP.ERRSR.DER).
+ */
+
+#define ASCLIN_PROTE_OFFSET         0x020
+#define ASCLIN_ACCEN_WRA_OFFSET     0x040
+#define ASCLIN_ACCEN_WRB_OFFSET     0x044
+#define ASCLIN_ACCEN_RDA_OFFSET     0x048
+#define ASCLIN_ACCEN_RDB_OFFSET     0x04C
+
 #endif /* __ARCH_TRICORE_SRC_TC4XX_HARDWARE_TC4XX_ASCLIN_H */

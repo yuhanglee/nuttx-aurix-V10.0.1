@@ -58,6 +58,67 @@ config TRICORE_ASCLINF_FREQUENCY
 
 endif # TRICORE_UART0
 
+config TRICORE_UART1
+        bool "ASCLIN1 UART"
+        default n
+        select UART1_SERIALDRIVER
+        select SERIAL
+        ---help---
+                Enable the ASCLIN1 peripheral as a UART serial port
+                (/dev/ttyS1).  On the TC4D7 Lite the pins are P15.0 (TX)
+                and P15.1 (RX).
+
+if TRICORE_UART1
+
+config TRICORE_UART1_TXIRQ
+        int "ASCLIN1 TX service-request node"
+        default 175
+
+config TRICORE_UART1_RXIRQ
+        int "ASCLIN1 RX service-request node"
+        default 176
+
+config TRICORE_UART1_ERIRQ
+        int "ASCLIN1 ERR service-request node"
+        default 177
+
+config TRICORE_UART1_TXDMA
+        bool "ASCLIN1 transmit over DMA"
+        default n
+        depends on TC4XX_DMA
+        select SERIAL_TXDMA
+        ---help---
+                Drive ASCLIN1 transmit through the DMA controller: the
+                ASCLIN1 TX service request is routed to a DMA channel that
+                feeds TXDATA from the transmit buffer.
+
+config TRICORE_UART1_TXDMA_CHAN
+        int "ASCLIN1 TX DMA channel"
+        default 1
+        depends on TRICORE_UART1_TXDMA
+
+config TRICORE_UART1_RXDMA
+        bool "ASCLIN1 receive over DMA"
+        default n
+        depends on TC4XX_DMA
+        select SERIAL_RXDMA
+        ---help---
+                Drive ASCLIN1 receive through the DMA controller: the ASCLIN1
+                RX service request is routed to a DMA channel that continuously
+                fills a double-buffer from RXDATA.
+
+config TRICORE_UART1_RXDMA_CHAN
+        int "ASCLIN1 RX DMA channel"
+        default 2
+        depends on TRICORE_UART1_RXDMA
+
+config TRICORE_UART1_RXDMA_BUFSIZE
+        int "ASCLIN1 RX DMA buffer size (bytes)"
+        default 64
+        depends on TRICORE_UART1_RXDMA
+
+endif # TRICORE_UART1
+
 config TRICORE_STM_FREQUENCY
         int "STM clock frequency (Hz)"
         default 500000000
