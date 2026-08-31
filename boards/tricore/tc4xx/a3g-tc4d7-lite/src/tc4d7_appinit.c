@@ -130,16 +130,8 @@ static const gpio_pinset_t g_user_led_pin =
   AURIX_GPIO(3, 9, GPIO_OUTPUT, GPIO_ALT0) | GPIO_OUTPUT_HIGH;
 #endif
 
-#if defined(CONFIG_TC4XX_EGTM_PWM_LOWERHALF) && defined(CONFIG_TC4D7_PWM_ANY)
-
-/* Board PWM map: minor -> (cluster, TOM channel, pad, TOUT, TOUTSEL).
- * Rows are gated by per-channel CONFIG_TC4D7_PWM_CH<N>; the whole
- * block is elided when no channel is enabled (TC4D7_PWM_ANY is auto-
- * selected by any TC4D7_PWM_CHx).
- */
-
-#define TC4D7_PAD(port, padx)                                           \
-  (AURIX_GPIO((port), (padx), GPIO_PERIPH, GPIO_ALT9) | GPIO_PERIPH_OWN_PAD)
+#if defined(CONFIG_TC4XX_EGTM_PWM_LOWERHALF) && \
+    (defined(CONFIG_TC4D7_PWM_ANY) || defined(CONFIG_TC4D7_ATOM_ANY))
 
 struct tc4d7_pwm_row_s
 {
@@ -150,6 +142,19 @@ struct tc4d7_pwm_row_s
   uint16_t      tout;
   uint8_t       sel;
 };
+
+#endif
+
+#if defined(CONFIG_TC4XX_EGTM_PWM_LOWERHALF) && defined(CONFIG_TC4D7_PWM_ANY)
+
+/* Board PWM map: minor -> (cluster, TOM channel, pad, TOUT, TOUTSEL).
+ * Rows are gated by per-channel CONFIG_TC4D7_PWM_CH<N>; the whole
+ * block is elided when no channel is enabled (TC4D7_PWM_ANY is auto-
+ * selected by any TC4D7_PWM_CHx).
+ */
+
+#define TC4D7_PAD(port, padx)                                           \
+  (AURIX_GPIO((port), (padx), GPIO_PERIPH, GPIO_ALT9) | GPIO_PERIPH_OWN_PAD)
 
 static const struct tc4d7_pwm_row_s g_tc4d7_pwm_map[] =
 {
@@ -201,12 +206,83 @@ static int tc4d7_pwm_bringup(void)
 
   for (i = 0; i < sizeof(g_tc4d7_pwm_map) / sizeof(g_tc4d7_pwm_map[0]); i++)
     {
-      ret = tc4xx_egtm_pwm_register(g_tc4d7_pwm_map[i].minor,
+      ret = tc4xx_egtm_pwm_register(g_tc4d7_pwm_map[i].minor, false,
                                     g_tc4d7_pwm_map[i].cluster,
                                     g_tc4d7_pwm_map[i].ch,
                                     g_tc4d7_pwm_map[i].pin,
                                     g_tc4d7_pwm_map[i].tout,
                                     g_tc4d7_pwm_map[i].sel);
+      if (ret < 0)
+        {
+          return ret;
+        }
+    }
+
+  return OK;
+}
+#endif
+
+#if defined(CONFIG_TC4XX_EGTM_PWM_LOWERHALF) && defined(CONFIG_TC4D7_ATOM_ANY)
+
+#define TC4D7_ATOM_PAD(port, padx) \
+  (AURIX_GPIO((port), (padx), GPIO_PERIPH, GPIO_ALT9) | GPIO_PERIPH_OWN_PAD)
+
+static const struct tc4d7_pwm_row_s g_tc4d7_atom_map[] =
+{
+#ifdef CONFIG_TC4D7_ATOM_CH0
+  {13, 0, 2, TC4D7_ATOM_PAD(0, 12),  21u, 0x01u},
+#endif
+#ifdef CONFIG_TC4D7_ATOM_CH1
+  {14, 0, 0, TC4D7_ATOM_PAD(0,  0),   9u, 0x12u},
+#endif
+#ifdef CONFIG_TC4D7_ATOM_CH2
+  {15, 0, 1, TC4D7_ATOM_PAD(0,  1),  10u, 0x12u},
+#endif
+#ifdef CONFIG_TC4D7_ATOM_CH3
+  {16, 0, 2, TC4D7_ATOM_PAD(0,  3),  12u, 0x12u},
+#endif
+#ifdef CONFIG_TC4D7_ATOM_CH4
+  {17, 0, 3, TC4D7_ATOM_PAD(0,  4),  13u, 0x12u},
+#endif
+#ifdef CONFIG_TC4D7_ATOM_CH5
+  {18, 0, 4, TC4D7_ATOM_PAD(0,  5),  14u, 0x12u},
+#endif
+#ifdef CONFIG_TC4D7_ATOM_CH6
+  {19, 0, 5, TC4D7_ATOM_PAD(0,  6),  15u, 0x12u},
+#endif
+#ifdef CONFIG_TC4D7_ATOM_CH7
+  {20, 0, 6, TC4D7_ATOM_PAD(0,  7),  16u, 0x12u},
+#endif
+#ifdef CONFIG_TC4D7_ATOM_CH8
+  {21, 0, 7, TC4D7_ATOM_PAD(0,  8),  17u, 0x12u},
+#endif
+#ifdef CONFIG_TC4D7_ATOM_CH9
+  {22, 1, 1, TC4D7_ATOM_PAD(3,  3), 274u, 0x02u},
+#endif
+#ifdef CONFIG_TC4D7_ATOM_CH10
+  {23, 1, 1, TC4D7_ATOM_PAD(3,  4), 275u, 0x02u},
+#endif
+#ifdef CONFIG_TC4D7_ATOM_CH11
+  {24, 2, 1, TC4D7_ATOM_PAD(3,  3), 274u, 0x03u},
+#endif
+#ifdef CONFIG_TC4D7_ATOM_CH12
+  {25, 2, 1, TC4D7_ATOM_PAD(3,  4), 275u, 0x03u},
+#endif
+};
+
+static int tc4d7_atom_bringup(void)
+{
+  size_t i;
+  int ret;
+
+  for (i = 0; i < sizeof(g_tc4d7_atom_map) / sizeof(g_tc4d7_atom_map[0]); i++)
+    {
+      ret = tc4xx_egtm_pwm_register(g_tc4d7_atom_map[i].minor, true,
+                                    g_tc4d7_atom_map[i].cluster,
+                                    g_tc4d7_atom_map[i].ch,
+                                    g_tc4d7_atom_map[i].pin,
+                                    g_tc4d7_atom_map[i].tout,
+                                    g_tc4d7_atom_map[i].sel);
       if (ret < 0)
         {
           return ret;
@@ -347,6 +423,14 @@ int board_app_initialize(uintptr_t arg)
   if (ret < 0)
     {
       _err("PWM bringup failed: %d\n", ret);
+    }
+#endif
+
+#ifdef CONFIG_TC4D7_ATOM_ANY
+  ret = tc4d7_atom_bringup();
+  if (ret < 0)
+    {
+      _err("ATOM PWM bringup failed: %d\n", ret);
     }
 #endif
 

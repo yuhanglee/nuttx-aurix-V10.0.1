@@ -23,9 +23,12 @@
 
 #ifdef CONFIG_TC4XX_EGTM_PWM_LOWERHALF
 
-/* Bind TOM channel <ch> of cluster <cluster> to /dev/pwm<minor>. */
+/* Bind TOM (is_atom=false) or ATOM (is_atom=true) channel <ch> of
+ * cluster <cluster> to /dev/pwm<minor>.
+ */
 
-int tc4xx_egtm_pwm_register(int minor, uint8_t cluster, uint8_t ch,
+int tc4xx_egtm_pwm_register(int minor, bool is_atom,
+                            uint8_t cluster, uint8_t ch,
                             gpio_pinset_t pin, uint16_t tout,
                             uint8_t sel_code);
 
