@@ -309,8 +309,8 @@ config TC3XX_GPT2_PWM_T6_SRN
 endif # TC3XX_GPT2_PWM
 
 # GPT12 Capture
-menuconfig TC3XX_GPT12_CAP
-        bool "TC3xx GPT12 capture (T5/CAPREL)"
+menuconfig TC3XX_GPT2_CAP
+        bool "TC3xx GPT2 capture (T5/CAPREL)"
         default n
         depends on CAPTURE
         ---help---
@@ -326,17 +326,17 @@ menuconfig TC3XX_GPT12_CAP
                 Both cannot be active simultaneously.  start() returns
                 -EBUSY if T6 is already running.
 
-if TC3XX_GPT12_CAP
+if TC3XX_GPT2_CAP
 
-config TC3XX_GPT12_CAP_CAPREL_SRN
-        int "GPT12 CAPREL SRN (Service Request Node) index"
+config TC3XX_GPT2_CAP_CAPREL_SRN
+        int "GPT2 CAPREL SRN (Service Request Node) index"
         default 184
         range 1 2047
         ---help---
                 NuttX IRQ number for the GPT120 CAPREL interrupt.
                 Verify the correct value for your specific TC3xx device.
 
-config TC3XX_GPT12_CAP_T5I
+config TC3XX_GPT2_CAP_T5I
         int "T5 input prescaler (T5I field, 0=div1 .. 7=div128)"
         default 4
         range 0 7
@@ -348,7 +348,7 @@ config TC3XX_GPT12_CAP_T5I
                 T5I=6: f_T5 ~781 kHz, min freq ~12 Hz.
                 T5I=7: f_T5 ~390 kHz, min freq ~6 Hz.
 
-config TC3XX_GPT12_CAP_CAPIN_SEL
+config TC3XX_GPT2_CAP_CAPIN_SEL
         int "PISEL.ISCAPIN pin select (0=CAPINA, 1=CAPINB)"
         default 0
         range 0 1
@@ -357,8 +357,144 @@ config TC3XX_GPT12_CAP_CAPIN_SEL
                 0 = CAPINA, 1 = CAPINB.
                 Verify the alternate-function pin mapping for your device
                 before changing this value.
+config TC3XX_GPT2_CAP_T3IN
+        bool "Enable T3IN capture input (/dev/cap3)"
+        default n
+        ---help---
+                Enable the T3IN capture path using GPT2 T5/CAPREL.
+                T3IN is routed to the CAPREL capture trigger by setting
+                T5CON.CT3=1 in start().  T5 is the shared free-running
+                timebase (same as CAPIN).
 
-endif # TC3XX_GPT12_CAP
+                T3IN and CAPIN share T5/CAPREL and the same SRN.  Only
+                one may be active at a time; start() returns -EBUSY if
+                the other channel is already running.
+
+                TC375 Lite Kit: P02.6 = GPT120_T3INA (PISEL.IST3IN=0).
+
+config TC3XX_GPT2_CAP_T3IN_SEL
+        int "PISEL.IST3IN pin select (0=T3INA .. 3=T3IND)"
+        depends on TC3XX_GPT2_CAP_T3IN
+        default 0
+        range 0 3
+        ---help---
+                Selects which physical pin is routed to the T3IN input.
+                The PISEL.IST3IN field is 2 bits wide (four options):
+                0 = T3INA (TC375 Lite Kit: P02.6).
+                1 = T3INB.
+                2 = T3INC.
+                3 = T3IND.
+                Verify the alternate-function pin mapping for your device
+                before changing this value.
+endif # TC3XX_GPT2_CAP
+
+# GPT1 Capture (T2IN / T4IN using T3 as free-running timer)
+menuconfig TC3XX_GPT1_CAP
+	bool "TC3xx GPT1 capture (T2IN/T4IN via T3)"
+	default n
+	depends on CAPTURE
+	---help---
+		Enable GPT1-block capture channels using T2 and/or T4 in
+		Capture Mode with T3 as the shared free-running time reference.
+
+		T3 runs in Timer Mode.  T2 (minor=2) or T4 (minor=4) latch
+		the current T3 value on each edge of their respective TxIN
+		input pin.
+
+		Three consecutive edge captures (rising, falling, rising) give
+		period and pulse width.  Frequency and duty cycle are derived
+		from T3 tick counts (16-bit).
+
+		Cannot coexist with TC3XX_GPT1_PWM at runtime; start()
+		returns -EBUSY if GPT1 PWM is active.
+
+if TC3XX_GPT1_CAP
+
+config TC3XX_GPT1_CAP_T2
+	bool "Enable T2IN capture channel (/dev/cap2)"
+	default n
+	---help---
+		Compile support for the T2IN capture path.  Call
+		tc3xx_gpt12_gpt1_cap_register(2) from the board file after
+		configuring the T2IN GPIO pin.
+
+		TC375 Lite Kit: P00.7 = GPT120_T2INA.
+
+config TC3XX_GPT1_CAP_T4
+	bool "Enable T4IN capture channel (/dev/cap4)"
+	default n
+	---help---
+		Compile support for the T4IN capture path.  Call
+		tc3xx_gpt12_gpt1_cap_register(4) from the board file after
+		configuring the T4IN GPIO pin.
+
+		TC375 Lite Kit: P02.8 = GPT120_T4INA.
+
+config TC3XX_GPT1_CAP_T2_SRN
+	int "T2 capture SRN (Service Request Node) index"
+	depends on TC3XX_GPT1_CAP_T2
+	default 185
+	range 1 2047
+	---help---
+		NuttX IRQ number for the GPT120 T2 capture interrupt (SR0).
+		185 = IRQ_GPT120_T2 (TC37x/TC39x SRC table).
+
+config TC3XX_GPT1_CAP_T3_SRN
+	int "T3 SRN (Service Request Node) index (reserved)"
+	default 186
+	range 1 2047
+	---help---
+		NuttX IRQ number for the GPT120 T3 interrupt (SR1).
+		186 = IRQ_GPT120_T3 (TC37x/TC39x SRC table).
+		Reserved for future use; not attached at runtime.
+
+config TC3XX_GPT1_CAP_T4_SRN
+	int "T4 capture SRN (Service Request Node) index"
+	depends on TC3XX_GPT1_CAP_T4
+	default 187
+	range 1 2047
+	---help---
+		NuttX IRQ number for the GPT120 T4 capture interrupt (SR2).
+		187 = IRQ_GPT120_T4 (TC37x/TC39x SRC table).
+
+config TC3XX_GPT1_CAP_T3I
+	int "T3 additional prescaler (0=div1 .. 3=div8)"
+	default 0
+	range 0 3
+	---help---
+		Additional per-timer prescaler for T3 beyond BPS1.
+		T3 frequency = (fSPB/4) / 2^(T3I+4).
+		With fSPB=100 MHz:
+
+		T3I=0 (default): f_T3=1.5625 MHz (640 ns/tick).
+		T3I=1: f_T3=781.25 kHz.
+		T3I=2: f_T3=390.625 kHz.
+		T3I=3: f_T3=195.3125 kHz.
+
+		NOTE: GPT1 T3I hardware field values 0b000-0b011 select
+		external T3IN trigger inputs; internal prescaler starts at
+		0b100.  The driver adds the required +4 offset automatically.
+
+config TC3XX_GPT1_CAP_T2IN_SEL
+	int "PISEL.IST2IN pin select (0=T2INA, 1=T2INB)"
+	depends on TC3XX_GPT1_CAP_T2
+	default 0
+	range 0 1
+	---help---
+		Selects which physical pin is routed to T2IN.
+		0 = T2INA (TC375 Lite Kit: P00.7).
+		1 = T2INB.
+
+config TC3XX_GPT1_CAP_T4IN_SEL
+	int "PISEL.IST4IN pin select (0=T4INA .. 3=T4IND)"
+	depends on TC3XX_GPT1_CAP_T4
+	default 0
+	range 0 3
+	---help---
+		Selects which physical pin is routed to T4IN.
+		0=T4INA (TC375 Lite Kit: P02.8), 1=T4INB, 2=T4INC, 3=T4IND.
+
+endif # TC3XX_GPT1_CAP
 
 config TC3XX_SMU
 	bool "TC3xx Safety Management Unit (SMU_core) driver"
