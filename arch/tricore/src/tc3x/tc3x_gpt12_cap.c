@@ -46,6 +46,46 @@
 #include "tc3x_gpt12_cap.h"
 
 /****************************************************************************
+ * Private Types (shared by GPT1 and GPT2 capture paths)
+ ****************************************************************************/
+
+/* Lower-half private state for one GPT12 capture channel.
+ * Shared by all paths (CAPIN, T3IN, T2IN, T4IN); priv->gpt1 selects
+ * the hardware path.  GPT2-only and GPT1-only fields are zero otherwise.
+ */
+
+struct tc3x_gpt12_cap_s
+{
+  struct cap_lowerhalf_s  base;
+  volatile uint32_t       freq_hz;      /* Measured frequency in Hz */
+  volatile uint8_t        duty_pct;     /* Duty cycle  */
+  volatile uint32_t       edges;        /* Complete period measurements */
+
+  /* Three-point capture state machine (shared by GPT1 and GPT2 paths) */
+
+  volatile uint8_t        cap_state;    /* CAP_STATE_* */
+  volatile uint16_t       t1;           /* Timestamp at first edge */
+  volatile uint16_t       t2;           /* Timestamp at second edge */
+
+  bool                    running;      /* True between start() and stop() */
+  bool                    gpt1;         /* True = GPT1 path (T2/T4); false = GPT2 (T5) */
+
+  /* GPT2 (T5/CAPREL) specific */
+
+  uint32_t                f_hz;         /* Timer tick frequency in Hz */
+  bool                    ct3;          /* True = T3IN trigger (CT3=1); false = CAPIN */
+  bool                    t1_rising;    /* T3IN only: first edge was rising */
+
+  /* GPT1 (T2/T4 + T3 timebase) specific */
+
+  uint16_t                con_offset;   /* GPT12_T2CON_OFFSET or T4CON_OFFSET */
+  uint16_t                cnt_offset;   /* GPT12_T2_OFFSET    or T4_OFFSET */
+  int                     srn;          /* SRN for this channel capture ISR */
+  uint16_t                pisel_mask;   /* PISEL bits that select the TxIN pin */
+  uint16_t                pisel_val;    /* PISEL value for the configured pin */
+};
+
+/****************************************************************************
  * Private Functions (shared read-only ops)
  ****************************************************************************/
 
@@ -145,46 +185,6 @@ static int gpt12_cap_clk_enable(void)
   cperr("ERROR: GPT120 clock enable timeout\n");
   return -EIO;
 }
-
-/****************************************************************************
- * Private Types (shared by GPT1 and GPT2 capture paths)
- ****************************************************************************/
-
-/* Lower-half private state for one GPT12 capture channel.
- * Shared by all paths (CAPIN, T3IN, T2IN, T4IN); priv->gpt1 selects
- * the hardware path.  GPT2-only and GPT1-only fields are zero otherwise.
- */
-
-struct tc3x_gpt12_cap_s
-{
-  struct cap_lowerhalf_s  base;
-  volatile uint32_t       freq_hz;      /* Measured frequency in Hz */
-  volatile uint8_t        duty_pct;     /* Duty cycle  */
-  volatile uint32_t       edges;        /* Complete period measurements */
-
-  /* Three-point capture state machine (shared by GPT1 and GPT2 paths) */
-
-  volatile uint8_t        cap_state;    /* CAP_STATE_* */
-  volatile uint16_t       t1;           /* Timestamp at first edge */
-  volatile uint16_t       t2;           /* Timestamp at second edge */
-
-  bool                    running;      /* True between start() and stop() */
-  bool                    gpt1;         /* True = GPT1 path (T2/T4); false = GPT2 (T5) */
-
-  /* GPT2 (T5/CAPREL) specific */
-
-  uint32_t                f_hz;         /* Timer tick frequency in Hz */
-  bool                    ct3;          /* True = T3IN trigger (CT3=1); false = CAPIN */
-  bool                    t1_rising;    /* T3IN only: first edge was rising */
-
-  /* GPT1 (T2/T4 + T3 timebase) specific */
-
-  uint16_t                con_offset;   /* GPT12_T2CON_OFFSET or T4CON_OFFSET */
-  uint16_t                cnt_offset;   /* GPT12_T2_OFFSET    or T4_OFFSET */
-  int                     srn;          /* SRN for this channel capture ISR */
-  uint16_t                pisel_mask;   /* PISEL bits that select the TxIN pin */
-  uint16_t                pisel_val;    /* PISEL value for the configured pin */
-};
 
 /****************************************************************************
  * Private Function Prototypes (shared)
