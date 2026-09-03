@@ -172,7 +172,7 @@ SECTIONS
     LONG(pflash5_base);
   } > CODE_MEM
 
-  .psram_base ALIGN(8) (NOLOAD):
+  .psram_base (NOLOAD) : ALIGN(8)
   {
     . += CONFIG_TRICORE_INITIAL_STACK_OFFSET;
      __PSRAM_USTACK = . ;
@@ -190,14 +190,14 @@ SECTIONS
     _ebss = ABSOLUTE(.);
   } > BSS_MEM
 
-  .ustack ALIGN(8) (NOLOAD) :
+  .ustack (NOLOAD) : ALIGN(8)
   {
     . +=  CONFIG_IDLETHREAD_STACKSIZE ;
     __USTACK =  . ;
   } > BSS_MEM
 
 #if defined(CONFIG_ARCH_INTERRUPTSTACK)
-  .istack ALIGN(8) (NOLOAD) :
+  .istack (NOLOAD) :  ALIGN(8)
   {
     . += CONFIG_ARCH_INTERRUPTSTACK;
     __istack =  . ;
