@@ -43,6 +43,25 @@ config DWXGMAC_NUM_TX_DMA_DESCRIPTORS
     int "Number of TX DMA descriptors"
     default 8
 
+config DWXGMAC_NUM_RX_CHANNELS
+    int "Number of RX DMA channels"
+    default 1
+    range 1 8
+    ---help---
+        Number of RX DMA channels to bring up.  Each channel is paired
+        with one MTL RX queue and costs NUM_RX_DMA_DESCRIPTORS
+        descriptors plus one packet buffer per descriptor, all of which
+        must fit in memory reachable by the MAC DMA.
+
+config DWXGMAC_NUM_TX_CHANNELS
+    int "Number of TX DMA channels"
+    default 1
+    range 1 8
+    ---help---
+        Number of TX DMA channels to bring up.  Each channel is paired
+        with one MTL TX queue and costs NUM_TX_DMA_DESCRIPTORS
+        descriptors plus one packet buffer per descriptor.
+
 config DWXGMAC_DMA_IRQ
     int "XGMAC DMA interrupt number"
     default 0
