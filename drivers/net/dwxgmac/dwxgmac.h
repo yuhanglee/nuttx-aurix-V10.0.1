@@ -15,6 +15,7 @@
 #include <nuttx/config.h>
 #include <nuttx/arch.h>
 #include <nuttx/net/netdev.h>
+#include <nuttx/net/netdev_lowerhalf.h>
 #include <stdint.h>
 #include <stdbool.h>
 
@@ -123,18 +124,23 @@ static inline bool eth_dwmac_tdes_error(void *d)
 
 struct eth_dwmac_dma_tx_ch_data
 {
-  sem_t desc_used;
   uint16_t head;
   uint16_t tail;
   mutex_t lock;
+
+  /* Packet in flight on each descriptor, freed on completion. */
+
+  FAR netpkt_t *pkt[CONFIG_DWXGMAC_NUM_TX_DMA_DESCRIPTORS];
 };
 
 struct eth_dwmac_dma_rx_ch_data
 {
-  sem_t desc_used;
   uint16_t head;
   uint16_t tail;
-  uint8_t *data[CONFIG_DWXGMAC_NUM_RX_DMA_DESCRIPTORS];
+
+  /* Packet the DMA writes into for each descriptor. */
+
+  FAR netpkt_t *pkt[CONFIG_DWXGMAC_NUM_RX_DMA_DESCRIPTORS];
 };
 
 struct eth_dwmac_dma_ch_config
@@ -213,7 +219,7 @@ struct eth_xgmac_data
 
 struct xgmac_driver_s
 {
-  struct net_driver_s dev;
+  struct netdev_lowerhalf_s dev;
   bool link_up;
   uintptr_t base;
   uintptr_t dmabase;
@@ -221,11 +227,6 @@ struct xgmac_driver_s
 
   struct eth_xgmac_config *config;
   struct eth_xgmac_data *data;
-
-  struct work_s rxwork;
-  struct work_s pollwork;
-
-  FAR uint8_t *pollbuf;   /* stack TX compose buffer during rx work */
 
   bool ifup;
   bool txcoe;

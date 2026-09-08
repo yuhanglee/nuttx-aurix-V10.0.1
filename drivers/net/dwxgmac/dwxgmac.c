@@ -70,26 +70,29 @@
 #define TX_CH_COUNT  CONFIG_DWXGMAC_NUM_TX_CHANNELS
 #define PKTBUF_SZ  ALIGN_UP(CONFIG_NET_ETH_PKTSIZE, 8)
 
+/* receive() takes a replacement buffer before releasing the one it hands
+ * up, so the RX quota must exceed the ring or every refill fails and the
+ * frame is dropped.
+ */
+
+#define RX_SPARE_BUFS  8
+#define RX_QUOTA  (RX_DMA_DESC_CNT * RX_CH_COUNT + RX_SPARE_BUFS)
+#define TX_QUOTA  (TX_DMA_DESC_CNT * TX_CH_COUNT)
+
+#if CONFIG_IOB_NBUFFERS < RX_QUOTA + TX_QUOTA
+#  error CONFIG_IOB_NBUFFERS is too small for the configured DMA rings
+#endif
+
+#if CONFIG_IOB_BUFSIZE < CONFIG_NET_ETH_PKTSIZE
+#  error CONFIG_IOB_BUFSIZE must hold a full frame for zero-copy RX
+#endif
+
 
 static struct eth_dwmac_dma_desc
   g_rx_descs[ETH_IF_COUNT][RX_CH_COUNT][RX_DMA_DESC_CNT]
   aligned_data(64) DWXGMAC_DMA_SECTION;
 static struct eth_dwmac_dma_desc
   g_tx_descs[ETH_IF_COUNT][TX_CH_COUNT][TX_DMA_DESC_CNT]
-  aligned_data(64) DWXGMAC_DMA_SECTION;
-
-static uint8_t
-  g_rxbuf_pool[ETH_IF_COUNT][RX_CH_COUNT][RX_DMA_DESC_CNT][PKTBUF_SZ]
-  aligned_data(64) DWXGMAC_DMA_SECTION;
-
-static uint8_t
-  g_txbuf_pool[ETH_IF_COUNT][TX_CH_COUNT][TX_DMA_DESC_CNT][PKTBUF_SZ]
-  aligned_data(64) DWXGMAC_DMA_SECTION;
-
-static uint8_t *g_txslot_buf[ETH_IF_COUNT][TX_CH_COUNT][TX_DMA_DESC_CNT];
-
-static uint8_t
-  g_pollbuf[ETH_IF_COUNT][ALIGN_UP(CONFIG_NET_ETH_PKTSIZE + CONFIG_NET_GUARDSIZE, 8)]
   aligned_data(64) DWXGMAC_DMA_SECTION;
 
 static struct eth_dwmac_dma_ch_config g_dma_rx_cfg[ETH_IF_COUNT][RX_CH_COUNT];
@@ -164,7 +167,6 @@ static void xgmac_cfg_init(int intf)
 }
 
 static void xgmac_dma_rx_process(FAR struct xgmac_driver_s *priv, uint8_t ch);
-void xgmac_txavail_work(FAR void *arg);
 
 
 static void dma_tx_data_init(FAR struct xgmac_driver_s *priv, uint8_t ch)
@@ -172,42 +174,27 @@ static void dma_tx_data_init(FAR struct xgmac_driver_s *priv, uint8_t ch)
   struct eth_dwmac_dma_tx_ch_data *d = &priv->data->dwmac.dma_tx[ch];
   int cnt = priv->config->dwmac.dma_tx[ch].descs_count;
 
-  int i;
-
   d->head = 0;
   d->tail = 0;
   nxmutex_init(&d->lock);
-  nxsem_init(&d->desc_used, 0, cnt - 1);
+  memset(d->pkt, 0, sizeof(d->pkt));
   memset(priv->config->dwmac.dma_tx[ch].descs, 0,
          cnt * sizeof(struct eth_dwmac_dma_desc));
-
-  for (i = 0; i < cnt; i++)
-    {
-      g_txslot_buf[xgmac_intf(priv)][ch][i] =
-        g_txbuf_pool[xgmac_intf(priv)][ch][i];
-    }
 }
 
 static void dma_rx_data_init(FAR struct xgmac_driver_s *priv, uint8_t ch)
 {
   struct eth_dwmac_dma_rx_ch_data *d = &priv->data->dwmac.dma_rx[ch];
   int cnt = priv->config->dwmac.dma_rx[ch].descs_count;
-  int i;
 
   d->head = 0;
   d->tail = 0;
-  nxsem_init(&d->desc_used, 0, cnt - 1);
-
-  for (i = 0; i < cnt; i++)
-    {
-      d->data[i] = g_rxbuf_pool[xgmac_intf(priv)][ch][i];
-    }
-
+  memset(d->pkt, 0, sizeof(d->pkt));
   memset(priv->config->dwmac.dma_rx[ch].descs, 0,
          cnt * sizeof(struct eth_dwmac_dma_desc));
 }
 
-static void dma_rx_fill_desc(FAR struct xgmac_driver_s *priv, uint8_t ch)
+static int dma_rx_fill_desc(FAR struct xgmac_driver_s *priv, uint8_t ch)
 {
   const struct eth_dwmac_dma_ch_config *dcfg = &priv->config->dwmac.dma_rx[ch];
   struct eth_dwmac_dma_rx_ch_data *d = &priv->data->dwmac.dma_rx[ch];
@@ -215,14 +202,27 @@ static void dma_rx_fill_desc(FAR struct xgmac_driver_s *priv, uint8_t ch)
 
   for (i = 0; i < (int)dcfg->descs_count; i++)
     {
-      eth_dwmac_rdes_rd_set(&dcfg->descs[i], (uintptr_t)d->data[i]);
+      if (d->pkt[i] == NULL)
+        {
+          d->pkt[i] = netpkt_alloc(&priv->dev, NETPKT_RX);
+          if (d->pkt[i] == NULL)
+            {
+              nerr("RX packet alloc failed, ch%u desc %d\n", ch, i);
+              return -ENOMEM;
+            }
+        }
+
+      eth_dwmac_rdes_rd_set(&dcfg->descs[i],
+                            (uintptr_t)netpkt_getdata(&priv->dev, d->pkt[i]));
     }
 
   d->head = 0;
   d->tail = dcfg->descs_count;
 
   /* Kick DMA by writing tail pointer past last descriptor */
+
   eth_dwmac_dma_rx_set_tail(priv, ch);
+  return OK;
 }
 
 static void mac_init(FAR struct xgmac_driver_s *priv)
@@ -375,70 +375,57 @@ static void set_link_state(FAR struct xgmac_driver_s *priv, bool up)
  */
 
 static uint8_t xgmac_txch_select(FAR struct xgmac_driver_s *priv,
-                                 FAR const uint8_t *buf, uint16_t len)
+                                 FAR netpkt_t *pkt, unsigned int len)
 {
   UNUSED(priv);
-  UNUSED(buf);
+  UNUSED(pkt);
   UNUSED(len);
 
   return 0;
 }
 
-static int xgmac_send(FAR struct xgmac_driver_s *priv,
-                      FAR uint8_t *buf, uint16_t len, bool swap)
+static int dwxgmac_transmit(FAR struct netdev_lowerhalf_s *dev,
+                            FAR netpkt_t *pkt)
 {
+  FAR struct xgmac_driver_s *priv = (FAR struct xgmac_driver_s *)dev;
   struct eth_dwmac_config *cfg = &priv->config->dwmac;
   struct eth_dwmac_dma_tx_ch_data *td;
   struct eth_dwmac_dma_ch_config *dcfg;
   struct eth_xgmac_tdes_rd *tdes;
-  FAR uint8_t *txbuf;
+  unsigned int len;
+  uint16_t next;
   uint8_t ch;
 
-  if (!buf || len == 0 || len > PKTBUF_SZ)
+  len = netpkt_getdatalen(dev, pkt);
+  if (len == 0 || len > PKTBUF_SZ)
     return -EINVAL;
 
-  ch   = xgmac_txch_select(priv, buf, len);
+  ch   = xgmac_txch_select(priv, pkt, len);
   td   = &priv->data->dwmac.dma_tx[ch];
   dcfg = &cfg->dma_tx[ch];
 
   nxmutex_lock(&td->lock);
 
-  if (nxsem_wait_uninterruptible(&td->desc_used) < 0)
+  /* One slot is left unused so a full ring is distinguishable from an
+   * empty one.
+   */
+
+  next = (td->tail + 1) % dcfg->descs_count;
+  if (next == td->head)
     {
       nxmutex_unlock(&td->lock);
-      return -ETIMEDOUT;
-    }
-
-  if (swap)
-    {
-      /* Zero-copy: hand the caller's buffer (d_buf) to the DMA and
-       * give the stack the slot's previous buffer, which the
-       * descriptor-grant guarantees is no longer in flight.
-       */
-
-      txbuf = buf;
-      priv->dev.d_buf = g_txslot_buf[xgmac_intf(priv)][ch][td->tail];
-      g_txslot_buf[xgmac_intf(priv)][ch][td->tail] = buf;
-    }
-  else
-    {
-      /* Copy into the slot-owned buffer so the caller's buffer (an
-       * RX ring buffer carrying an in-place reply) is free for reuse
-       * immediately.
-       */
-
-      txbuf = g_txslot_buf[xgmac_intf(priv)][ch][td->tail];
-      memcpy(txbuf, buf, len);
+      return -ENOSPC;
     }
 
   tdes = (struct eth_xgmac_tdes_rd *)&dcfg->descs[td->tail];
 
-  eth_dwmac_tdes_rd_set_buffer(tdes, txbuf, len);
+  eth_dwmac_tdes_rd_set_buffer(tdes, netpkt_getdata(dev, pkt), len);
   UP_DSB();
   eth_dwmac_tdes_rd_set(tdes, true, true, len, priv->txcoe, false);
   UP_DSB();
 
-  td->tail = (td->tail + 1) % dcfg->descs_count;
+  td->pkt[td->tail] = pkt;
+  td->tail = next;
 
   eth_dwmac_dma_tx_set_tail(priv, ch);
 
@@ -448,149 +435,83 @@ static int xgmac_send(FAR struct xgmac_driver_s *priv,
   return OK;
 }
 
-static int xgmac_txpoll(FAR struct net_driver_s *dev)
+static FAR netpkt_t *dwxgmac_receive(FAR struct netdev_lowerhalf_s *dev)
 {
-  if (dev->d_len > 0)
-    {
-      xgmac_send(dev->d_private, dev->d_buf, dev->d_len, true);
-      dev->d_len = 0;
-    }
-
-   return  0;
-}
-
-static void xgmac_rx_input(FAR struct xgmac_driver_s *priv)
-{
-  struct net_driver_s *dev = &priv->dev;
-  struct eth_hdr_s *eth = (struct eth_hdr_s *)dev->d_buf;
-
-#ifdef CONFIG_NET_IPv4
-  if (eth->type == HTONS(ETHTYPE_IP))
-    {
-      NETDEV_RXIPV4(dev);
-      ipv4_input(dev);
-      if (dev->d_len > 0)
-        {
-          xgmac_send(priv, dev->d_buf, dev->d_len, false);
-          dev->d_len = 0;
-        }
-    }
-  else
-#endif
-#ifdef CONFIG_NET_IPv6
-  if (eth->type == HTONS(ETHTYPE_IP6))
-    {
-      NETDEV_RXIPV6(dev);
-      ipv6_input(dev);
-      if (dev->d_len > 0)
-        {
-          xgmac_send(priv, dev->d_buf, dev->d_len, false);
-          dev->d_len = 0;
-        }
-    }
-  else
-#endif
-#ifdef CONFIG_NET_ARP
-  if (eth->type == HTONS(ETHTYPE_ARP))
-    {
-      NETDEV_RXARP(dev);
-      arp_input(dev);
-      if (dev->d_len > 0)
-        {
-          xgmac_send(priv, dev->d_buf, dev->d_len, false);
-          dev->d_len = 0;
-        }
-    }
-  else
-#endif
-    {
-      NETDEV_RXDROPPED(dev);
-    }
-
-  dev->d_len = 0;
-}
-
-static void xgmac_rx_work(FAR void *arg)
-{
-  FAR struct xgmac_driver_s *priv = arg;
-  struct net_driver_s *dev = &priv->dev;
+  FAR struct xgmac_driver_s *priv = (FAR struct xgmac_driver_s *)dev;
   uint8_t ch;
-
-  net_lock();
-
-  /* d_buf temporarily points at RX ring buffers below; remember the
-   * stack's current TX compose buffer.  An ACK sent from the input
-   * path uses the copy path, but a zero-copy swap can still occur if
-   * the poll path runs from this work item, so reload via priv.
-   */
-
-  priv->pollbuf = dev->d_buf;
 
   for (ch = 0; ch < priv->config->dwmac.dma_rx_channel; ch++)
     {
       const struct eth_dwmac_dma_ch_config *dcfg =
         &priv->config->dwmac.dma_rx[ch];
       struct eth_dwmac_dma_rx_ch_data *d = &priv->data->dwmac.dma_rx[ch];
-      bool processed = false;
 
       for (; ; )
         {
-          void *desc = &dcfg->descs[d->head];
+          FAR void *desc = &dcfg->descs[d->head];
+          FAR netpkt_t *pkt;
+          FAR netpkt_t *fresh;
+          uint16_t pktlen;
+          bool good;
 
           if (eth_dwmac_rdes_own(desc))
             break;
 
-          if (eth_dwmac_rdes_desc_error(desc))
-            {
-              nerr("RX desc error at %d\n", d->head);
-              NETDEV_RXERRORS(dev);
-            }
-          else if (eth_dwmac_rdes_context(desc))
-            {
-              /* ignore context descriptors */
-            }
-          else if (eth_dwmac_rdes_pkt_error(desc))
-            {
-              NETDEV_RXERRORS(dev);
-            }
-          else if (eth_dwmac_rdes_csum_error(desc))
-            {
-              NETDEV_RXERRORS(dev);
-            }
-          else if (eth_dwmac_rdes_last(desc))
-            {
-              uint16_t pktlen = eth_dwmac_rdes_packet_length(desc);
+          good = eth_dwmac_rdes_last(desc) &&
+                 !eth_dwmac_rdes_desc_error(desc) &&
+                 !eth_dwmac_rdes_context(desc) &&
+                 !eth_dwmac_rdes_pkt_error(desc) &&
+                 !eth_dwmac_rdes_csum_error(desc);
 
-              if (pktlen > 0 && pktlen <= CONFIG_NET_ETH_PKTSIZE)
-                {
-                  dev->d_buf = d->data[d->head];
-                  dev->d_len = pktlen;
-                  NETDEV_RXPACKETS(dev);
-                  xgmac_rx_input(priv);
-                }
+          pktlen = eth_dwmac_rdes_packet_length(desc);
+          pkt = d->pkt[d->head];
+
+          /* The slot needs a buffer before the DMA can use it again, so
+           * only hand this packet up if a replacement is available.
+           */
+
+          fresh = netpkt_alloc(dev, NETPKT_RX);
+          if (fresh != NULL)
+            {
+              d->pkt[d->head] = fresh;
+            }
+          else
+            {
+              NETDEV_RXDROPPED(&dev->netdev);
+              pkt = NULL;
             }
 
-          eth_dwmac_rdes_rd_set(desc, (uintptr_t)d->data[d->head]);
+          eth_dwmac_rdes_rd_set(desc,
+            (uintptr_t)netpkt_getdata(dev, d->pkt[d->head]));
+
           d->head = (d->head + 1) % dcfg->descs_count;
-          processed = true;
-        }
-
-      if (processed)
-        {
           d->tail = dcfg->descs_count;
           eth_dwmac_dma_rx_set_tail(priv, ch);
+
+          if (pkt == NULL)
+            {
+              continue;
+            }
+
+          if (!good || pktlen == 0 || pktlen > PKTBUF_SZ)
+            {
+              NETDEV_RXERRORS(&dev->netdev);
+              netpkt_free(dev, pkt, NETPKT_RX);
+              continue;
+            }
+
+          netpkt_setdatalen(dev, pkt, pktlen);
+          return pkt;
         }
     }
 
-  dev->d_buf = priv->pollbuf;
-  dev->d_len = 0;
-  net_unlock();
+  return NULL;
 }
 
 static void xgmac_dma_rx_process(FAR struct xgmac_driver_s *priv, uint8_t ch)
 {
   eth_dwmac_dma_rx_clear_irq(priv, ch);
-  work_queue(ETHWORK, &priv->rxwork, xgmac_rx_work, priv, 0);
+  netdev_lower_rxready(&priv->dev);
 }
 
 static void xgmac_dma_tx_process(FAR struct xgmac_driver_s *priv, uint8_t ch)
@@ -603,7 +524,7 @@ static void xgmac_dma_tx_process(FAR struct xgmac_driver_s *priv, uint8_t ch)
 
   while (td->head != td->tail)
     {
-      void *desc = &dcfg->descs[td->head];
+      FAR void *desc = &dcfg->descs[td->head];
 
       if (eth_dwmac_tdes_own(desc))
         break;
@@ -611,16 +532,21 @@ static void xgmac_dma_tx_process(FAR struct xgmac_driver_s *priv, uint8_t ch)
       if (eth_dwmac_tdes_last(desc) && eth_dwmac_tdes_error(desc))
         {
           nerr("TX DMA error ch%d\n", ch);
-          NETDEV_TXERRORS(&priv->dev);
+          NETDEV_TXERRORS(&priv->dev.netdev);
+        }
+
+      if (td->pkt[td->head] != NULL)
+        {
+          netpkt_free(&priv->dev, td->pkt[td->head], NETPKT_TX);
+          td->pkt[td->head] = NULL;
         }
 
       td->head = (td->head + 1) % dcfg->descs_count;
-      nxsem_post(&td->desc_used);
       freed = true;
     }
 
-  if (freed && priv->ifup && work_available(&priv->pollwork))
-    work_queue(ETHWORK, &priv->pollwork, xgmac_txavail_work, priv, 0);
+  if (freed)
+    netdev_lower_txdone(&priv->dev);
 }
 
 int dwxgmac_mac_isr(int irq, FAR void *context, FAR void *arg)
@@ -681,14 +607,18 @@ int dwxgmac_mac_isr(int irq, FAR void *context, FAR void *arg)
   return OK;
 }
 
-static int dwxgmac_ifup(FAR struct net_driver_s *dev)
+static int dwxgmac_ifup(FAR struct netdev_lowerhalf_s *dev)
 {
-  FAR struct xgmac_driver_s *priv = (FAR struct xgmac_driver_s *)dev->d_private;
+  FAR struct xgmac_driver_s *priv = (FAR struct xgmac_driver_s *)dev;
   uint8_t ch;
+  int ret;
 
   for (ch = 0; ch < priv->config->dwmac.dma_rx_channel; ch++)
     {
-      dma_rx_fill_desc(priv, ch);
+      ret = dma_rx_fill_desc(priv, ch);
+      if (ret < 0)
+        return ret;
+
       eth_dwmac_dma_rx_start(priv, ch);
     }
 
@@ -704,20 +634,21 @@ static int dwxgmac_ifup(FAR struct net_driver_s *dev)
 
   if (priv->link_up)
     {
-      netdev_carrier_on(dev);
+      netdev_lower_carrier_on(dev);
     }
   else
     {
-      netdev_carrier_off(dev);
+      netdev_lower_carrier_off(dev);
     }
 
   return OK;
 }
 
-static int dwxgmac_ifdown(FAR struct net_driver_s *dev)
+static int dwxgmac_ifdown(FAR struct netdev_lowerhalf_s *dev)
 {
-  FAR struct xgmac_driver_s *priv = (FAR struct xgmac_driver_s *)dev->d_private;
+  FAR struct xgmac_driver_s *priv = (FAR struct xgmac_driver_s *)dev;
   uint8_t ch;
+  int i;
 
   if (priv->irq)
     up_disable_irq(priv->irq);
@@ -734,29 +665,42 @@ static int dwxgmac_ifdown(FAR struct net_driver_s *dev)
       eth_dwmac_dma_tx_disable_irq(priv, ch);
     }
 
+  /* Give the buffers held by both rings back to the pool. */
+
+  for (ch = 0; ch < priv->config->dwmac.dma_rx_channel; ch++)
+    {
+      struct eth_dwmac_dma_rx_ch_data *d = &priv->data->dwmac.dma_rx[ch];
+
+      for (i = 0; i < priv->config->dwmac.dma_rx[ch].descs_count; i++)
+        {
+          if (d->pkt[i] != NULL)
+            {
+              netpkt_free(dev, d->pkt[i], NETPKT_RX);
+              d->pkt[i] = NULL;
+            }
+        }
+    }
+
+  for (ch = 0; ch < priv->config->dwmac.dma_tx_channel; ch++)
+    {
+      struct eth_dwmac_dma_tx_ch_data *td = &priv->data->dwmac.dma_tx[ch];
+
+      for (i = 0; i < priv->config->dwmac.dma_tx[ch].descs_count; i++)
+        {
+          if (td->pkt[i] != NULL)
+            {
+              netpkt_free(dev, td->pkt[i], NETPKT_TX);
+              td->pkt[i] = NULL;
+            }
+        }
+
+      td->head = 0;
+      td->tail = 0;
+    }
+
   priv->ifup = false;
   set_link_state(priv, false);
-  netdev_carrier_off(dev);
-
-  return OK;
-}
-
-void xgmac_txavail_work(FAR void *arg)
-{
-  FAR struct xgmac_driver_s *priv = arg;
-
-  net_lock();
-  if (priv->ifup)
-    devif_poll(&priv->dev, xgmac_txpoll);
-  net_unlock();
-}
-
-int dwxgmac_txavail(FAR struct net_driver_s *dev)
-{
-  FAR struct xgmac_driver_s *priv = (FAR struct xgmac_driver_s *)dev->d_private;
-
-  if (work_available(&priv->pollwork))
-    work_queue(ETHWORK, &priv->pollwork, xgmac_txavail_work, priv, 0);
+  netdev_lower_carrier_off(dev);
 
   return OK;
 }
@@ -800,13 +744,21 @@ void dwxgmac_carrier(int intf, bool up)
 
   if (up)
     {
-      netdev_carrier_on(&priv->dev);
+      netdev_lower_carrier_on(&priv->dev);
     }
   else
     {
-      netdev_carrier_off(&priv->dev);
+      netdev_lower_carrier_off(&priv->dev);
     }
 }
+
+static const struct netdev_ops_s g_dwxgmac_ops =
+{
+  .ifup     = dwxgmac_ifup,
+  .ifdown   = dwxgmac_ifdown,
+  .transmit = dwxgmac_transmit,
+  .receive  = dwxgmac_receive,
+};
 
 int xgmac_initialize(int intf)
 {
@@ -833,11 +785,12 @@ int xgmac_initialize(int intf)
 
   priv->link_up = true;
 
-  priv->dev.d_ifup    = dwxgmac_ifup;
-  priv->dev.d_ifdown  = dwxgmac_ifdown;
-  priv->dev.d_txavail = dwxgmac_txavail;
-  priv->dev.d_private = priv;
-  priv->dev.d_buf     = g_pollbuf[intf];
+  priv->dev.ops = &g_dwxgmac_ops;
+
+  /* Cap how many pool buffers the rings may hold at once. */
+
+  priv->dev.quota[NETPKT_TX] = TX_QUOTA;
+  priv->dev.quota[NETPKT_RX] = RX_QUOTA;
 
   for (ch = 0; ch < priv->config->dwmac.dma_tx_channel; ch++)
     dma_tx_data_init(priv, ch);
@@ -875,8 +828,9 @@ int xgmac_initialize(int intf)
   mtl_init(priv);
   mac_init(priv);
 
-  xgmac_generate_mac(priv->dev.d_mac.ether.ether_addr_octet);
-  eth_dwmac_set_mac_addr(priv, 0, priv->dev.d_mac.ether.ether_addr_octet);
+  xgmac_generate_mac(priv->dev.netdev.d_mac.ether.ether_addr_octet);
+  eth_dwmac_set_mac_addr(priv, 0,
+                         priv->dev.netdev.d_mac.ether.ether_addr_octet);
 
   if (priv->irq)
     {
@@ -885,7 +839,7 @@ int xgmac_initialize(int intf)
         return ret;
     }
 
-  ret = netdev_register(&priv->dev, NET_LL_ETHERNET);
+  ret = netdev_lower_register(&priv->dev, NET_LL_ETHERNET);
   if (ret < 0)
     {
       if (priv->irq)
@@ -895,12 +849,12 @@ int xgmac_initialize(int intf)
     }
 
   printf("XGMAC%d initialized, MAC %02x:%02x:%02x:%02x:%02x:%02x\n", intf,
-        priv->dev.d_mac.ether.ether_addr_octet[0],
-        priv->dev.d_mac.ether.ether_addr_octet[1],
-        priv->dev.d_mac.ether.ether_addr_octet[2],
-        priv->dev.d_mac.ether.ether_addr_octet[3],
-        priv->dev.d_mac.ether.ether_addr_octet[4],
-        priv->dev.d_mac.ether.ether_addr_octet[5]);
+        priv->dev.netdev.d_mac.ether.ether_addr_octet[0],
+        priv->dev.netdev.d_mac.ether.ether_addr_octet[1],
+        priv->dev.netdev.d_mac.ether.ether_addr_octet[2],
+        priv->dev.netdev.d_mac.ether.ether_addr_octet[3],
+        priv->dev.netdev.d_mac.ether.ether_addr_octet[4],
+        priv->dev.netdev.d_mac.ether.ether_addr_octet[5]);
 
   return OK;
 }

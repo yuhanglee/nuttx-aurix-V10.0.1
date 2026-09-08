@@ -32,7 +32,7 @@ CONFIG_TRICORE_INITIAL_STACK_SIZE = 512;
 CONFIG_TRICORE_INITIAL_STACK_OFFSET = 0xEB00;
 
 #if defined(CONFIG_ARCH_CHIP_FAMILY_TC4X)
-__HEAP_SIZE = (384 * 1024);   /* dlmu less the 128K DMA window */
+__HEAP_SIZE = (256 * 1024);   /* dlmu less the 256K DMA window */
 #else
 __HEAP_SIZE = (64 * 1024);
 #endif
@@ -47,8 +47,8 @@ MEMORY
    * stay coherent without cache maintenance.
    */
 
-  dlmu   (rw): ORIGIN = 0x90000000, LENGTH = 384K
-  dma_nc (rw): ORIGIN = 0xB0060000, LENGTH = 128K
+  dlmu   (rw): ORIGIN = 0x90000000, LENGTH = 256K
+  dma_nc (rw): ORIGIN = 0xB0040000, LENGTH = 256K
 #else
   dlmu   (rw): ORIGIN = 0x90000000, LENGTH = 96K
 #endif
