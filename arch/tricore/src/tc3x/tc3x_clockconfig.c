@@ -149,6 +149,7 @@ static void tc3x_perpll_init(void)
   uint32_t con1 = REGADDR(TC3X_CLOCK_PERPLLCON1_OFFSET);
   uint32_t stat = REGADDR(TC3X_CLOCK_PERPLLSTAT_OFFSET);
   uint32_t val;
+  unsigned int i;
 
   val  = 0;
   if (TC3X_PERPLL_DIVBY)
@@ -169,6 +170,15 @@ static void tc3x_perpll_init(void)
   putreg32(val, con0);
   aurix_safety_endinit_enable(true);
 
+  /* Wait for LOCK before writing K3DIV: it only latches while K3RDY=1 (UM ch.10
+   * Note 3); the old code wrote it pre-lock (K3RDY=0) so the divide-by-2 was
+   * gated out and fASCLINF stayed at its 400 MHz reset default.
+   */
+  while (!(getreg32(stat) & TC3X_PERPLLSTAT_LOCK))
+    {
+      tc3x_busywait(10);
+    }
+
   val  = 0;
   val |= FIELD_PREP(TC3X_PERPLLCON1_K2DIV_MASK,
                     TC3X_PERPLLCON1_K2DIV_SHIFT,
@@ -177,12 +187,28 @@ static void tc3x_perpll_init(void)
                     TC3X_PERPLLCON1_K3DIV_SHIFT,
                     TC3X_PERPLL_K3DIV - 1u);
 
+  /* Bounded K3RDY handshake — erratum PER_PLL_TC.002 can leave K3RDY stuck 0. */
+  for (i = 0; i < TC3X_PERPLL_KRDY_TIMEOUT; i++)
+    {
+      if (getreg32(stat) & TC3X_PERPLLSTAT_K3RDY)
+        {
+          break;
+        }
+
+      tc3x_busywait(10);
+    }
+
   aurix_safety_endinit_enable(false);
   putreg32(val, con1);
   aurix_safety_endinit_enable(true);
 
-  while (!(getreg32(stat) & TC3X_PERPLLSTAT_LOCK))
+  for (i = 0; i < TC3X_PERPLL_KRDY_TIMEOUT; i++)
     {
+      if (getreg32(stat) & TC3X_PERPLLSTAT_K3RDY)
+        {
+          break;
+        }
+
       tc3x_busywait(10);
     }
 }

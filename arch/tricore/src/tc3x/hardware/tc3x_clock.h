@@ -281,6 +281,9 @@ enum tc3x_extclk0_sel
 #define TC3X_PERPLL_K3DIV       2u
 #define TC3X_PERPLL_DIVBY       0u
 
+/* Bounded PERPLL KxRDY poll count — erratum PER_PLL_TC.002 can leave K3RDY at 0. */
+#define TC3X_PERPLL_KRDY_TIMEOUT 1000u
+
 /* PLL1DIVDIS: 0 -> fsource1 = fPLL1/2 = 160 MHz */
 
 #define TC3X_PLL1DIVDIS         0u

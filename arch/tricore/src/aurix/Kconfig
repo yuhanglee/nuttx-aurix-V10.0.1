@@ -79,7 +79,7 @@ endif
 config TRICORE_ASCLINF_FREQUENCY
 	int "ASCLIN fASCLIN clock frequency (Hz)"
 	default 200000000 if ARCH_CHIP_FAMILY_TC4X
-	default 100000000 if ARCH_CHIP_FAMILY_TC3X
+	default 200000000 if ARCH_CHIP_FAMILY_TC3X
 	depends on TRICORE_UART0 || TRICORE_UART1
 	---help---
 		ASCLIN baud generator source clock (fASCLIN), in Hz.
