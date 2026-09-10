@@ -1,0 +1,92 @@
+#
+# For a description of the syntax of this configuration file,
+# see the file kconfig-language.txt in the NuttX tools repository.
+#
+menuconfig NET_DWXGMAC
+	bool "Synopsys Design Ware XGMAC support"
+	default n
+	---help---
+		Enable designware xgmac Ethernet driver.
+
+if NET_DWXGMAC
+
+config DWXGMAC_NETHERNET
+    int "Number of XGMAC Ethernet interfaces"
+    default 1
+
+config DWXGMAC_BASE
+    hex "XGMAC MAC base address"
+    default 0xf9010000
+
+config DWXGMAC_MAC_STRIDE
+    hex "Address stride between per-port MAC cores"
+    default 0x0
+    ---help---
+        Distance between the MAC core of one Ethernet port and the next.
+        Interface i uses DWXGMAC_BASE + i * this value.  Only needed when
+        more than one interface is enabled (0x2000 on the Infineon GETH).
+
+config DWXGMAC_DMA_OFFSET
+    hex "Offset from the MAC base to the DMA register block"
+    default 0x0
+    ---help---
+        On most parts the DWC Ethernet DMA registers are contiguous with the
+        MAC core (offset 0).  The Infineon LETH wrapper places the shared DMA
+        block far from the per-port MAC core, so this offset is added to the
+        MAC base to reach the DMA registers (0xE000 for LETH).
+
+config DWXGMAC_NUM_RX_DMA_DESCRIPTORS
+    int "Number of RX DMA descriptors"
+    default 8
+
+config DWXGMAC_NUM_TX_DMA_DESCRIPTORS
+    int "Number of TX DMA descriptors"
+    default 8
+
+config DWXGMAC_DMA_IRQ
+    int "XGMAC DMA interrupt number"
+    default 0
+
+config NET_DWXGMAC_MDIO
+	bool "XGMAC MDIO driver"
+	default n
+	---help---
+		Enable MDIO bus for designware xgmac Ethernet driver.
+
+config DWXGMAC_QOS
+	bool "XGMAC based on QOS driver"
+	default n
+	---help---
+		Enable QOS version of designware xgmac Ethernet driver.
+
+config DWXGMAC_LINK_SPEED
+	int "Fixed MAC link speed in Mbps (10/100/1000)"
+	default 1000
+	---help---
+		Speed programmed into the MAC at link-up (full duplex).
+		Must match what the PHY negotiates: 10, 100 or 1000.
+
+config NET_DWXGMAC_MAC_LOOPBACK
+	bool "Enable MAC-internal loopback (debug only)"
+	default n
+	---help---
+		Sets the MAC loopback bit (MAC_RX_CONFIGURATION.LM on XGMAC,
+		MAC_CONFIGURATION.LM on QOS) so the MAC loops every transmitted
+		frame back into its own receive path, bypassing the MII/RMII
+		PHY pads.  Use this only to isolate MAC vs. PHY/board issues.
+
+config NET_DWXGMAC_DMA_SECTION_USE
+	bool "Place DMA descriptors and RX buffers in a custom linker section"
+	default n
+
+config NET_DWXGMAC_DMA_SECTION
+	string "Linker section for DMA descriptors and RX buffers"
+	depends on NET_DWXGMAC_DMA_SECTION_USE
+	---help---
+		If non-empty, place the DMA descriptors and RX buffer pool
+		into the named linker section.  Required on systems where the
+		Ethernet DMA peripheral cannot access the default .bss memory
+		(for example AURIX TriCore, where .bss lives in CPU-local DSPR
+		but the GETH DMA only reaches LMU/system RAM).
+
+endif #NET_DWXGMAC
