@@ -54,3 +54,7 @@ endif()
 if(CONFIG_ARCH_BUTTONS)
   target_sources(board PRIVATE tc4d7_buttons.c)
 endif()
+
+if(CONFIG_TC4X_GETH)
+  list(APPEND SRCS tc4d7_ethernet.c)
+endif()

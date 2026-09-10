@@ -50,4 +50,8 @@ ifeq ($(CONFIG_ARCH_BUTTONS),y)
 CSRCS += tc4d7_buttons.c
 endif
 
+ifeq ($(CONFIG_TC4X_GETH),y)
+CSRCS += tc4d7_ethernet.c
+endif
+
 include $(TOPDIR)/boards/Board.mk

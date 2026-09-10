@@ -276,6 +276,10 @@ int aurix_smu_register(const char *path,
 
 
 
+#ifdef CONFIG_TC4X_GETH
+int tc4d7_ethernet_initialize(void);
+#endif
+
 /****************************************************************************
  * Public Functions
  ****************************************************************************/
@@ -522,5 +526,9 @@ void board_late_initialize(void)
         _err("ERROR: aurix_smu_register smu1 failed: %d\n", ret);
       }
   }
+#endif
+
+#ifdef CONFIG_TC4X_GETH
+  tc4d7_ethernet_initialize();
 #endif
 }
