@@ -39,6 +39,13 @@
 #  include <nuttx/input/buttons.h>
 #endif
 
+#ifdef CONFIG_TRICORE_FLASH_MTD
+#  include <nuttx/mtd/mtd.h>
+#  include <nuttx/fs/fs.h>
+
+struct mtd_dev_s *tricore_flash_initialize(void);
+#endif
+
 #ifdef CONFIG_TC3X_WDT
 int tc3x_wdt_initialize(const char *devpath, int wdtid);
 #endif
@@ -103,6 +110,17 @@ void board_late_initialize(void)
 
 #ifdef CONFIG_TC3X_WDT
   tc3x_wdt_initialize("/dev/watchdog0", 0);
+#endif
+
+#ifdef CONFIG_TRICORE_FLASH_MTD
+  {
+    struct mtd_dev_s *mtd = tricore_flash_initialize();
+
+    if (mtd != NULL)
+      {
+        register_mtddriver("/dev/dflash0", mtd, 0666, NULL);
+      }
+  }
 #endif
 
 #ifdef CONFIG_TC3X_I2C0
