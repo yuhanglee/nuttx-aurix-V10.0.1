@@ -32,6 +32,10 @@
 #  include "tc375_i2c.h"
 #endif
 
+#ifdef CONFIG_TC3X_WDT
+int tc3x_wdt_initialize(const char *devpath, int wdtid);
+#endif
+
 /****************************************************************************
  * Public Functions
  ****************************************************************************/
@@ -73,5 +77,9 @@ void board_late_initialize(void)
 {
 #ifdef CONFIG_TC3X_I2C0
   tc375_i2c_bringup();
+#endif
+
+#ifdef CONFIG_TC3X_WDT
+  tc3x_wdt_initialize("/dev/watchdog0", 0);
 #endif
 }
