@@ -61,4 +61,11 @@ if(CONFIG_TC4X_I2S)
   list(APPEND SRCS tc4x_i2s.c)
 endif()
 
+if(CONFIG_TC4X_GETH)
+  list(APPEND SRCS tc4x_geth.c)
+  if(CONFIG_TRICORE_GETH_IF_SGMII)
+    list(APPEND SRCS tc4x_xpcs.c)
+  endif()
+endif()
+
 target_sources(arch PRIVATE ${SRCS})
