@@ -113,7 +113,7 @@ static void tc4x_syspll_init(void)
   stat = REGADDR(TC4X_CLOCK_SYSPLLSTAT_OFFSET);
 
   val = getreg32(con0);
-  val = ~TC4X_SYSPLLCON0_PLLPWR;
+  val &= ~TC4X_SYSPLLCON0_PLLPWR;
 
   tc4x_ccu_wait_unlocked();
   putreg32(val, con0);
@@ -180,7 +180,7 @@ static void tc4x_perpll_init(void)
   stat = REGADDR(TC4X_CLOCK_PERPLLSTAT_OFFSET);
 
   val = getreg32(con0);
-  val = ~TC4X_PERPLLCON0_PLLPWR;
+  val &= ~TC4X_PERPLLCON0_PLLPWR;
 
   tc4x_ccu_wait_unlocked();
   putreg32(val, con0);
