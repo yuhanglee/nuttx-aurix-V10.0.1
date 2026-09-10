@@ -108,6 +108,13 @@ void board_late_initialize(void)
   }
 #endif
 
+#ifdef CONFIG_DEV_GPIO
+  /* LED1 on P00.5 is active-low; init HIGH = LED off. Exposed as /dev/gpio0. */
+
+  aurix_gpio_lower_register(AURIX_GPIO(0, 5, GPIO_OUTPUT, GPIO_ALT0) |
+                            GPIO_OUTPUT_HIGH, 0);
+#endif
+
 #ifdef CONFIG_TC3X_WDT
   tc3x_wdt_initialize("/dev/watchdog0", 0);
 #endif
