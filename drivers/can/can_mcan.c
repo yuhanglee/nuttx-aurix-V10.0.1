@@ -23,6 +23,7 @@
 #include <nuttx/config.h>
 
 #include <stdint.h>
+#include <inttypes.h>
 #include <stddef.h>
 #include <stdbool.h>
 #include <errno.h>
@@ -65,7 +66,6 @@ static int can_mcan_search_bt(uint32_t fck, uint32_t bitrate,
                               const struct mcan_bt_limits_s *lim,
                               struct can_timing_s *timing)
 {
-  uint32_t best_err = UINT32_MAX;
   uint32_t best_prescaler = 0;
   uint32_t best_bits = 0;
   uint32_t prescaler;
@@ -129,7 +129,6 @@ static int can_mcan_search_bt(uint32_t fck, uint32_t bitrate,
           best_score     = score;
           best_prescaler = prescaler;
           best_bits      = bits;
-          best_err       = err_bitrate;
         }
     }
 
@@ -575,7 +574,7 @@ int can_mcan_set_mode(struct can_mcan_priv_s *priv, can_mode_t mode)
 
   if ((mode & ~supported) != 0u)
     {
-      canerr("unsupported mode: 0x%08x", mode);
+      canerr("unsupported mode: 0x%08" PRIx32, mode);
       return -ENOTSUP;
     }
 
@@ -993,7 +992,7 @@ int can_mcan_send(struct can_mcan_priv_s *priv,
   uint32_t reg;
   int err;
 
-  caninfo("Sending %zu bytes. Id: 0x%x, IDE: %d RTR: %d FDF: %d BRS: %d",
+  caninfo("Sending %zu bytes. Id: 0x%" PRIx32 ", IDE: %d RTR: %d FDF: %d BRS: %d",
           data_length, frame->id,
           (frame->flags & CAN_FRAME_IDE) != 0u,
           (frame->flags & CAN_FRAME_RTR) != 0u,
@@ -1584,14 +1583,16 @@ static void can_mcan_get_message(struct can_mcan_priv_s *priv,
 
           if ((frame.flags & CAN_FRAME_IDE) != 0)
             {
-              caninfo("Frame on ext filter %d, ID: 0x%x", filt_idx, frame.id);
+              caninfo("Frame on ext filter %" PRId32 ", ID: 0x%" PRIx32,
+                      filt_idx, frame.id);
               DEBUGASSERT(filt_idx < cbs->num_ext);
               cb        = cbs->ext[filt_idx].function;
               user_data = cbs->ext[filt_idx].user_data;
             }
           else
             {
-              caninfo("Frame on std filter %d, ID: 0x%x", filt_idx, frame.id);
+              caninfo("Frame on std filter %" PRId32 ", ID: 0x%" PRIx32,
+                      filt_idx, frame.id);
               DEBUGASSERT(filt_idx < cbs->num_std);
               cb        = cbs->std[filt_idx].function;
               user_data = cbs->std[filt_idx].user_data;
@@ -1694,12 +1695,12 @@ void can_mcan_line_1_isr(struct can_mcan_priv_s *priv)
 
   if ((ir & CAN_MCAN_IR_PEA) != 0u)
     {
-      caninfo("Protocol error arbitration phase: ir=0x%x", ir);
+      caninfo("Protocol error arbitration phase: ir=0x%" PRIx32, ir);
     }
 
   if ((ir & CAN_MCAN_IR_PED) != 0u)
     {
-      caninfo("Protocol error data phase: ir=0x%x", ir);
+      caninfo("Protocol error data phase: ir=0x%" PRIx32, ir);
     }
 
   while ((ir & events) != 0u)
