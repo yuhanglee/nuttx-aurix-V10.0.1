@@ -39,6 +39,10 @@ if(CONFIG_USERLED)
   target_sources(board PRIVATE tc375_userleds.c)
 endif()
 
+if(CONFIG_TC3X_QSPI)
+  target_sources(board PRIVATE tc375_qspi.c)
+endif()
+
 if(CONFIG_TC3X_I2C)
   target_sources(board PRIVATE tc375_i2c.c)
 endif()

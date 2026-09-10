@@ -31,6 +31,10 @@ ifeq ($(CONFIG_USERLED),y)
 CSRCS += tc375_userleds.c
 endif
 
+ifeq ($(CONFIG_TC3X_QSPI),y)
+CSRCS += tc375_qspi.c
+endif
+
 ifeq ($(CONFIG_TC3X_I2C),y)
 CSRCS += tc375_i2c.c
 endif

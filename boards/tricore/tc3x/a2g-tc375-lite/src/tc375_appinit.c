@@ -50,6 +50,10 @@ struct mtd_dev_s *tricore_flash_initialize(void);
 int tc3x_wdt_initialize(const char *devpath, int wdtid);
 #endif
 
+#ifdef CONFIG_TC3X_QSPI3
+int tc375_qspi_initialize(void);
+#endif
+
 #ifdef CONFIG_TC3X_I2C
 #  include "tc375_i2c.h"
 #endif
@@ -128,6 +132,10 @@ void board_late_initialize(void)
         register_mtddriver("/dev/dflash0", mtd, 0666, NULL);
       }
   }
+#endif
+
+#ifdef CONFIG_TC3X_QSPI3
+  tc375_qspi_initialize();
 #endif
 
 #ifdef CONFIG_TC3X_I2C0
