@@ -28,6 +28,10 @@ ifeq ($(CONFIG_DEV_GPIO),y)
 CMN_CSRCS += tricore_gpio_lower.c
 endif
 
+ifeq ($(CONFIG_TRICORE_DMA),y)
+CHIP_CSRCS += tricore_dma.c
+endif
+
 ifeq ($(CONFIG_I2C),y)
 CMN_CSRCS += tricore_i2c.c
 endif

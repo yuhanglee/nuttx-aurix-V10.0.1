@@ -147,3 +147,58 @@ config TRICORE_FLASH_MTD
 		TC4X: sector erase, page program and read.
 
 endmenu
+
+# DMA
+menuconfig TRICORE_DMA
+	bool "Aurix SDMA controller driver"
+	default n
+	select DMA
+	---help---
+		Enable the Infineon Aurix SDMA controller (TC3xx/TC4xx), exposed
+		through the generic NuttX DMA framework (include/nuttx/dma/dma.h).
+		Consumers acquire a channel with DMA_GET_CHAN() and drive it via
+		DMA_CONFIG()/DMA_START().  Supports memory-to-memory, single
+		peripheral copy, and cyclic double-buffer transfers.
+
+if TRICORE_DMA
+
+config TRICORE_DMA_NCHANNELS
+	int "Number of DMA channels exposed"
+	default 8
+	range 1 128
+	---help---
+		How many of the 128 hardware DMA channels are made available
+		through the framework.  Channels are addressed by their absolute
+		hardware number (0..N-1), so this must be larger than the highest
+		channel number any consumer uses.
+
+config TRICORE_DMA_IRQ_BASE
+	int "DMA channel-0 transaction-end IRQ (SRN) number"
+	default 460 if ARCH_CHIP_FAMILY_TC4X
+	default 220 if ARCH_CHIP_FAMILY_TC3X
+	default 0
+	---help---
+		Interrupt-router service-request-node index of DMA channel 0's
+		transaction-end interrupt.  Channel c uses IRQ_BASE + c.  This is a
+		fixed property of the interrupt-router connection table (TC37x/TC39x
+		dma0 channel-0 = SRN 220; TC4xx dma0 channel-0 = SRN 460).  The driver
+		is interrupt-driven and reports completion from this node; it must be
+		non-zero (a build with IRQ_BASE = 0 is rejected at compile time).
+
+config TRICORE_DMA_ERR_IRQ_BASE
+	int "DMA error IRQ (SRN) number (0 = disabled)"
+	default 440 if ARCH_CHIP_FAMILY_TC4X
+	default 208 if ARCH_CHIP_FAMILY_TC3X
+	default 0
+	---help---
+		Interrupt-router SRN of the DMA controller's error interrupt.  The
+		handler reads ERRSR.LEC to find the faulting channel and reports the
+		error to that channel's DMA callback with a negative errno.
+
+		TC4Dx reports errors per resource partition (RP0 error = SRN 440);
+		all exposed channels are assigned to RP0, so that single node covers
+		them.  TC37x/TC39x reports errors per move engine (ME0/ME1); its RP0
+		error node is SRN 208, and the handler scans both ME error-status
+		registers.  Set to 0 to disable DMA error-interrupt handling.
+
+endif # TRICORE_DMA

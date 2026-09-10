@@ -56,6 +56,39 @@ static inline void tricore_srcr_write(int irq, uint32_t val)
   putreg32(val, TRICORE_IR_GET_SRC(irq));
 }
 
+/****************************************************************************
+ * Name: tricore_route_irq_to_dma
+ *
+ * Description:
+ *   Route a peripheral service request to the DMA instead of a CPU.  The SRC
+ *   TOS field selects the DMA0 service provider and SRPN selects the DMA
+ *   channel that the request triggers.  Used to drive a DMA channel from a
+ *   peripheral (e.g. the ASCLIN TX/RX FIFO) rather than raising a CPU
+ *   interrupt.  'channel' is the DMA channel the request will trigger.
+ *
+ ****************************************************************************/
+
+void tricore_route_irq_to_dma(int irq, unsigned int channel)
+{
+  uint32_t regval = tricore_srcr_read(irq);
+
+  regval |= SRCR_CLRR | SRCR_IOVCLR;
+#if defined(CONFIG_ARCH_CHIP_FAMILY_TC3X)
+  regval |= SRCR_SWSCLR;
+#endif
+
+  regval &= ~(SRCR_TOS_MASK | SRCR_SRPN_MASK);
+#if defined(CONFIG_ARCH_CHIP_FAMILY_TC4X)
+  regval |= (0x7u << SRCR_TOS_SHIFT) & SRCR_TOS_MASK;   /* DMA0 service prov. */
+#else
+  regval |= (0x1u << SRCR_TOS_SHIFT) & SRCR_TOS_MASK;   /* DMA service prov.  */
+#endif
+  regval |= ((uint32_t)channel << SRCR_SRPN_SHIFT) & SRCR_SRPN_MASK;
+  regval |= SRCR_SRE;
+
+  tricore_srcr_write(irq, regval);
+}
+
 void up_irq_enable(void)
 {
   TRICORE_IRQ_ENABLE();
