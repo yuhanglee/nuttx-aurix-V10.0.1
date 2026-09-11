@@ -301,6 +301,7 @@ menuconfig NET_VLAN
 	bool "VLAN support"
 	default n
 	depends on NET_ETHERNET
+	select NETDEV_IOCTL
 	---help---
 		Enable support for VLANs (Virtual Local Area Networks) on Ethernet
 		devices.
