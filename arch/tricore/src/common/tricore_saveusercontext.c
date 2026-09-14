@@ -51,10 +51,26 @@
 int up_saveusercontext(void *saveregs)
 {
   uintptr_t *regs;
-  uint32_t val;
+  uintptr_t  pcxi;
+  uintptr_t  lpcxi;
+  int csa_size = TC_CONTEXT_REGS * sizeof(uintptr_t);
 
-  TRICORE_MFCR(TRICORE_CPU_FCX, val);
-  regs = tricore_csa2addr(val);
-  memcpy(saveregs, regs, XCPTCONTEXT_SIZE);
+  TRICORE_MFCR(TRICORE_CPU_PCXI, pcxi);
+  regs = tricore_csa2addr(pcxi);
+  memcpy((char *)saveregs + csa_size, regs, csa_size);
+
+  __asm__ __volatile__("svlcx" ::: "memory");
+
+  TRICORE_MFCR(TRICORE_CPU_PCXI, lpcxi);
+  regs = tricore_csa2addr(lpcxi);
+  memcpy(saveregs, regs, csa_size);
+
+  /* Lower CSA link normally points to the upper CSA; here both halves sit
+   * contiguously in the buffer, so repurpose it to carry the upper PCXI.
+   */
+
+  ((uintptr_t *)saveregs)[REG_LPCXI] = pcxi & (~PCXI_UL);
+
+  __asm__ __volatile__("rslcx" ::: "memory");
   return 0;
 }
