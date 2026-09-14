@@ -61,6 +61,10 @@
 
 /* FPU registers */
 
+#define CPU_FPU_TRAP_CON     0xa000  /* CSFR no. for mfcr/mtcr */
+
+#define CPU_FPU_SYNC_TRAP_CON 0xa030
+
 #ifdef CONFIG_ARCH_TC1V6
 #  define FPU_SYNC_TRAP_REG  CPU_FPU_TRAP_CON
 #  define FPU_ASYNC_TRAP_REG CPU_FPU_TRAP_CON

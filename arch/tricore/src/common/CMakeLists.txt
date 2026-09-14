@@ -54,6 +54,10 @@ if(CONFIG_SPINLOCK)
   list(APPEND SRCS tricore_testset.c)
 endif()
 
+if(CONFIG_ARCH_HAVE_FPU)
+  list(APPEND SRCS tricore_fpu.c)
+endif()
+
 target_sources(arch PRIVATE ${SRCS})
 target_sources(nuttx PRIVATE tricore_doirq.c tricore_head.S)
 target_include_directories(

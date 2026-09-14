@@ -28,7 +28,7 @@
 
 #include <string.h>
 
-#include "tricore_internal.h"
+#include <arch/irq.h>
 
 /****************************************************************************
  * Public Functions
@@ -40,10 +40,12 @@
 
 void tricore_fpuinit(void)
 {
+  uint32_t con;
+
   /* FPU zero-divide trap enable */
 
-  __mtcr(FPU_SYNC_TRAP_REG,
-         __mfcr(FPU_SYNC_TRAP_REG) | (1U << FPU_TRAP_FZE_SHIFT));
+  TRICORE_MFCR(FPU_SYNC_TRAP_REG, con);
+  TRICORE_MTCR(FPU_SYNC_TRAP_REG, con | (1U << FPU_TRAP_FZE_SHIFT));
 }
 
 /****************************************************************************

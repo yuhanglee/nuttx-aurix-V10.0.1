@@ -161,6 +161,10 @@ void tricore_safety_endinit_enable(void);
 void tricore_wdt_disable(void);
 void up_clockconfig(void);
 
+#ifdef CONFIG_ARCH_HAVE_FPU
+void tricore_fpuinit(void);
+#endif
+
 #if defined(CONFIG_ARCH_CHIP_FAMILY_TC3X)
 void aurix_cpu_endinit_enable(bool enable);
 void aurix_safety_endinit_enable(bool enable);

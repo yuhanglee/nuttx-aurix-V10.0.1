@@ -29,6 +29,7 @@ config ARCH_CHIP_FAMILY_TC3X
 	select ARCH_HAVE_RESET
 	select ARCH_HAVE_TESTSET
 	select ARCH_SETJMP_H
+	select ARCH_HAVE_FPU
 	---help---
 		AURIX TC3X family (TriCore 1.6.2P).
 
@@ -43,6 +44,7 @@ config ARCH_CHIP_FAMILY_TC4X
 	select ARCH_HAVE_RESET
 	select ARCH_HAVE_TESTSET
 	select ARCH_SETJMP_H
+	select ARCH_HAVE_FPU
 	---help---
 		AURIX TC4X family (TriCore 1.8P).
 
