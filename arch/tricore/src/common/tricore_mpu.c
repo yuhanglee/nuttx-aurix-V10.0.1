@@ -1386,38 +1386,6 @@ unsigned int mpu_get_active_set(void)
 }
 
 /****************************************************************************
- * Name: mpu_set_active_set
- *
- * Description:
- *   Set active protection set
- *
- * Input Parameters:
- *   Protection set .
- *
- * Returned Value:
- *   None.
- *
- ****************************************************************************/
-
-void mpu_set_active_set(unsigned int set)
-{
-  /* Check that the set valid */
-
-  DEBUGASSERT(set < CONFIG_ARCH_MPU_NSETS);
-
-  uint32_t psw_value;
-
-  TRICORE_MFCR(CPU_PSW, psw_value);
-
-  psw_value &= ~((0x3 << 12) | (0x1 << 15));
-  psw_value |= (set >> 2) << 15;
-  psw_value |= (set & 0x03) << 12;
-  TRICORE_MTCR(CPU_PSW, psw_value);
-
-  UP_ISB();
-}
-
-/****************************************************************************
  * Name: mpu_initialize
  *
  * Description:
