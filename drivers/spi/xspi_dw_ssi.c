@@ -317,7 +317,7 @@ static int dw_ssi_poll(FAR struct xspi_dw_ssi_s *priv, unsigned int offset,
 
   while ((dw_ssi_read(priv, offset) & mask) != want)
     {
-      if ((sclock_t)(clock_systime_ticks() - deadline) >= 0)
+      if (clock_systime_ticks() >= deadline)
         {
           return -ETIMEDOUT;
         }

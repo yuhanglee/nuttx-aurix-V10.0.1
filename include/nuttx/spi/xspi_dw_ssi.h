@@ -71,6 +71,12 @@ FAR struct xspi_dev_s *
 xspi_dw_ssi_initialize(FAR struct xspi_dw_ssi_s *priv,
                        FAR const struct xspi_dw_ssi_config_s *cfg);
 
+/* Register accessors provided by the SoC xSPI glue (e.g. tc4x_xspi.c). */
+
+uint32_t xspi_read(uintptr_t reg);
+void xspi_write(uint32_t value, uintptr_t reg);
+void xspi_modreg(uint32_t value, uint32_t mask, uintptr_t reg);
+
 #ifdef __cplusplus
 }
 #endif
