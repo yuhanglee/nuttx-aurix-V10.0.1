@@ -45,7 +45,24 @@
 #define REGADDR(off)   (TC3X_SCU_BASE + (off))
 
 /****************************************************************************
- * Public Functions
+ * Private Function Prototypes
+ ****************************************************************************/
+
+static void tc3x_clock_fail(uint8_t step) noinline_function
+                                          noreturn_function;
+
+/****************************************************************************
+ * Private Data
+ ****************************************************************************/
+
+/* Stage that failed; read it over the debugger when parked in
+ * tc3x_clock_fail(), since the console is not up yet.
+ */
+
+static volatile uint8_t g_clock_failstep;
+
+/****************************************************************************
+ * Private Functions
  ****************************************************************************/
 
 static inline void tc3x_busywait(unsigned int loops)
@@ -57,20 +74,45 @@ static inline void tc3x_busywait(unsigned int loops)
     }
 }
 
+static void tc3x_clock_fail(uint8_t step)
+{
+  g_clock_failstep = step;
+
+  for (; ; )
+    {
+    }
+}
+
+static void tc3x_wait(uint32_t offset, uint32_t mask, uint32_t want,
+                      uint32_t count, uint8_t step)
+{
+  while ((getreg32(REGADDR(offset)) & mask) != want)
+    {
+      if (--count == 0)
+        {
+          tc3x_clock_fail(step);
+        }
+    }
+}
+
+static void tc3x_scu_modify(uint32_t offset, uint32_t clear, uint32_t set)
+{
+  uint32_t addr = REGADDR(offset);
+
+  aurix_safety_endinit_enable(false);
+  putreg32((getreg32(addr) & ~clear) | set, addr);
+  aurix_safety_endinit_enable(true);
+}
+
 static inline void tc3x_ccucon0_wait_unlocked(void)
 {
-  while (getreg32(REGADDR(TC3X_CLOCK_CCUCON0_OFFSET)) & TC3X_CCUCON0_LCK)
-    {
-      __asm__ __volatile__("nop");
-    }
+  tc3x_wait(TC3X_CLOCK_CCUCON0_OFFSET, TC3X_CCUCON0_LCK, 0,
+            TC3X_CCU_LCK_TIMEOUT, 16);
 }
 
 static inline void tc3x_ccucon_wait_unlocked(uint32_t offset)
 {
-  while (getreg32(REGADDR(offset)) & BIT(31))
-    {
-      __asm__ __volatile__("nop");
-    }
+  tc3x_wait(offset, BIT(31), 0, TC3X_CCU_LCK_TIMEOUT, 17);
 }
 
 static void tc3x_osc_init(void)
@@ -95,122 +137,6 @@ static void tc3x_osc_init(void)
   aurix_safety_endinit_enable(false);
   putreg32(val, addr);
   aurix_safety_endinit_enable(true);
-
-  while (1)
-    {
-      val = getreg32(addr);
-      if ((val & TC3X_OSCCON_PLLHV) && (val & TC3X_OSCCON_PLLLV))
-        {
-          break;
-        }
-
-      tc3x_busywait(100);
-    }
-}
-
-static void tc3x_syspll_init(void)
-{
-  uint32_t con0 = REGADDR(TC3X_CLOCK_SYSPLLCON0_OFFSET);
-  uint32_t con1 = REGADDR(TC3X_CLOCK_SYSPLLCON1_OFFSET);
-  uint32_t stat = REGADDR(TC3X_CLOCK_SYSPLLSTAT_OFFSET);
-  uint32_t val;
-
-  val  = TC3X_SYSPLLCON0_INSEL_FOSC;
-  val |= FIELD_PREP(TC3X_SYSPLLCON0_PDIV_MASK,
-                    TC3X_SYSPLLCON0_PDIV_SHIFT,
-                    TC3X_SYSPLL_PDIV - 1u);
-  val |= FIELD_PREP(TC3X_SYSPLLCON0_NDIV_MASK,
-                    TC3X_SYSPLLCON0_NDIV_SHIFT,
-                    TC3X_SYSPLL_NDIV - 1u);
-  val |= TC3X_SYSPLLCON0_PLLPWD;
-  val |= TC3X_SYSPLLCON0_RESLD;
-
-  aurix_safety_endinit_enable(false);
-  putreg32(val, con0);
-  aurix_safety_endinit_enable(true);
-
-  val = FIELD_PREP(TC3X_SYSPLLCON1_K2DIV_MASK,
-                   TC3X_SYSPLLCON1_K2DIV_SHIFT,
-                   TC3X_SYSPLL_K2DIV_INIT - 1u);
-
-  aurix_safety_endinit_enable(false);
-  putreg32(val, con1);
-  aurix_safety_endinit_enable(true);
-
-  while (!(getreg32(stat) & TC3X_SYSPLLSTAT_LOCK))
-    {
-      tc3x_busywait(10);
-    }
-}
-
-static void tc3x_perpll_init(void)
-{
-  uint32_t con0 = REGADDR(TC3X_CLOCK_PERPLLCON0_OFFSET);
-  uint32_t con1 = REGADDR(TC3X_CLOCK_PERPLLCON1_OFFSET);
-  uint32_t stat = REGADDR(TC3X_CLOCK_PERPLLSTAT_OFFSET);
-  uint32_t val;
-  unsigned int i;
-
-  val  = 0;
-  if (TC3X_PERPLL_DIVBY)
-    {
-      val |= TC3X_PERPLLCON0_DIVBY;
-    }
-
-  val |= FIELD_PREP(TC3X_PERPLLCON0_PDIV_MASK,
-                    TC3X_PERPLLCON0_PDIV_SHIFT,
-                    TC3X_PERPLL_PDIV - 1u);
-  val |= FIELD_PREP(TC3X_PERPLLCON0_NDIV_MASK,
-                    TC3X_PERPLLCON0_NDIV_SHIFT,
-                    TC3X_PERPLL_NDIV - 1u);
-  val |= TC3X_PERPLLCON0_PLLPWD;
-  val |= TC3X_PERPLLCON0_RESLD;
-
-  aurix_safety_endinit_enable(false);
-  putreg32(val, con0);
-  aurix_safety_endinit_enable(true);
-
-  /* Wait for LOCK before writing K3DIV: it only latches while K3RDY=1 (UM ch.10
-   * Note 3); the old code wrote it pre-lock (K3RDY=0) so the divide-by-2 was
-   * gated out and fASCLINF stayed at its 400 MHz reset default.
-   */
-  while (!(getreg32(stat) & TC3X_PERPLLSTAT_LOCK))
-    {
-      tc3x_busywait(10);
-    }
-
-  val  = 0;
-  val |= FIELD_PREP(TC3X_PERPLLCON1_K2DIV_MASK,
-                    TC3X_PERPLLCON1_K2DIV_SHIFT,
-                    TC3X_PERPLL_K2DIV - 1u);
-  val |= FIELD_PREP(TC3X_PERPLLCON1_K3DIV_MASK,
-                    TC3X_PERPLLCON1_K3DIV_SHIFT,
-                    TC3X_PERPLL_K3DIV - 1u);
-
-  /* Bounded K3RDY handshake — erratum PER_PLL_TC.002 can leave K3RDY stuck 0. */
-  for (i = 0; i < TC3X_PERPLL_KRDY_TIMEOUT; i++)
-    {
-      if (getreg32(stat) & TC3X_PERPLLSTAT_K3RDY)
-        {
-          break;
-        }
-
-      tc3x_busywait(10);
-    }
-
-  aurix_safety_endinit_enable(false);
-  putreg32(val, con1);
-  aurix_safety_endinit_enable(true);
-
-  for (i = 0; i < TC3X_PERPLL_KRDY_TIMEOUT; i++)
-    {
-      if (getreg32(stat) & TC3X_PERPLLSTAT_K3RDY)
-        {
-          break;
-        }
-
-      tc3x_busywait(10);
-    }
 }
 
 static void tc3x_ccu_set_dividers(void)
@@ -380,10 +306,141 @@ static void tc3x_ccu_select_clock(uint32_t clksel)
   tc3x_ccucon0_wait_unlocked();
 }
 
+/* Same order as iLLD IfxScuCcu_configureCcuInitialStep(): dividers are set
+ * with both PLLs powered down, and a K divider is written only once KxRDY
+ * is set.
+ */
+
+static void tc3x_pll_init(void)
+{
+  uint32_t kmask = TC3X_PERPLLSTAT_K2RDY | TC3X_PERPLLSTAT_K3RDY;
+  uint32_t oscok = TC3X_OSCCON_PLLHV | TC3X_OSCCON_PLLLV;
+  uint32_t kdiv;
+  uint32_t val;
+
+  /* The PLLs must not be reconfigured while the CCU runs from them */
+
+  tc3x_ccu_select_clock(0u);
+
+  tc3x_scu_modify(TC3X_CLOCK_SYSPLLCON0_OFFSET, TC3X_SYSPLLCON0_PLLPWD, 0);
+  tc3x_scu_modify(TC3X_CLOCK_PERPLLCON0_OFFSET, TC3X_PERPLLCON0_PLLPWD, 0);
+
+  tc3x_wait(TC3X_CLOCK_SYSPLLSTAT_OFFSET, TC3X_SYSPLLSTAT_PWDSTAT,
+            TC3X_SYSPLLSTAT_PWDSTAT, TC3X_PLL_PWDSTAT_TIMEOUT, 2);
+  tc3x_wait(TC3X_CLOCK_PERPLLSTAT_OFFSET, TC3X_PERPLLSTAT_PWDSTAT,
+            TC3X_PERPLLSTAT_PWDSTAT, TC3X_PLL_PWDSTAT_TIMEOUT, 3);
+
+  tc3x_osc_init();
+
+  tc3x_scu_modify(TC3X_CLOCK_SYSPLLCON0_OFFSET,
+                  TC3X_SYSPLLCON0_INSEL_MASK | TC3X_SYSPLLCON0_PDIV_MASK |
+                  TC3X_SYSPLLCON0_NDIV_MASK,
+                  TC3X_SYSPLLCON0_INSEL_FOSC |
+                  FIELD_PREP(TC3X_SYSPLLCON0_PDIV_MASK,
+                             TC3X_SYSPLLCON0_PDIV_SHIFT,
+                             TC3X_SYSPLL_PDIV - 1u) |
+                  FIELD_PREP(TC3X_SYSPLLCON0_NDIV_MASK,
+                             TC3X_SYSPLLCON0_NDIV_SHIFT,
+                             TC3X_SYSPLL_NDIV - 1u));
+
+  /* K3DIV has to be 0 or 1 before DIVBY is written (iLLD, TC37x). K3RDY is
+   * not valid yet, so this may be ignored; the gated write below sets it.
+   */
+
+  tc3x_scu_modify(TC3X_CLOCK_PERPLLCON1_OFFSET, TC3X_PERPLLCON1_K3DIV_MASK,
+                  FIELD_PREP(TC3X_PERPLLCON1_K3DIV_MASK,
+                             TC3X_PERPLLCON1_K3DIV_SHIFT, 1u));
+
+  tc3x_scu_modify(TC3X_CLOCK_PERPLLCON0_OFFSET,
+                  TC3X_PERPLLCON0_DIVBY | TC3X_PERPLLCON0_PDIV_MASK |
+                  TC3X_PERPLLCON0_NDIV_MASK,
+                  (TC3X_PERPLL_DIVBY ? TC3X_PERPLLCON0_DIVBY : 0) |
+                  FIELD_PREP(TC3X_PERPLLCON0_PDIV_MASK,
+                             TC3X_PERPLLCON0_PDIV_SHIFT,
+                             TC3X_PERPLL_PDIV - 1u) |
+                  FIELD_PREP(TC3X_PERPLLCON0_NDIV_MASK,
+                             TC3X_PERPLLCON0_NDIV_SHIFT,
+                             TC3X_PERPLL_NDIV - 1u));
+
+  tc3x_scu_modify(TC3X_CLOCK_SYSPLLCON0_OFFSET, 0, TC3X_SYSPLLCON0_PLLPWD);
+  tc3x_scu_modify(TC3X_CLOCK_PERPLLCON0_OFFSET, 0, TC3X_PERPLLCON0_PLLPWD);
+
+  tc3x_wait(TC3X_CLOCK_SYSPLLSTAT_OFFSET, TC3X_SYSPLLSTAT_PWDSTAT, 0,
+            TC3X_PLL_PWDSTAT_TIMEOUT, 4);
+  tc3x_wait(TC3X_CLOCK_PERPLLSTAT_OFFSET, TC3X_PERPLLSTAT_PWDSTAT, 0,
+            TC3X_PLL_PWDSTAT_TIMEOUT, 5);
+
+  tc3x_wait(TC3X_CLOCK_SYSPLLSTAT_OFFSET, TC3X_SYSPLLSTAT_K2RDY,
+            TC3X_SYSPLLSTAT_K2RDY, TC3X_PLL_KRDY_TIMEOUT, 6);
+  tc3x_wait(TC3X_CLOCK_PERPLLSTAT_OFFSET, kmask, kmask,
+            TC3X_PLL_KRDY_TIMEOUT, 7);
+
+  tc3x_scu_modify(TC3X_CLOCK_SYSPLLCON1_OFFSET, TC3X_SYSPLLCON1_K2DIV_MASK,
+                  FIELD_PREP(TC3X_SYSPLLCON1_K2DIV_MASK,
+                             TC3X_SYSPLLCON1_K2DIV_SHIFT,
+                             TC3X_SYSPLL_K2DIV_INIT - 1u));
+
+  tc3x_scu_modify(TC3X_CLOCK_PERPLLCON1_OFFSET,
+                  TC3X_PERPLLCON1_K2DIV_MASK | TC3X_PERPLLCON1_K3DIV_MASK,
+                  FIELD_PREP(TC3X_PERPLLCON1_K2DIV_MASK,
+                             TC3X_PERPLLCON1_K2DIV_SHIFT,
+                             TC3X_PERPLL_K2DIV - 1u) |
+                  FIELD_PREP(TC3X_PERPLLCON1_K3DIV_MASK,
+                             TC3X_PERPLLCON1_K3DIV_SHIFT, 1u));
+
+  tc3x_wait(TC3X_CLOCK_SYSPLLSTAT_OFFSET, TC3X_SYSPLLSTAT_K2RDY,
+            TC3X_SYSPLLSTAT_K2RDY, TC3X_PLL_KRDY_TIMEOUT, 8);
+  tc3x_wait(TC3X_CLOCK_PERPLLSTAT_OFFSET, kmask, kmask,
+            TC3X_PLL_KRDY_TIMEOUT, 9);
+
+  /* The oscillator watchdog restarts with the PLLs, so the range flags are
+   * only meaningful once both PLLs are powered and clocked.
+   */
+
+  tc3x_wait(TC3X_CLOCK_OSCCON_OFFSET, oscok, oscok, TC3X_OSC_TIMEOUT, 10);
+
+  tc3x_scu_modify(TC3X_CLOCK_SYSPLLCON0_OFFSET, 0, TC3X_SYSPLLCON0_RESLD);
+  tc3x_scu_modify(TC3X_CLOCK_PERPLLCON0_OFFSET, 0, TC3X_PERPLLCON0_RESLD);
+
+  tc3x_wait(TC3X_CLOCK_SYSPLLSTAT_OFFSET, TC3X_SYSPLLSTAT_LOCK,
+            TC3X_SYSPLLSTAT_LOCK, TC3X_PLL_LOCK_TIMEOUT, 11);
+  tc3x_wait(TC3X_CLOCK_PERPLLSTAT_OFFSET, TC3X_PERPLLSTAT_LOCK,
+            TC3X_PERPLLSTAT_LOCK, TC3X_PLL_LOCK_TIMEOUT, 12);
+
+  tc3x_wait(TC3X_CLOCK_PERPLLSTAT_OFFSET, TC3X_PERPLLSTAT_K3RDY,
+            TC3X_PERPLLSTAT_K3RDY, TC3X_PLL_KRDY_TIMEOUT, 13);
+
+  tc3x_scu_modify(TC3X_CLOCK_PERPLLCON1_OFFSET, TC3X_PERPLLCON1_K3DIV_MASK,
+                  FIELD_PREP(TC3X_PERPLLCON1_K3DIV_MASK,
+                             TC3X_PERPLLCON1_K3DIV_SHIFT,
+                             TC3X_PERPLL_K3DIV - 1u));
+
+  tc3x_wait(TC3X_CLOCK_PERPLLSTAT_OFFSET, TC3X_PERPLLSTAT_K3RDY,
+            TC3X_PERPLLSTAT_K3RDY, TC3X_PLL_KRDY_TIMEOUT, 14);
+
+  /* A KxDIV write can be dropped without any status bit saying so */
+
+  kdiv = TC3X_PERPLLCON1_K2DIV_MASK | TC3X_PERPLLCON1_K3DIV_MASK;
+  val  = FIELD_PREP(TC3X_PERPLLCON1_K2DIV_MASK,
+                    TC3X_PERPLLCON1_K2DIV_SHIFT,
+                    TC3X_PERPLL_K2DIV - 1u) |
+         FIELD_PREP(TC3X_PERPLLCON1_K3DIV_MASK,
+                    TC3X_PERPLLCON1_K3DIV_SHIFT,
+                    TC3X_PERPLL_K3DIV - 1u);
+
+  if ((getreg32(REGADDR(TC3X_CLOCK_PERPLLCON1_OFFSET)) & kdiv) != val ||
+      (getreg32(REGADDR(TC3X_CLOCK_SYSPLLCON1_OFFSET)) &
+       TC3X_SYSPLLCON1_K2DIV_MASK) !=
+      FIELD_PREP(TC3X_SYSPLLCON1_K2DIV_MASK, TC3X_SYSPLLCON1_K2DIV_SHIFT,
+                 TC3X_SYSPLL_K2DIV_INIT - 1u))
+    {
+      tc3x_clock_fail(15);
+    }
+}
+
 static void tc3x_syspll_k2_step(void)
 {
   uint32_t con1 = REGADDR(TC3X_CLOCK_SYSPLLCON1_OFFSET);
-  uint32_t stat = REGADDR(TC3X_CLOCK_SYSPLLSTAT_OFFSET);
 
   static const uint32_t k2_steps[] =
   {
@@ -400,10 +457,8 @@ static void tc3x_syspll_k2_step(void)
     {
       uint32_t k2div_val = k2_steps[i] - 1u;
 
-      while (!(getreg32(stat) & TC3X_SYSPLLSTAT_K2RDY))
-        {
-          __asm__ __volatile__("nop");
-        }
+      tc3x_wait(TC3X_CLOCK_SYSPLLSTAT_OFFSET, TC3X_SYSPLLSTAT_K2RDY,
+                TC3X_SYSPLLSTAT_K2RDY, TC3X_PLL_KRDY_TIMEOUT, 18);
 
       aurix_safety_endinit_enable(false);
       putreg32(k2div_val, con1);
@@ -412,17 +467,17 @@ static void tc3x_syspll_k2_step(void)
       tc3x_busywait(50000);
     }
 
-  while (!(getreg32(stat) & TC3X_SYSPLLSTAT_K2RDY))
-    {
-      __asm__ __volatile__("nop");
-    }
+  tc3x_wait(TC3X_CLOCK_SYSPLLSTAT_OFFSET, TC3X_SYSPLLSTAT_K2RDY,
+            TC3X_SYSPLLSTAT_K2RDY, TC3X_PLL_KRDY_TIMEOUT, 18);
 }
+
+/****************************************************************************
+ * Public Functions
+ ****************************************************************************/
 
 void up_clockconfig(void)
 {
-  tc3x_osc_init();
-  tc3x_syspll_init();
-  tc3x_perpll_init();
+  tc3x_pll_init();
   tc3x_ccu_set_dividers();
   tc3x_ccu_select_clock(1u);
   tc3x_syspll_k2_step();

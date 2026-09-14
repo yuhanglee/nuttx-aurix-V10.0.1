@@ -127,7 +127,7 @@
 
 #define TC3X_SYSPLLCON0_INSEL_FBACK   (0 << TC3X_SYSPLLCON0_INSEL_SHIFT)
 #define TC3X_SYSPLLCON0_INSEL_FOSC    (1 << TC3X_SYSPLLCON0_INSEL_SHIFT)
-#define TC3X_SYSPLLCON0_INSEL_SYSCLK  (2 << TC3X_SYSPLLCON0_INSEL_SHIFT)
+#define TC3X_SYSPLLCON0_INSEL_SYSCLK  (2u << TC3X_SYSPLLCON0_INSEL_SHIFT)
 
 #define TC3X_SYSPLLCON1_K2DIV_SHIFT   0
 #define TC3X_SYSPLLCON1_K2DIV_MASK    GENMASK(2, 0)
@@ -281,8 +281,13 @@ enum tc3x_extclk0_sel
 #define TC3X_PERPLL_K3DIV       2u
 #define TC3X_PERPLL_DIVBY       0u
 
-/* Bounded PERPLL KxRDY poll count — erratum PER_PLL_TC.002 can leave K3RDY at 0. */
-#define TC3X_PERPLL_KRDY_TIMEOUT 1000u
+/* Poll limits from iLLD IfxScuCcu.h, with the same count semantics */
+
+#define TC3X_CCU_LCK_TIMEOUT      0x1000u
+#define TC3X_PLL_PWDSTAT_TIMEOUT  0x3000u
+#define TC3X_PLL_LOCK_TIMEOUT     0x3000u
+#define TC3X_PLL_KRDY_TIMEOUT     0x6000u
+#define TC3X_OSC_TIMEOUT          0x493e0u
 
 /* PLL1DIVDIS: 0 -> fsource1 = fPLL1/2 = 160 MHz */
 
