@@ -112,7 +112,7 @@ static int tc4x_pwm_start(FAR struct pwm_lowerhalf_s *dev,
       return -ERANGE;
     }
 
-  duty = ((uint64_t)period * (uint32_t)info->duty) >> 16;
+  duty = ((uint64_t)period * (uint32_t)info->channels[0].duty) >> 16;
 
   tc4x_egtm_pwm_setup(p->ch, 0, period, duty, -1, NULL, 0);
   return OK;
