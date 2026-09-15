@@ -78,15 +78,15 @@ void board_aurix_setup_serial_pin(int idx)
 }
 
 #ifdef CONFIG_TC3X_I2C
-/* SCL/SDA pads inherited from the TC397 board (P15.4/P15.5, open-drain);
- * confirm against the TC375 Lite Kit wiring at board-return.
+/* Lite Kit routes I2C0 (EEPROM 0x50, mikroBUS, Shield2Go) to P13.1 SCL /
+ * P13.2 SDA, input B, which TC3X_I2C0_PISEL=1 selects.
  */
 
 void board_aurix_setup_i2c_pin(int bus)
 {
-  gpio_pinset_t sclpin = AURIX_GPIO(15, 4, GPIO_PERIPH, GPIO_ALT6) |
+  gpio_pinset_t sclpin = AURIX_GPIO(13, 1, GPIO_PERIPH, GPIO_ALT6) |
                          GPIO_OPEN_DRAIN;
-  gpio_pinset_t sdapin = AURIX_GPIO(15, 5, GPIO_PERIPH, GPIO_ALT6) |
+  gpio_pinset_t sdapin = AURIX_GPIO(13, 2, GPIO_PERIPH, GPIO_ALT6) |
                          GPIO_OPEN_DRAIN;
 
   aurix_config_gpio(sclpin);
