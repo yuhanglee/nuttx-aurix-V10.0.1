@@ -15,4 +15,12 @@ config BOARD_CAN_TLE9251V_STB_PIN
 		boots in standby; the CPU must drive P20.6 low to enable
 		normal operating mode before any frame leaves the bus.
 
+config BOARD_USER_LED_GPIO
+	bool "Register on-board user LED1 (P00.5) as /dev/gpio0"
+	default n
+	depends on DEV_GPIO
+	---help---
+		Registers Lite Kit user LED1 (P00.5, active-low) as /dev/gpio0,
+		output with init level HIGH so the LED is off at boot.
+
 endif
