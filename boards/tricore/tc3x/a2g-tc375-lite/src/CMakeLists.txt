@@ -33,7 +33,9 @@ target_sources(board PRIVATE tc375_appinit.c)
 
 if(CONFIG_ARCH_LEDS)
   target_sources(board PRIVATE tc375_autoleds.c)
-else()
+endif()
+
+if(CONFIG_USERLED)
   target_sources(board PRIVATE tc375_userleds.c)
 endif()
 
