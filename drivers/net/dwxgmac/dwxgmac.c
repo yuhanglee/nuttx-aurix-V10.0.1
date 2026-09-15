@@ -114,6 +114,27 @@ static inline int xgmac_intf(FAR struct xgmac_driver_s *priv)
   return (int)(priv - g_xgmac);
 }
 
+/* 802.1Q PCP p is steered to RX queue p % RX_CH_COUNT.  TX uses the same
+ * rule in xgmac_txch_select(), so both directions of one priority share a
+ * channel number.
+ */
+
+static uint8_t xgmac_rxq_pcp_mask(uint8_t queue)
+{
+  uint8_t mask = 0;
+  uint8_t pcp;
+
+  for (pcp = 0; pcp < 8; pcp++)
+    {
+      if (pcp % RX_CH_COUNT == queue)
+        {
+          mask |= 1u << pcp;
+        }
+    }
+
+  return mask;
+}
+
 static void xgmac_cfg_init(int intf)
 {
   uint8_t ch;
@@ -125,7 +146,7 @@ static void xgmac_cfg_init(int intf)
       g_dma_rx_cfg[intf][ch].nr          = ch;
 
       g_mtl_rx_cfg[intf][ch].nr          = ch;
-      g_mtl_rx_cfg[intf][ch].priority    = 0xFF;
+      g_mtl_rx_cfg[intf][ch].priority    = xgmac_rxq_pcp_mask(ch);
       g_mtl_rx_cfg[intf][ch].threshold   = 64;
       g_mtl_rx_cfg[intf][ch].sf          = true;
       g_mtl_rx_cfg[intf][ch].dma_channel = ch;
@@ -370,18 +391,29 @@ static void set_link_state(FAR struct xgmac_driver_s *priv, bool up)
 }
 
 /* Pick the TX DMA channel for one frame.  Each channel drains the MTL
- * TX queue of the same number, so an 802.1Q priority lookup belongs
- * here once VLAN tagging is supported.
+ * TX queue of the same number.  The VLAN device inserts the 802.1Q tag
+ * before calling transmit, so tagged frames go to channel PCP % channels
+ * and untagged frames to channel 0.
  */
 
 static uint8_t xgmac_txch_select(FAR struct xgmac_driver_s *priv,
                                  FAR netpkt_t *pkt, unsigned int len)
 {
-  UNUSED(priv);
-  UNUSED(pkt);
-  UNUSED(len);
+  uint8_t nch = priv->config->dwmac.dma_tx_channel;
+  FAR const uint8_t *frame;
 
-  return 0;
+  if (nch <= 1 || len < 16)
+    {
+      return 0;
+    }
+
+  frame = netpkt_getdata(&priv->dev, pkt);
+  if (frame[12] != 0x81 || frame[13] != 0x00)
+    {
+      return 0;
+    }
+
+  return (frame[14] >> 5) % nch;
 }
 
 static int dwxgmac_transmit(FAR struct netdev_lowerhalf_s *dev,

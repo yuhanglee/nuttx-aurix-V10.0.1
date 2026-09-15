@@ -505,6 +505,7 @@ static inline void eth_dwmac_mtl_set_rxq_ctrl(const struct xgmac_driver_s *priv)
   uint8_t queue;
   uint32_t rxq_ctrl0 = 0;
   uint32_t rxq_ctrl1 = 0;
+  uint32_t rxq_ctrl2[2] = {0, 0};
   uint32_t rxq_dma_map[2] = {0, 0};
 
   for (queue = 0; queue < cfg->dwmac.mtl_rx_queues; queue++)
@@ -519,6 +520,9 @@ static inline void eth_dwmac_mtl_set_rxq_ctrl(const struct xgmac_driver_s *priv)
                        FIELD_PREP(MAC_RXQ_CTRL1_MCBCQ, qcfg->nr);
         }
 
+      rxq_ctrl2[qcfg->nr / 4] |=
+        ((uint32_t)qcfg->priority << ((qcfg->nr % 4) * 8));
+
       rxq_dma_map[qcfg->nr / 4] |= (qcfg->dma_channel << ((qcfg->nr % 4) * 8));
     }
 
@@ -526,6 +530,8 @@ static inline void eth_dwmac_mtl_set_rxq_ctrl(const struct xgmac_driver_s *priv)
   xgmac_write(rxq_dma_map[1], priv->base + MTL_RXQ_DMA_MAP1);
   xgmac_write(rxq_ctrl0, priv->base + MAC_RXQ_CTRL0);
   xgmac_write(rxq_ctrl1, priv->base + MAC_RXQ_CTRL1);
+  xgmac_write(rxq_ctrl2[0], priv->base + MAC_RXQ_CTRL2);
+  xgmac_write(rxq_ctrl2[1], priv->base + MAC_RXQ_CTRL3);
 }
 
 #endif /* XGMAC_PRIV_H */
