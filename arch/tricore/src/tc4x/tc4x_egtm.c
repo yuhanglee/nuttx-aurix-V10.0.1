@@ -27,8 +27,6 @@
 #include "hardware/tc4x_egtm.h"
 #include "tc4x_egtm.h"
 
-extern void aurix_cpu_endinit_enable(bool enable);
-
 /****************************************************************************
  * Private Types
  ****************************************************************************/
@@ -53,9 +51,9 @@ static void egtm_clc_enable(void)
 {
   int retries = 100000;
 
-  aurix_cpu_endinit_enable(false);
+  putreg32(PROT_UNLOCK, EGTM_CTRL_PROTE);
   modreg32(0u, EGTM_CLC_DISR, EGTM_CLC);
-  aurix_cpu_endinit_enable(true);
+  putreg32(PROT_LOCK_RUN, EGTM_CTRL_PROTE);
   while ((getreg32(EGTM_CLC) & EGTM_CLC_DISS) && --retries > 0)
     {
     }
@@ -63,17 +61,17 @@ static void egtm_clc_enable(void)
 
 static void egtm_cmu_init(uint32_t gclk_den)
 {
-  /* NUM/DEN are PROTE-guarded and writable only while CLK_EN == 0. */
+  /* NUM/DEN are writable only while CLK_EN == 0. */
 
-  putreg32(PROT_UNLOCK, EGTM_CFGCMU0_PROTSE);
-  putreg32(PROT_UNLOCK, EGTM_CFGCMU0_PROTE);
+  putreg32(PROT_UNLOCK, EGTM_PROTSE);
+  putreg32(PROT_UNLOCK, EGTM_CTRL_PROTE);
 
   putreg32(1u,       EGTM_CMU_GCLK_NUM);
   putreg32(gclk_den, EGTM_CMU_GCLK_DEN);
   putreg32(CMU_CLK_EN_CFGCMU_FXCLK, EGTM_CMU_CLK_EN);
 
-  putreg32(PROT_LOCK_RUN, EGTM_CFGCMU0_PROTE);
-  putreg32(PROT_LOCK_RUN, EGTM_CFGCMU0_PROTSE);
+  putreg32(PROT_LOCK_RUN, EGTM_CTRL_PROTE);
+  putreg32(PROT_LOCK_RUN, EGTM_PROTSE);
 }
 
 static void egtm_ch_disable(uint8_t ch)

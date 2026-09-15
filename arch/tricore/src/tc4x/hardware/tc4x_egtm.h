@@ -29,14 +29,15 @@
 #define EGTM_CLC_DISR     BIT(0)
 #define EGTM_CLC_DISS     BIT(1)
 
-/* CFGCMU0 protection. CMU NUM/DEN are guarded. */
+/* PROT registers: PROTE guards E (CLC), PROTSE guards SE (UM p.9057). */
 
-#define EGTM_CFGCMU0_PROTSE  (EGTM_BASE + 0x6001Cu)
-#define EGTM_CFGCMU0_PROTE   (EGTM_BASE + 0x601D0u)
+#define EGTM_PROTSE       (EGTM_BASE + 0x6001Cu)
+#define EGTM_CTRL_PROTE   (EGTM_BASE + 0x601D0u)
 
 #define PROT_SWEN         BIT(3)
+#define PROT_STATE_CONFIG 0x1u
 #define PROT_STATE_RUN    0x4u
-#define PROT_UNLOCK       PROT_SWEN
+#define PROT_UNLOCK       (PROT_SWEN | PROT_STATE_CONFIG)
 #define PROT_LOCK_RUN     (PROT_SWEN | PROT_STATE_RUN)
 
 /* CMU: GCLK = feGTM * GCLK_NUM / GCLK_DEN */
