@@ -235,4 +235,18 @@ struct xgmac_driver_s
   bool txcoe;
 };
 
+/* Size of one RX DMA buffer.  The DMA counts the 4 octet FCS against it
+ * even with CRC stripping enabled, and a VLAN tagged frame is 4 octets
+ * longer than CONFIG_NET_ETH_PKTSIZE.  A frame that does not fit spills
+ * into a second descriptor and is dropped.
+ */
+
+#ifdef CONFIG_NET_VLAN
+#  define DWXGMAC_RX_FRAME_MAX  (CONFIG_NET_ETH_PKTSIZE + 4 + 4)
+#else
+#  define DWXGMAC_RX_FRAME_MAX  (CONFIG_NET_ETH_PKTSIZE + 4)
+#endif
+
+#define DWXGMAC_RX_BUFSZ  (((DWXGMAC_RX_FRAME_MAX) + 7) & ~7)
+
 #endif /* ETHERNET_DWXGMAC_H */

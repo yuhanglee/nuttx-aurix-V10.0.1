@@ -83,8 +83,8 @@
 #  error CONFIG_IOB_NBUFFERS is too small for the configured DMA rings
 #endif
 
-#if CONFIG_IOB_BUFSIZE < CONFIG_NET_ETH_PKTSIZE
-#  error CONFIG_IOB_BUFSIZE must hold a full frame for zero-copy RX
+#if CONFIG_IOB_BUFSIZE < CONFIG_NET_LL_GUARDSIZE + DWXGMAC_RX_BUFSZ
+#  error CONFIG_IOB_BUFSIZE must hold the L2 guard plus one RX DMA buffer
 #endif
 
 
@@ -525,7 +525,7 @@ static FAR netpkt_t *dwxgmac_receive(FAR struct netdev_lowerhalf_s *dev)
               continue;
             }
 
-          if (!good || pktlen == 0 || pktlen > PKTBUF_SZ)
+          if (!good || pktlen == 0 || pktlen > DWXGMAC_RX_BUFSZ)
             {
               NETDEV_RXERRORS(&dev->netdev);
               netpkt_free(dev, pkt, NETPKT_RX);

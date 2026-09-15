@@ -182,7 +182,7 @@ static inline void eth_dwmac_dma_rx_init(const struct xgmac_driver_s *priv,
 
   xgmac_write(DMA_CHi_RX_CONTROL_RPF |
               FIELD_PREP(DMA_CHi_RX_CONTROL_RBSZ,
-                         ALIGN_UP(CONFIG_NET_ETH_PKTSIZE, 8)) |
+                         DWXGMAC_RX_BUFSZ) |
               FIELD_PREP(DMA_CHi_RX_CONTROL_RXPBL, 32),
               priv->dmabase + DMA_CHi_RX_CONTROL(hw_ch));
   xgmac_write(FIELD_PREP(DMA_CHi_RX_CONTROL2_RDRL,

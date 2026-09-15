@@ -255,7 +255,7 @@ static inline void eth_dwmac_dma_rx_init(const struct xgmac_driver_s *priv,
                 dma + DMA_CHi_RXDESC_LIST_ADDRESS(hw_ch));
 
   xgmac_write(FIELD_PREP(DMA_CHi_RX_CONTROL_RBSZ,
-                         ALIGN_UP(CONFIG_NET_ETH_PKTSIZE, 8)),
+                         DWXGMAC_RX_BUFSZ),
                 dma + DMA_CHi_RX_CONTROL(hw_ch));
   xgmac_write(FIELD_PREP(DMA_CHi_RXDESC_RING_LENGTH_RDRL,
                 dcfg->descs_count - 1),
