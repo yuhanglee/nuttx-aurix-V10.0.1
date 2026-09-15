@@ -514,6 +514,17 @@ static void xgmac_dma_rx_process(FAR struct xgmac_driver_s *priv, uint8_t ch)
   netdev_lower_rxready(&priv->dev);
 }
 
+/* netdev_lower_txdone() walks the VLAN devices under net_lock(), which may
+ * block, so it must not run in the interrupt handler.
+ */
+
+static void xgmac_txdone_work(FAR void *arg)
+{
+  FAR struct xgmac_driver_s *priv = arg;
+
+  netdev_lower_txdone(&priv->dev);
+}
+
 static void xgmac_dma_tx_process(FAR struct xgmac_driver_s *priv, uint8_t ch)
 {
   const struct eth_dwmac_dma_ch_config *dcfg = &priv->config->dwmac.dma_tx[ch];
@@ -545,8 +556,10 @@ static void xgmac_dma_tx_process(FAR struct xgmac_driver_s *priv, uint8_t ch)
       freed = true;
     }
 
-  if (freed)
-    netdev_lower_txdone(&priv->dev);
+  if (freed && work_available(&priv->txdone_work))
+    {
+      work_queue(ETHWORK, &priv->txdone_work, xgmac_txdone_work, priv, 0);
+    }
 }
 
 int dwxgmac_mac_isr(int irq, FAR void *context, FAR void *arg)
@@ -652,6 +665,8 @@ static int dwxgmac_ifdown(FAR struct netdev_lowerhalf_s *dev)
 
   if (priv->irq)
     up_disable_irq(priv->irq);
+
+  work_cancel(ETHWORK, &priv->txdone_work);
 
   for (ch = 0; ch < priv->config->dwmac.dma_rx_channel; ch++)
     {

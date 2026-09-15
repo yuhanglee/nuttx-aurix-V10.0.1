@@ -22,6 +22,7 @@
 #include <nuttx/irq.h>
 #include <nuttx/mutex.h>
 #include <nuttx/semaphore.h>
+#include <nuttx/wqueue.h>
 #include <nuttx/bits.h>
 
 struct eth_dwmac_dma_desc
@@ -227,6 +228,8 @@ struct xgmac_driver_s
 
   struct eth_xgmac_config *config;
   struct eth_xgmac_data *data;
+
+  struct work_s txdone_work;
 
   bool ifup;
   bool txcoe;
