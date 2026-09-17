@@ -1,5 +1,5 @@
 /****************************************************************************
- * boards/tricore/tc3x/a2g-tc397-5v-trb/src/tc3xx_i2c_bringup.c
+ * boards/tricore/tc3x/a2g-tc397-5v-trb/src/tc397_i2c.c
  *
  * SPDX-License-Identifier: Apache-2.0
  *
@@ -16,19 +16,19 @@
 
 #include <nuttx/i2c/i2c_master.h>
 
-#include "tc3xx_i2c.h"
+#include "tc397_i2c.h"
 
 /****************************************************************************
  * Public Functions
  ****************************************************************************/
 
-int tc3xx_i2c_bringup(void)
+int tc397_i2c_bringup(void)
 {
   FAR struct i2c_master_s *i2c;
   int ret = OK;
 
-#ifdef CONFIG_TC3XX_I2C0
-  i2c = tc3xx_i2cbus_initialize(0);
+#ifdef CONFIG_TC3X_I2C0
+  i2c = tc3x_i2cbus_initialize(0);
   if (i2c == NULL)
     {
       i2cerr("Failed to initialize I2C0\n");
@@ -42,8 +42,8 @@ int tc3xx_i2c_bringup(void)
     }
 #endif
 
-#ifdef CONFIG_TC3XX_I2C1
-  i2c = tc3xx_i2cbus_initialize(1);
+#ifdef CONFIG_TC3X_I2C1
+  i2c = tc3x_i2cbus_initialize(1);
   if (i2c == NULL)
     {
       i2cerr("Failed to initialize I2C1\n");

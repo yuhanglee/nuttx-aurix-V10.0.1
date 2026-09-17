@@ -23,6 +23,7 @@
 
 #include <nuttx/config.h>
 
+#include <inttypes.h>
 #include <stdint.h>
 #include <stdbool.h>
 #include <stdio.h>
@@ -37,7 +38,7 @@
 #include "tc3x_qspi.h"
 #include "hardware/tc3x_qspi.h"
 
-#ifdef CONFIG_TC3XX_QSPI2
+#ifdef CONFIG_TC3X_QSPI2
 
 
 
@@ -181,7 +182,8 @@ static void tc397_qspi2_lb_self_test(void)
       TC3X_QSPI_FLAGSCLEAR_ERRORCLEAR_MASK |
       TC3X_QSPI_FLAGSCLEAR_TXC | TC3X_QSPI_FLAGSCLEAR_RXC;
 
-  printf("=== QSPI2 LB result: %u pass / %u fail ===\n", pass, fail);
+  printf("=== QSPI2 LB result: %" PRIu32 " pass / %" PRIu32 " fail ===\n",
+         pass, fail);
   fflush(stdout);
 }
 
@@ -486,7 +488,7 @@ int tc397_qspi_initialize(void)
 
   tc397_qspi2_pinmux();
 
-  qspi2 = tc3xx_qspibus_initialize(2);
+  qspi2 = tc3x_qspibus_initialize(2);
   if (qspi2 == NULL)
     {
       printf("QSPI2 init FAILED\n");
@@ -515,4 +517,4 @@ int tc397_qspi_initialize(void)
 
 #undef QSPI2_REG
 
-#endif /* CONFIG_TC3XX_QSPI2 */
+#endif /* CONFIG_TC3X_QSPI2 */

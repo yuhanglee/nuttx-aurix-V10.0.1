@@ -33,7 +33,7 @@
 #include <nuttx/arch.h>
 #include <nuttx/board.h>
 
-#include "tc3xx_gpio.h"
+#include "tricore_gpio.h"
 #include "tricore_mcmcan.h"
 
 //TODO all in Kconfig

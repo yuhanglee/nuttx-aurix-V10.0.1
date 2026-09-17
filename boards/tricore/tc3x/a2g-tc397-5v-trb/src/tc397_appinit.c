@@ -26,8 +26,8 @@
 #include <errno.h>
 #include "tricore_gpio.h"
 
-#ifdef CONFIG_TC3XX_I2C
-#include "tc3xx_i2c.h"
+#ifdef CONFIG_TC3X_I2C
+#include "tc397_i2c.h"
 #endif
 
 #ifdef CONFIG_TRICORE_FLASH_MTD
@@ -36,15 +36,15 @@
 struct mtd_dev_s *tricore_flash_initialize(void);
 #endif
 
-#ifdef CONFIG_CAN
+#ifdef CONFIG_CAN_MCAN
 int mcmcan_board_initialize(void);
 #endif
 
-#ifdef CONFIG_TC3XX_QSPI2
+#ifdef CONFIG_TC3X_QSPI2
 int tc397_qspi_initialize(void);
 #endif
 
-#ifdef CONFIG_TC3XX_WDT
+#ifdef CONFIG_TC3X_WDT
 int tc3x_wdt_initialize(const char *devpath, int wdtid);
 #endif
 
@@ -81,36 +81,22 @@ static const gpio_pinset_t g_test_gpio_pins[] =
 
 int board_app_initialize(uintptr_t arg)
 {
-  int ret = OK;
-#if 0
-  bool ledon = true;
-  uint8_t i = 10;
-  gpio_pinset_t led1 = AURIX_GPIO(GPIO_PORT33, GPIO_PIN1, GPIO_OUTPUT, GPIO_ALT0);
+  return OK;
+}
 
-  aurix_config_gpio(led1);
-  while (i--) {
-    aurix_gpio_write(led1, (ledon = !ledon));
-    usleep(500 * 1000);
-  }
-#endif
+void board_late_initialize(void)
+{
+  int ret;
 
-#ifdef CONFIG_TC3XX_I2C
-  ret = tc3xx_i2c_bringup();
+#ifdef CONFIG_TC3X_I2C
+  ret = tc397_i2c_bringup();
   if (ret < 0)
     {
       _err("I2C init failed: %d\n", ret);
     }
 #endif
 
-#ifdef CONFIG_TC3XX_GETH
-  ret = tc397_ethernet_initialize();
-  if (ret < 0)
-    {
-      _err("eth init failed: %d\n", ret);
-    }
-#endif
-
-#ifdef CONFIG_CAN
+#ifdef CONFIG_CAN_MCAN
   ret = mcmcan_board_initialize();
   if (ret < 0)
     {
@@ -118,7 +104,7 @@ int board_app_initialize(uintptr_t arg)
     }
 #endif
 
-#ifdef CONFIG_TC3XX_QSPI2
+#ifdef CONFIG_TC3X_QSPI2
   ret = tc397_qspi_initialize();
   if (ret < 0)
     {
@@ -126,7 +112,7 @@ int board_app_initialize(uintptr_t arg)
     }
 #endif
 
-#ifdef CONFIG_TC3XX_WDT
+#ifdef CONFIG_TC3X_WDT
   ret = tc3x_wdt_initialize("/dev/watchdog0", 0);
   if (ret < 0)
     {
@@ -163,5 +149,5 @@ int board_app_initialize(uintptr_t arg)
     }
 #endif
 
-  return ret;
+  UNUSED(ret);
 }

@@ -1,5 +1,5 @@
 # ##############################################################################
-# boards/tricore/tc397/a2g-tc397-5v-trb/src/CMakeLists.txt
+# boards/tricore/tc3x/a2g-tc397-5v-trb/src/CMakeLists.txt
 #
 # SPDX-License-Identifier: Apache-2.0
 #
@@ -20,4 +20,25 @@
 #
 # ##############################################################################
 
-set_property( GLOBAL PROPERTY LD_SCRIPT "${NUTTX_BOARD_DIR}/scripts/tricore-llvm.ld")
+if(CONFIG_TRICORE_TOOLCHAIN_LLVM)
+  set_property(
+    GLOBAL PROPERTY LD_SCRIPT
+                    "${NUTTX_DIR}/arch/tricore/src/common/tricore-llvm.ld")
+else()
+  set_property(
+    GLOBAL PROPERTY LD_SCRIPT "${NUTTX_DIR}/arch/tricore/src/common/tricore.ld")
+endif()
+
+target_sources(board PRIVATE tc397_appinit.c)
+
+if(CONFIG_TC3X_I2C)
+  target_sources(board PRIVATE tc397_i2c.c)
+endif()
+
+if(CONFIG_CAN_MCAN)
+  target_sources(board PRIVATE tc397_can.c)
+endif()
+
+if(CONFIG_TC3X_QSPI2)
+  target_sources(board PRIVATE tc397_qspi.c)
+endif()

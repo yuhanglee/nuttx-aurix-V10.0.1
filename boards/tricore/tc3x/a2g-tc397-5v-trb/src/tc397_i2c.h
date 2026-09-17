@@ -1,5 +1,5 @@
 /****************************************************************************
- * arch/tricore/src/tc3xx/tc3xx_i2c.h
+ * boards/tricore/tc3x/a2g-tc397-5v-trb/src/tc397_i2c.h
  *
  * SPDX-License-Identifier: Apache-2.0
  *
@@ -8,8 +8,8 @@
  *
  ****************************************************************************/
 
-#ifndef __ARCH_TRICORE_SRC_TC3XX_TC3XX_I2C_H
-#define __ARCH_TRICORE_SRC_TC3XX_TC3XX_I2C_H
+#ifndef __BOARDS_TRICORE_TC3X_A2G_TC397_5V_TRB_SRC_TC397_I2C_H
+#define __BOARDS_TRICORE_TC3X_A2G_TC397_5V_TRB_SRC_TC397_I2C_H
 
 /****************************************************************************
  * Included Files
@@ -22,10 +22,10 @@
  * Public Function Prototypes
  ****************************************************************************/
 
-#ifdef CONFIG_TC3XX_I2C
+#ifdef CONFIG_TC3X_I2C
 
 /****************************************************************************
- * Name: tc3xx_i2cbus_initialize
+ * Name: tc3x_i2cbus_initialize
  *
  * Description:
  *   Initialize one I2C bus.
@@ -38,10 +38,10 @@
  *
  ****************************************************************************/
 
-FAR struct i2c_master_s *tc3xx_i2cbus_initialize(int bus);
+FAR struct i2c_master_s *tc3x_i2cbus_initialize(int bus);
 
 /****************************************************************************
- * Name: tc3xx_i2c_bringup
+ * Name: tc397_i2c_bringup
  *
  * Description:
  *   Board-level I2C initialization: init controllers, register /dev/i2cN.
@@ -49,7 +49,7 @@ FAR struct i2c_master_s *tc3xx_i2cbus_initialize(int bus);
  *
  ****************************************************************************/
 
-int tc3xx_i2c_bringup(void);
+int tc397_i2c_bringup(void);
 
-#endif /* CONFIG_TC3XX_I2C */
-#endif /* __ARCH_TRICORE_SRC_TC3XX_TC3XX_I2C_H */
+#endif /* CONFIG_TC3X_I2C */
+#endif /* __BOARDS_TRICORE_TC3X_A2G_TC397_5V_TRB_SRC_TC397_I2C_H */
