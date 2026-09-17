@@ -1,5 +1,5 @@
 /****************************************************************************
- * boards/tricore/tc4x/triboard-tc4x7-com/src/tc4xx_i2c_bringup.c
+ * boards/tricore/tc4x/triboard-tc4x7-com/src/tc4x7_i2c.h
  *
  * SPDX-License-Identifier: Apache-2.0
  *
@@ -20,71 +20,25 @@
  *
  ****************************************************************************/
 
+#ifndef __BOARDS_TRICORE_TC4X_TRIBOARD_TC4X7_COM_SRC_TC4X7_I2C_H
+#define __BOARDS_TRICORE_TC4X_TRIBOARD_TC4X7_COM_SRC_TC4X7_I2C_H
+
 /****************************************************************************
  * Included Files
  ****************************************************************************/
 
 #include <nuttx/config.h>
-
-#include <errno.h>
-#include <debug.h>
-
 #include <nuttx/i2c/i2c_master.h>
-#include "tc4xx_i2c.h"
 
 /****************************************************************************
- * Public Functions
+ * Public Function Prototypes
  ****************************************************************************/
 
-int tc4xx_i2c_bringup(void)
-{
-  FAR struct i2c_master_s *i2c;
-  int ret = OK;
+#ifdef CONFIG_TC4X_I2C
 
-#ifdef CONFIG_TC4XX_I2C0
-  i2c = tc4xx_i2cbus_initialize(0);
-  if (i2c == NULL)
-    {
-      i2cerr("Failed to initialize I2C0\n");
-      ret = -ENODEV;
-    }
-  else
-    {
-#ifdef CONFIG_I2C_DRIVER
-      i2c_register(i2c, 0);
-#endif
-    }
-#endif
+FAR struct i2c_master_s *tc4x_i2cbus_initialize(int bus);
 
-#ifdef CONFIG_TC4XX_I2C1
-  i2c = tc4xx_i2cbus_initialize(1);
-  if (i2c == NULL)
-    {
-      i2cerr("Failed to initialize I2C1\n");
-      ret = -ENODEV;
-    }
-  else
-    {
-#ifdef CONFIG_I2C_DRIVER
-      i2c_register(i2c, 1);
-#endif
-    }
-#endif
+int tc4x7_i2c_bringup(void);
 
-#ifdef CONFIG_TC4XX_I2C2
-  i2c = tc4xx_i2cbus_initialize(2);
-  if (i2c == NULL)
-    {
-      i2cerr("Failed to initialize I2C2\n");
-      ret = -ENODEV;
-    }
-  else
-    {
-#ifdef CONFIG_I2C_DRIVER
-      i2c_register(i2c, 2);
-#endif
-    }
-#endif
-
-  return ret;
-}
+#endif /* CONFIG_TC4X_I2C */
+#endif /* __BOARDS_TRICORE_TC4X_TRIBOARD_TC4X7_COM_SRC_TC4X7_I2C_H */

@@ -26,7 +26,7 @@
 
 #include <nuttx/config.h>
 
-#ifdef CONFIG_TC4XX_QSPI
+#ifdef CONFIG_TC4X_QSPI
 
 #include <stdint.h>
 #include <inttypes.h>
@@ -64,7 +64,7 @@
  * Included Files
  ****************************************************************************/
 
-#ifdef CONFIG_TC4XX_QSPI0
+#ifdef CONFIG_TC4X_QSPI0
 /****************************************************************************
  * Name: tc4x7_qspi0_pinmux
  *
@@ -99,15 +99,15 @@ static void tc4x7_qspi0_pinmux(void)
   aurix_config_gpio(AURIX_GPIO(20, 8, GPIO_PERIPH, GPIO_ALT3)
                     | GPIO_PERIPH_OWN_PAD);
 }
-#endif /* CONFIG_TC4XX_QSPI0 */
+#endif /* CONFIG_TC4X_QSPI0 */
 
-#ifdef CONFIG_TC4XX_QSPI1
+#ifdef CONFIG_TC4X_QSPI1
 /****************************************************************************
  * Name: tc4x7_qspi1_pinmux
  *
  * Description:
  *   Configure port pins for QSPI1 (P10.3/P10.6/P10.2, CS9=P10.5).
- *   No SLSO0_F on Port 10 in BGA292; set CONFIG_TC4XX_QSPI1_DEFAULT_CS=9.
+ *   No SLSO0_F on Port 10 in BGA292; set CONFIG_TC4X_QSPI1_DEFAULT_CS=9.
  *
  ****************************************************************************/
 
@@ -136,9 +136,9 @@ static void tc4x7_qspi1_pinmux(void)
   aurix_config_gpio(AURIX_GPIO(10, 5, GPIO_PERIPH, GPIO_ALT4)
                     | GPIO_PERIPH_OWN_PAD);
 }
-#endif /* CONFIG_TC4XX_QSPI1 */
+#endif /* CONFIG_TC4X_QSPI1 */
 
-#ifdef CONFIG_TC4XX_QSPI2
+#ifdef CONFIG_TC4X_QSPI2
 /****************************************************************************
  * Name: tc4x7_qspi2_pinmux
  *
@@ -173,9 +173,9 @@ static void tc4x7_qspi2_pinmux(void)
   aurix_config_gpio(AURIX_GPIO(15, 2, GPIO_PERIPH, GPIO_ALT3)
                     | GPIO_PERIPH_OWN_PAD);
 }
-#endif /* CONFIG_TC4XX_QSPI2 */
+#endif /* CONFIG_TC4X_QSPI2 */
 
-#ifdef CONFIG_TC4XX_QSPI3
+#ifdef CONFIG_TC4X_QSPI3
 /****************************************************************************
  * Name: tc4x7_qspi3_pinmux
  *
@@ -209,9 +209,9 @@ static void tc4x7_qspi3_pinmux(void)
   aurix_config_gpio(AURIX_GPIO(2, 4, GPIO_PERIPH, GPIO_ALT3)
                     | GPIO_PERIPH_OWN_PAD);
 }
-#endif /* CONFIG_TC4XX_QSPI3 */
+#endif /* CONFIG_TC4X_QSPI3 */
 
-#ifdef CONFIG_TC4XX_QSPI4
+#ifdef CONFIG_TC4X_QSPI4
 /****************************************************************************
  * Name: tc4x7_qspi4_pinmux
  *
@@ -251,9 +251,9 @@ static void tc4x7_qspi4_pinmux(void)
   aurix_config_gpio(AURIX_GPIO(23, 1, GPIO_PERIPH, GPIO_ALT3)
                     | GPIO_PERIPH_OWN_PAD);
 }
-#endif /* CONFIG_TC4XX_QSPI4 */
+#endif /* CONFIG_TC4X_QSPI4 */
 
-#ifdef CONFIG_TC4XX_QSPI5
+#ifdef CONFIG_TC4X_QSPI5
 /****************************************************************************
  * Name: tc4x7_qspi5_pinmux
  *
@@ -287,9 +287,9 @@ static void tc4x7_qspi5_pinmux(void)
   aurix_config_gpio(AURIX_GPIO(22, 3, GPIO_PERIPH, GPIO_ALT2)
                     | GPIO_PERIPH_OWN_PAD);
 }
-#endif /* CONFIG_TC4XX_QSPI5 */
+#endif /* CONFIG_TC4X_QSPI5 */
 
-#ifdef CONFIG_TC4XX_QSPI6
+#ifdef CONFIG_TC4X_QSPI6
 /****************************************************************************
  * Name: tc4x7_qspi6_pinmux
  *
@@ -316,9 +316,9 @@ static void tc4x7_qspi6_pinmux(void)
 
   aurix_config_gpio(AURIX_GPIO(23, 4, GPIO_INPUT, GPIO_PULL_UP));
 }
-#endif /* CONFIG_TC4XX_QSPI6 */
+#endif /* CONFIG_TC4X_QSPI6 */
 
-#ifdef CONFIG_TC4XX_QSPI7
+#ifdef CONFIG_TC4X_QSPI7
 /****************************************************************************
  * Name: tc4x7_qspi7_pinmux
  *
@@ -354,9 +354,9 @@ static void tc4x7_qspi7_pinmux(void)
   aurix_config_gpio(AURIX_GPIO(15, 2, GPIO_PERIPH, GPIO_ALT7)
                     | GPIO_PERIPH_OWN_PAD);
 }
-#endif /* CONFIG_TC4XX_QSPI7 */
+#endif /* CONFIG_TC4X_QSPI7 */
 
-#ifdef CONFIG_TC4XX_QSPI4_LOOPBACK
+#ifdef CONFIG_TC4X_QSPI4_LOOPBACK
 /****************************************************************************
  * Name: tc4x7_qspi4_lb_one
  *
@@ -396,7 +396,7 @@ static uint16_t tc4x7_qspi4_lb_one(uint16_t tx)
 
   /* Build BACONENTRY for 16-bit MSB-first short-data frame on CS6 */
 
-  bacon = TC4X_QSPI_BACON_CS(CONFIG_TC4XX_QSPI4_DEFAULT_CS)
+  bacon = TC4X_QSPI_BACON_CS(CONFIG_TC4X_QSPI4_DEFAULT_CS)
         | TC4X_QSPI_BACON_DL(16u)
         | TC4X_QSPI_BACON_MSB
         | TC4X_QSPI_BACON_LAST
@@ -511,7 +511,7 @@ static void tc4x7_qspi4_loopback_test(void)
          pass, fail);
   fflush(stdout);
 }
-#endif /* CONFIG_TC4XX_QSPI4_LOOPBACK */
+#endif /* CONFIG_TC4X_QSPI4_LOOPBACK */
 
 /****************************************************************************
  * Public Functions
@@ -546,42 +546,42 @@ int tc4x7_qspi_initialize(int bus)
 
   switch (bus)
     {
-#ifdef CONFIG_TC4XX_QSPI0
+#ifdef CONFIG_TC4X_QSPI0
       case 0:
         tc4x7_qspi0_pinmux();
         break;
 #endif
-#ifdef CONFIG_TC4XX_QSPI1
+#ifdef CONFIG_TC4X_QSPI1
       case 1:
         tc4x7_qspi1_pinmux();
         break;
 #endif
-#ifdef CONFIG_TC4XX_QSPI2
+#ifdef CONFIG_TC4X_QSPI2
       case 2:
         tc4x7_qspi2_pinmux();
         break;
 #endif
-#ifdef CONFIG_TC4XX_QSPI3
+#ifdef CONFIG_TC4X_QSPI3
       case 3:
         tc4x7_qspi3_pinmux();
         break;
 #endif
-#ifdef CONFIG_TC4XX_QSPI4
+#ifdef CONFIG_TC4X_QSPI4
       case 4:
         tc4x7_qspi4_pinmux();
         break;
 #endif
-#ifdef CONFIG_TC4XX_QSPI5
+#ifdef CONFIG_TC4X_QSPI5
       case 5:
         tc4x7_qspi5_pinmux();
         break;
 #endif
-#ifdef CONFIG_TC4XX_QSPI6
+#ifdef CONFIG_TC4X_QSPI6
       case 6:
         tc4x7_qspi6_pinmux();
         break;
 #endif
-#ifdef CONFIG_TC4XX_QSPI7
+#ifdef CONFIG_TC4X_QSPI7
       case 7:
         tc4x7_qspi7_pinmux();
         break;
@@ -591,10 +591,10 @@ int tc4x7_qspi_initialize(int bus)
         return -ENODEV;
     }
 
-  qspi = tc4xx_qspibus_initialize(bus);
+  qspi = tc4x_qspibus_initialize(bus);
   if (qspi == NULL)
     {
-      _err("ERROR: tc4xx_qspibus_initialize(%d) failed\n", bus);
+      _err("ERROR: tc4x_qspibus_initialize(%d) failed\n", bus);
       return -ENODEV;
     }
 
@@ -635,7 +635,7 @@ int tc4x7_qspi_bringup(void)
 {
   int ret = OK;
 
-#ifdef CONFIG_TC4XX_QSPI0
+#ifdef CONFIG_TC4X_QSPI0
   ret = tc4x7_qspi_initialize(0);
   if (ret < 0)
     {
@@ -644,7 +644,7 @@ int tc4x7_qspi_bringup(void)
     }
 #endif
 
-#ifdef CONFIG_TC4XX_QSPI1
+#ifdef CONFIG_TC4X_QSPI1
   ret = tc4x7_qspi_initialize(1);
   if (ret < 0)
     {
@@ -653,7 +653,7 @@ int tc4x7_qspi_bringup(void)
     }
 #endif
 
-#ifdef CONFIG_TC4XX_QSPI2
+#ifdef CONFIG_TC4X_QSPI2
   ret = tc4x7_qspi_initialize(2);
   if (ret < 0)
     {
@@ -662,7 +662,7 @@ int tc4x7_qspi_bringup(void)
     }
 #endif
 
-#ifdef CONFIG_TC4XX_QSPI3
+#ifdef CONFIG_TC4X_QSPI3
   ret = tc4x7_qspi_initialize(3);
   if (ret < 0)
     {
@@ -671,7 +671,7 @@ int tc4x7_qspi_bringup(void)
     }
 #endif
 
-#ifdef CONFIG_TC4XX_QSPI4
+#ifdef CONFIG_TC4X_QSPI4
   ret = tc4x7_qspi_initialize(4);
   if (ret < 0)
     {
@@ -679,12 +679,12 @@ int tc4x7_qspi_bringup(void)
       return ret;
     }
 
-#ifdef CONFIG_TC4XX_QSPI4_LOOPBACK
+#ifdef CONFIG_TC4X_QSPI4_LOOPBACK
   tc4x7_qspi4_loopback_test();
 #endif
 #endif
 
-#ifdef CONFIG_TC4XX_QSPI5
+#ifdef CONFIG_TC4X_QSPI5
   ret = tc4x7_qspi_initialize(5);
   if (ret < 0)
     {
@@ -693,7 +693,7 @@ int tc4x7_qspi_bringup(void)
     }
 #endif
 
-#ifdef CONFIG_TC4XX_QSPI6
+#ifdef CONFIG_TC4X_QSPI6
   ret = tc4x7_qspi_initialize(6);
   if (ret < 0)
     {
@@ -702,7 +702,7 @@ int tc4x7_qspi_bringup(void)
     }
 #endif
 
-#ifdef CONFIG_TC4XX_QSPI7
+#ifdef CONFIG_TC4X_QSPI7
   ret = tc4x7_qspi_initialize(7);
   if (ret < 0)
     {
@@ -714,5 +714,5 @@ int tc4x7_qspi_bringup(void)
   return ret;
 }
 
-#endif /* CONFIG_TC4XX_QSPI */
+#endif /* CONFIG_TC4X_QSPI */
 

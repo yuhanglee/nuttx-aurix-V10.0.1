@@ -20,13 +20,43 @@
 #
 # ##############################################################################
 
+if(CONFIG_TRICORE_TOOLCHAIN_LLVM)
+  set_property(
+    GLOBAL PROPERTY LD_SCRIPT
+                    "${NUTTX_DIR}/arch/tricore/src/common/tricore-llvm.ld")
+else()
+  set_property(
+    GLOBAL PROPERTY LD_SCRIPT "${NUTTX_DIR}/arch/tricore/src/common/tricore.ld")
+endif()
+
 set(SRCS tc4x7_appinit.c)
+
+if(CONFIG_ARCH_LEDS)
+  list(APPEND SRCS tc4x7_autoleds.c)
+endif()
+
+if(CONFIG_USERLED)
+  list(APPEND SRCS tc4x7_userleds.c)
+endif()
 
 if(CONFIG_ARCH_BUTTONS)
   list(APPEND SRCS tc4x7_buttons.c)
 endif()
 
-target_sources(board PRIVATE ${SRCS})
+if(CONFIG_TC4X_I2C)
+  list(APPEND SRCS tc4x7_i2c.c)
+endif()
 
-set_property(GLOBAL PROPERTY LD_SCRIPT
-                             "${NUTTX_BOARD_DIR}/scripts/tricore-llvm.ld")
+if(CONFIG_CAN_MCAN)
+  list(APPEND SRCS tc4x7_can.c)
+endif()
+
+if(CONFIG_TC4X_XSPI)
+  list(APPEND SRCS tc4x7_xspi.c)
+endif()
+
+if(CONFIG_TC4X_QSPI)
+  list(APPEND SRCS tc4x7_qspi.c)
+endif()
+
+target_sources(board PRIVATE ${SRCS})

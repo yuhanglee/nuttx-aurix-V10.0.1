@@ -36,7 +36,7 @@
 #include <nuttx/arch.h>
 #include <nuttx/board.h>
 
-#include "tc4xx_gpio.h"
+#include "tricore_gpio.h"
 #include "tricore_mcmcan.h"
 
 /****************************************************************************

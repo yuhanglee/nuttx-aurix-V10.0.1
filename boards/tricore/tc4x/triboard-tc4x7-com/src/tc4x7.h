@@ -20,8 +20,8 @@
  *
  ****************************************************************************/
 
-#ifndef __BOARDS_TRICORE_TC4XX_TRIBOARD_TC4X7_COM_SRC_TC4X7_H
-#define __BOARDS_TRICORE_TC4XX_TRIBOARD_TC4X7_COM_SRC_TC4X7_H
+#ifndef __BOARDS_TRICORE_TC4X_TRIBOARD_TC4X7_COM_SRC_TC4X7_H
+#define __BOARDS_TRICORE_TC4X_TRIBOARD_TC4X7_COM_SRC_TC4X7_H
 
 /****************************************************************************
  * Included Files
@@ -71,4 +71,4 @@
 
 #define GPIO_NLEDS  8
 
-#endif /* __BOARDS_TRICORE_TC4XX_TRIBOARD_TC4X7_COM_SRC_TC4X7_H */
+#endif /* __BOARDS_TRICORE_TC4X_TRIBOARD_TC4X7_COM_SRC_TC4X7_H */

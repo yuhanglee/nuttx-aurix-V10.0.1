@@ -1,5 +1,5 @@
 /****************************************************************************
- * arch/tricore/src/tc4xx/tc4xx_i2c.h
+ * boards/tricore/tc4x/triboard-tc4x7-com/src/tc4x7_i2c.c
  *
  * SPDX-License-Identifier: Apache-2.0
  *
@@ -20,27 +20,71 @@
  *
  ****************************************************************************/
 
-#ifndef __ARCH_TRICORE_SRC_TC4XX_TC4XX_I2C_H
-#define __ARCH_TRICORE_SRC_TC4XX_TC4XX_I2C_H
-
 /****************************************************************************
  * Included Files
  ****************************************************************************/
 
 #include <nuttx/config.h>
+
+#include <errno.h>
+#include <debug.h>
+
 #include <nuttx/i2c/i2c_master.h>
+#include "tc4x7_i2c.h"
 
 /****************************************************************************
- * Public Function Prototypes
+ * Public Functions
  ****************************************************************************/
 
-#ifdef CONFIG_TC4XX_I2C
+int tc4x7_i2c_bringup(void)
+{
+  FAR struct i2c_master_s *i2c;
+  int ret = OK;
 
-FAR struct i2c_master_s *tc4xx_i2cbus_initialize(int bus);
+#ifdef CONFIG_TC4X_I2C0
+  i2c = tc4x_i2cbus_initialize(0);
+  if (i2c == NULL)
+    {
+      i2cerr("Failed to initialize I2C0\n");
+      ret = -ENODEV;
+    }
+  else
+    {
+#ifdef CONFIG_I2C_DRIVER
+      i2c_register(i2c, 0);
+#endif
+    }
+#endif
 
-int tc4xx_i2cbus_uninitialize(FAR struct i2c_master_s *dev);
+#ifdef CONFIG_TC4X_I2C1
+  i2c = tc4x_i2cbus_initialize(1);
+  if (i2c == NULL)
+    {
+      i2cerr("Failed to initialize I2C1\n");
+      ret = -ENODEV;
+    }
+  else
+    {
+#ifdef CONFIG_I2C_DRIVER
+      i2c_register(i2c, 1);
+#endif
+    }
+#endif
 
-int tc4xx_i2c_bringup(void);
+#ifdef CONFIG_TC4X_I2C2
+  i2c = tc4x_i2cbus_initialize(2);
+  if (i2c == NULL)
+    {
+      i2cerr("Failed to initialize I2C2\n");
+      ret = -ENODEV;
+    }
+  else
+    {
+#ifdef CONFIG_I2C_DRIVER
+      i2c_register(i2c, 2);
+#endif
+    }
+#endif
 
-#endif /* CONFIG_TC4XX_I2C */
-#endif /* __ARCH_TRICORE_SRC_TC4XX_TC4XX_I2C_H */
+  return ret;
+}

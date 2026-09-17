@@ -41,21 +41,28 @@
 #include "hardware/tc4x_wdt.h"
 #endif
 
-#ifdef CONFIG_TC4XX_I2C
-#include "tc4xx_i2c.h"
+#ifdef CONFIG_TC4X_I2C
+#include "tc4x7_i2c.h"
 #endif
 
 #ifdef CONFIG_USERLED_LOWER
 #  include <nuttx/leds/userled.h>
 #endif
 
-#ifdef CONFIG_TC4XX_QSPI
+#ifdef CONFIG_TC4X_QSPI
 int tc4x7_qspi_bringup(void);
 #endif
 
-#ifdef CONFIG_TC4XX_EGTM_PWM_LOWERHALF
-#  include "tc4xx_gpio.h"
-#  include "tc4xx_egtm_pwm.h"
+#ifdef CONFIG_TC4X_XSPI
+int tc4x7_xspi_initialize(void);
+#endif
+
+#ifdef CONFIG_CAN_MCAN
+int mcmcan_board_initialize(void);
+#endif
+
+#ifdef CONFIG_TC4X_EGTM_PWM_LOWERHALF
+#  include "tc4x_egtm_pwm.h"
 #endif
 
 /****************************************************************************
@@ -64,8 +71,10 @@ int tc4x7_qspi_bringup(void);
 
 void board_aurix_setup_i2c_pin(int bus)
 {
-  gpio_pinset_t sclpin = AURIX_GPIO(15, 4, GPIO_PERIPH, GPIO_ALT6);
-  gpio_pinset_t sdapin = AURIX_GPIO(15, 5, GPIO_PERIPH, GPIO_ALT6);
+  gpio_pinset_t sclpin = AURIX_GPIO(15, 4, GPIO_PERIPH, GPIO_ALT6) |
+                         GPIO_OPEN_DRAIN;
+  gpio_pinset_t sdapin = AURIX_GPIO(15, 5, GPIO_PERIPH, GPIO_ALT6) |
+                         GPIO_OPEN_DRAIN;
 
   aurix_config_gpio(sclpin);
   aurix_config_gpio(sdapin);
@@ -82,41 +91,33 @@ void board_aurix_setup_serial_pin(int idx)
   aurix_config_gpio(AURIX_GPIO(14, 1, GPIO_INPUT, GPIO_PULL_UP));
 }
 
-#ifdef CONFIG_TC4XX_EGTM_PWM_LOWERHALF
+#ifdef CONFIG_TC4X_EGTM_PWM_LOWERHALF
 
 /* P00.<ch> ALT9 routes to TOUT(9+ch); OWN_PAD hands pad control to the
  * peripheral. TOUTSEL code 20 selects TOM0 channels onto this group.
  */
 
-#  define EGTM_PWM_PIN  (AURIX_GPIO(0, CONFIG_TC4XX_EGTM_TOM0_CH,           \
+#  define EGTM_PWM_PIN  (AURIX_GPIO(0, CONFIG_TC4X_EGTM_TOM0_CH,            \
                                     GPIO_PERIPH, GPIO_ALT9)                \
                          | GPIO_PERIPH_OWN_PAD)
-#  define EGTM_PWM_TOUT      (9u + CONFIG_TC4XX_EGTM_TOM0_CH)
+#  define EGTM_PWM_TOUT      (9u + CONFIG_TC4X_EGTM_TOM0_CH)
 #  define EGTM_PWM_TOUTSEL   20u
 
 static int tc4x7_pwm_bringup(void)
 {
-  return tc4xx_egtm_pwm_register(0, EGTM_PWM_PIN,
-                                 EGTM_PWM_TOUT, EGTM_PWM_TOUTSEL);
+  return tc4x_egtm_pwm_register(0, EGTM_PWM_PIN,
+                                EGTM_PWM_TOUT, EGTM_PWM_TOUTSEL);
 }
 #endif
 
 int board_app_initialize(uintptr_t arg)
 {
-  bool ledon = true;
-  uint8_t i = 10;
-  int ret = 0;
-  gpio_pinset_t led1 = AURIX_GPIO(GPIO_PORT13, GPIO_PIN0,
-                                  GPIO_OUTPUT, GPIO_ALT0);
+  return OK;
+}
 
-  aurix_config_gpio(led1);
-  while (i--)
-    {
-      aurix_gpio_write(led1, (ledon = !ledon));
-      usleep(500 * 1000);
-    }
-
-  aurix_gpio_write(led1, false);  /* D406 back ON: solid after startup blink */
+void board_late_initialize(void)
+{
+  int ret;
 
 #ifdef CONFIG_TC4X_WDT
   ret = tc4x_wdt_initialize("/dev/watchdog0", TC4X_WDT_CPU0);
@@ -126,23 +127,19 @@ int board_app_initialize(uintptr_t arg)
     }
 #endif
 
-#ifdef CONFIG_TC4XX_I2C
-  ret = tc4xx_i2c_bringup();
+#ifdef CONFIG_TC4X_I2C
+  ret = tc4x7_i2c_bringup();
   if (ret < 0)
     {
       _err("I2C init failed: %d\n", ret);
     }
 #endif
 
-#ifdef CONFIG_TC4XX_GETH
-  tc4x7_ethernet_initialize();
-#endif
-
-#ifdef CONFIG_CAN
+#ifdef CONFIG_CAN_MCAN
   mcmcan_board_initialize();
 #endif
 
-#ifdef CONFIG_TC4XX_QSPI
+#ifdef CONFIG_TC4X_QSPI
   ret = tc4x7_qspi_bringup();
   if (ret < 0)
     {
@@ -150,7 +147,7 @@ int board_app_initialize(uintptr_t arg)
     }
 #endif
 
-#ifdef CONFIG_TC4XX_XSPI
+#ifdef CONFIG_TC4X_XSPI
   ret = tc4x7_xspi_initialize();
   if (ret < 0)
     {
@@ -175,7 +172,7 @@ int board_app_initialize(uintptr_t arg)
     }
 #endif
 
-#ifdef CONFIG_TC4XX_EGTM_PWM_LOWERHALF
+#ifdef CONFIG_TC4X_EGTM_PWM_LOWERHALF
   ret = tc4x7_pwm_bringup();
   if (ret < 0)
     {
@@ -183,5 +180,5 @@ int board_app_initialize(uintptr_t arg)
     }
 #endif
 
-  return ret;
+  UNUSED(ret);
 }

@@ -21,9 +21,7 @@
 ############################################################################
 include $(TOPDIR)/Make.defs
 
-ifeq ($(CONFIG_BOARDCTL),y)
 CSRCS = tc4x7_appinit.c
-endif
 
 ifeq ($(CONFIG_ARCH_LEDS),y)
 CSRCS += tc4x7_autoleds.c
@@ -37,23 +35,19 @@ ifeq ($(CONFIG_ARCH_BUTTONS),y)
 CSRCS += tc4x7_buttons.c
 endif
 
-ifeq ($(CONFIG_TC4XX_I2C),y)
-CSRCS += tc4xx_i2c_bringup.c
+ifeq ($(CONFIG_TC4X_I2C),y)
+CSRCS += tc4x7_i2c.c
 endif
 
-ifeq ($(CONFIG_TC4XX_GETH),y)
-CSRCS += tc4x7_ethernet.c
-endif
-
-ifeq ($(CONFIG_CAN),y)
+ifeq ($(CONFIG_CAN_MCAN),y)
 CSRCS += tc4x7_can.c
 endif
 
-ifeq ($(CONFIG_TC4XX_XSPI),y)
+ifeq ($(CONFIG_TC4X_XSPI),y)
 CSRCS += tc4x7_xspi.c
 endif
 
-ifeq ($(CONFIG_TC4XX_QSPI),y)
+ifeq ($(CONFIG_TC4X_QSPI),y)
 CSRCS += tc4x7_qspi.c
 endif
 

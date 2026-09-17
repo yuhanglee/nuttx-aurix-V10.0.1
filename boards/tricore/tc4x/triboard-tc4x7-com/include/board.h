@@ -20,8 +20,8 @@
  *
  ****************************************************************************/
 
-#ifndef __BOARDS_TRICORE_TC4XX_TRIBOARD_TC4X7_COM_INCLUDE_BOARD_H
-#define __BOARDS_TRICORE_TC4XX_TRIBOARD_TC4X7_COM_INCLUDE_BOARD_H
+#ifndef __BOARDS_TRICORE_TC4X_TRIBOARD_TC4X7_COM_INCLUDE_BOARD_H
+#define __BOARDS_TRICORE_TC4X_TRIBOARD_TC4X7_COM_INCLUDE_BOARD_H
 
 /****************************************************************************
  * Included Files
@@ -80,4 +80,4 @@
 #define NUM_BUTTONS       1
 #define BUTTON_USER1_BIT  (1 << BUTTON_USER1)
 
-#endif /* __BOARDS_TRICORE_TC4XX_TRIBOARD_TC4X7_COM_INCLUDE_BOARD_H */
+#endif /* __BOARDS_TRICORE_TC4X_TRIBOARD_TC4X7_COM_INCLUDE_BOARD_H */
