@@ -1,5 +1,5 @@
 # ##############################################################################
-# boards/tricore/tc397/a2g-tc397xa-3v3-tft/src/CMakeLists.txt
+# boards/tricore/tc3x/a2g-tc397xa-3v3-tft/src/CMakeLists.txt
 #
 # SPDX-License-Identifier: Apache-2.0
 #
@@ -20,7 +20,14 @@
 #
 # ##############################################################################
 
-set_property( GLOBAL PROPERTY LD_SCRIPT "${NUTTX_BOARD_DIR}/scripts/tricore-llvm.ld")
+if(CONFIG_TRICORE_TOOLCHAIN_LLVM)
+  set_property(
+    GLOBAL PROPERTY LD_SCRIPT
+                    "${NUTTX_DIR}/arch/tricore/src/common/tricore-llvm.ld")
+else()
+  set_property(
+    GLOBAL PROPERTY LD_SCRIPT "${NUTTX_DIR}/arch/tricore/src/common/tricore.ld")
+endif()
 
 set(SRCS tc397_appinit.c tc397_amp_secondary.c)
 
@@ -32,19 +39,15 @@ if(CONFIG_USERLED)
   list(APPEND SRCS tc397_userleds.c)
 endif()
 
-if(CONFIG_TC3XX_I2C)
-  list(APPEND SRCS tc3xx_i2c_bringup.c)
+if(CONFIG_TC3X_I2C)
+  list(APPEND SRCS tc397_i2c.c)
 endif()
 
-if(CONFIG_TC3XX_GETH)
-  list(APPEND SRCS tc397_ethernet.c)
-endif()
-
-if(CONFIG_CAN)
+if(CONFIG_CAN_MCAN)
   list(APPEND SRCS tc397_can.c)
 endif()
 
-if(CONFIG_TC3XX_QSPI2)
+if(CONFIG_TC3X_QSPI)
   list(APPEND SRCS tc397_qspi.c)
 endif()
 

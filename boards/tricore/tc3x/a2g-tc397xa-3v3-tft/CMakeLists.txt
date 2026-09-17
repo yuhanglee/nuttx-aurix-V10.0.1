@@ -1,5 +1,5 @@
 # ##############################################################################
-# boards/tricore/tc397/a2g-tc397-5v-tft/CMakeLists.txt
+# boards/tricore/tc3x/a2g-tc397xa-3v3-tft/CMakeLists.txt
 #
 # SPDX-License-Identifier: Apache-2.0
 #

@@ -20,8 +20,8 @@
  *
  ****************************************************************************/
 
-#ifndef __BOARDS_TRICORE_TC3XX_A2G_TC397XA_3V3_TFT_INCLUDE_BOARD_H
-#define __BOARDS_TRICORE_TC3XX_A2G_TC397XA_3V3_TFT_INCLUDE_BOARD_H
+#ifndef __BOARDS_TRICORE_TC3X_A2G_TC397XA_3V3_TFT_INCLUDE_BOARD_H
+#define __BOARDS_TRICORE_TC3X_A2G_TC397XA_3V3_TFT_INCLUDE_BOARD_H
 
 /****************************************************************************
  * Included Files
@@ -89,4 +89,4 @@
 #define LED_PANIC         7
 #define LED_IDLE          8
 
-#endif /* __BOARDS_TRICORE_TC3XX_A2G_TC397XA_3V3_TFT_INCLUDE_BOARD_H */
+#endif /* __BOARDS_TRICORE_TC3X_A2G_TC397XA_3V3_TFT_INCLUDE_BOARD_H */

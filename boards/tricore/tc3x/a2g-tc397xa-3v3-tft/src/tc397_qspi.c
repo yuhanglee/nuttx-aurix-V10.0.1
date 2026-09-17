@@ -35,7 +35,7 @@
 #include "tricore_gpio.h"
 #include "tc3x_qspi.h"
 
-#ifdef CONFIG_TC3XX_QSPI2
+#ifdef CONFIG_TC3X_QSPI2
 
 static void tc397_qspi2_pinmux(void)
 {
@@ -46,9 +46,9 @@ static void tc397_qspi2_pinmux(void)
   aurix_config_gpio(AURIX_GPIO(14, 2, GPIO_PERIPH, GPIO_ALT3));   /* SLSO1 */
 }
 
-#endif /* CONFIG_TC3XX_QSPI2 */
+#endif /* CONFIG_TC3X_QSPI2 */
 
-#ifdef CONFIG_TC3XX_QSPI3
+#ifdef CONFIG_TC3X_QSPI3
 
 static void tc397_qspi3_pinmux(void)
 {
@@ -62,9 +62,9 @@ static void tc397_qspi3_pinmux(void)
   aurix_config_gpio(AURIX_GPIO(0, 5, GPIO_PERIPH, GPIO_ALT3));    /* SLSO3 */
 }
 
-#endif /* CONFIG_TC3XX_QSPI3 */
+#endif /* CONFIG_TC3X_QSPI3 */
 
-#if defined(CONFIG_TC3XX_QSPI2) || defined(CONFIG_TC3XX_QSPI3)
+#if defined(CONFIG_TC3X_QSPI2) || defined(CONFIG_TC3X_QSPI3)
 
 int tc397_qspi_initialize(void)
 {
@@ -76,10 +76,10 @@ int tc397_qspi_initialize(void)
       return OK;
     }
 
-#ifdef CONFIG_TC3XX_QSPI2
+#ifdef CONFIG_TC3X_QSPI2
   tc397_qspi2_pinmux();
 
-  dev = tc3xx_qspibus_initialize(2);
+  dev = tc3x_qspibus_initialize(2);
   if (dev == NULL)
     {
       _err("QSPI2: bus initialize failed\n");
@@ -95,12 +95,12 @@ int tc397_qspi_initialize(void)
       }
   }
 #endif
-#endif /* CONFIG_TC3XX_QSPI2 */
+#endif /* CONFIG_TC3X_QSPI2 */
 
-#ifdef CONFIG_TC3XX_QSPI3
+#ifdef CONFIG_TC3X_QSPI3
   tc397_qspi3_pinmux();
 
-  dev = tc3xx_qspibus_initialize(3);
+  dev = tc3x_qspibus_initialize(3);
   if (dev == NULL)
     {
       _err("QSPI3: bus initialize failed\n");
@@ -117,10 +117,10 @@ int tc397_qspi_initialize(void)
 
   }
 #endif
-#endif /* CONFIG_TC3XX_QSPI3 */
+#endif /* CONFIG_TC3X_QSPI3 */
 
   s_initialized = true;
   return OK;
 }
 
-#endif /* CONFIG_TC3XX_QSPI2 || CONFIG_TC3XX_QSPI3 */
+#endif /* CONFIG_TC3X_QSPI2 || CONFIG_TC3X_QSPI3 */

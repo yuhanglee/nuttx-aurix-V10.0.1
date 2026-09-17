@@ -20,8 +20,8 @@
  *
  ****************************************************************************/
 
-#ifndef __BOARDS_TRICORE_TC3XX_A2G_TC397XA_3V3_TFT_SRC_TC397_H
-#define __BOARDS_TRICORE_TC3XX_A2G_TC397XA_3V3_TFT_SRC_TC397_H
+#ifndef __BOARDS_TRICORE_TC3X_A2G_TC397XA_3V3_TFT_SRC_TC397_H
+#define __BOARDS_TRICORE_TC3X_A2G_TC397XA_3V3_TFT_SRC_TC397_H
 
 /****************************************************************************
  * Included Files
@@ -31,7 +31,7 @@
 
 #include <stdint.h>
 
-#include "tc3xx_gpio.h"
+#include "tricore_gpio.h"
 
 /****************************************************************************
  * Pre-processor Definitions
@@ -61,4 +61,4 @@
 
 #define GPIO_NLEDS  4
 
-#endif /* __BOARDS_TRICORE_TC3XX_A2G_TC397XA_3V3_TFT_SRC_TC397_H */
+#endif /* __BOARDS_TRICORE_TC3X_A2G_TC397XA_3V3_TFT_SRC_TC397_H */

@@ -21,18 +21,10 @@
 ############################################################################
 include $(TOPDIR)/Make.defs
 
-ifeq ($(CONFIG_BOARDCTL),y)
-CSRCS += tc397_appinit.c
+CSRCS = tc397_appinit.c
 
 # AMP secondary CPU init thread (used when INIT_ENTRYPOINT=amp_secondary_main)
 CSRCS += tc397_amp_secondary.c
-endif
-
-# Always compile the board init file: it provides the
-# board_aurix_setup_serial_pin() weak override that AMP secondary
-# CPUs (which don't enable CONFIG_BOARDCTL) still need at boot to
-# configure the shared ASCLIN0 pins.
-CSRCS = tc397_appinit.c
 
 ifeq ($(CONFIG_ARCH_LEDS),y)
 CSRCS += tc397_autoleds.c
@@ -42,22 +34,15 @@ ifeq ($(CONFIG_USERLED),y)
 CSRCS += tc397_userleds.c
 endif
 
-# AMP secondary CPU init thread (used when INIT_ENTRYPOINT=amp_secondary_main)
-CSRCS += tc397_amp_secondary.c
-
-ifeq ($(CONFIG_TC3XX_I2C),y)
-CSRCS += tc3xx_i2c_bringup.c
+ifeq ($(CONFIG_TC3X_I2C),y)
+CSRCS += tc397_i2c.c
 endif
 
-ifeq ($(CONFIG_TC3XX_GETH),y)
-CSRCS += tc397_ethernet.c
-endif
-
-ifeq ($(CONFIG_CAN),y)
+ifeq ($(CONFIG_CAN_MCAN),y)
 CSRCS += tc397_can.c
 endif
 
-ifeq ($(CONFIG_TC3XX_QSPI),y)
+ifeq ($(CONFIG_TC3X_QSPI),y)
 CSRCS += tc397_qspi.c
 endif
 
