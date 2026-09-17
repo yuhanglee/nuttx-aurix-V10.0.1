@@ -14,6 +14,11 @@ config TC3X_CHIP_TC375
 	---help---
 		Infineon AURIX TC375.
 
+config TC3X_CHIP_TC397
+	bool "TC397 SoC"
+	---help---
+		Infineon AURIX TC397.
+
 endchoice
 
 config ARCH_TRICORE_CPU_COUNT
