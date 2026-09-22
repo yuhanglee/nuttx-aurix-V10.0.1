@@ -233,6 +233,7 @@ struct xgmac_driver_s
 
   bool ifup;
   bool txcoe;
+  uint8_t rxch;      /* RX channel to look at first, for fairness */
 };
 
 /* Size of one RX DMA buffer.  The DMA counts the 4 octet FCS against it

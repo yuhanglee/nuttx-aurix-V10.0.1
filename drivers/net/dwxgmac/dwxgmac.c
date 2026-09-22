@@ -494,13 +494,24 @@ static int dwxgmac_transmit(FAR struct netdev_lowerhalf_s *dev,
 static FAR netpkt_t *dwxgmac_receive(FAR struct netdev_lowerhalf_s *dev)
 {
   FAR struct xgmac_driver_s *priv = (FAR struct xgmac_driver_s *)dev;
+  uint8_t nch = priv->config->dwmac.dma_rx_channel;
   uint8_t ch;
+  uint8_t i;
 
-  for (ch = 0; ch < priv->config->dwmac.dma_rx_channel; ch++)
+  /* Each call hands up one frame, so always starting the search at channel
+   * zero lets a busy channel keep the others waiting: with one VLAN per
+   * channel the lowest priority one takes almost the whole link.  Carry on
+   * from where the last frame came from instead.
+   */
+
+  for (i = 0; i < nch; i++)
     {
-      const struct eth_dwmac_dma_ch_config *dcfg =
-        &priv->config->dwmac.dma_rx[ch];
-      struct eth_dwmac_dma_rx_ch_data *d = &priv->data->dwmac.dma_rx[ch];
+      const struct eth_dwmac_dma_ch_config *dcfg;
+      struct eth_dwmac_dma_rx_ch_data *d;
+
+      ch   = (priv->rxch + i) % nch;
+      dcfg = &priv->config->dwmac.dma_rx[ch];
+      d    = &priv->data->dwmac.dma_rx[ch];
 
       for (; ; )
         {
@@ -557,6 +568,7 @@ static FAR netpkt_t *dwxgmac_receive(FAR struct netdev_lowerhalf_s *dev)
             }
 
           netpkt_setdatalen(dev, pkt, pktlen);
+          priv->rxch = (ch + 1) % nch;
           return pkt;
         }
     }
