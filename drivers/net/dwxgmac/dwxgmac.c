@@ -299,6 +299,30 @@ static void xgmac_check_caps(FAR struct xgmac_driver_s *priv)
   if (rxfifo < CONFIG_NET_ETH_PKTSIZE || txfifo < CONFIG_NET_ETH_PKTSIZE)
     nerr("MTL queue smaller than one frame: rx=%" PRIu32 " tx=%" PRIu32 "\n",
          rxfifo, txfifo);
+
+  /* The checksum engine has to hold the whole frame in the transmit queue
+   * until the sum is known, and OSF lets the DMA push a second frame in
+   * behind it.  With less room than that the MAC sends the frame on with
+   * the checksum field untouched instead of reporting anything, which the
+   * peer then discards: TCP looks connected but never carries data.  Fall
+   * back to the checksums computed by the network stack, which only exist
+   * if they were left enabled.
+   */
+
+  if (priv->txcoe && txfifo < 2 * CONFIG_NET_ETH_PKTSIZE)
+    {
+      priv->txcoe = false;
+      priv->data->dwmac.txcoe_available = false;
+
+#ifdef CONFIG_NET_TCP_CHECKSUMS
+      syslog(LOG_INFO, "xgmac: TX FIFO %" PRIu32 " B per queue, checksum "
+             "insertion disabled\n", txfifo);
+#else
+      nerr("TX FIFO %" PRIu32 " B per queue cannot insert checksums and "
+           "CONFIG_NET_TCP_CHECKSUMS is off: TCP will not pass data\n",
+           txfifo);
+#endif
+    }
 }
 
 static void mtl_init(FAR struct xgmac_driver_s *priv)
