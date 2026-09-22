@@ -35,7 +35,7 @@
 #include <nuttx/net/mii.h>
 #include <nuttx/net/mdio.h>
 
-#include "tc3xx_gpio.h"
+#include "tricore_gpio.h"
 
 /* KIT_A2G_TC375_LITE: DP83825I 10/100 PHY on RMII, MDIO address 0 */
 

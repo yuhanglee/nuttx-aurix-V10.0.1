@@ -228,6 +228,7 @@ void board_late_initialize(void)
   mcmcan_board_initialize();
 #endif
 
+
 #ifdef CONFIG_TRICORE_LIN_SOCKET
   {
     int ret = tricore_lin_sock_initialize();
@@ -237,6 +238,10 @@ void board_late_initialize(void)
         _err("ERROR: tricore_lin_sock_initialize failed: %d\n", ret);
       }
   }
+#endif
+
+#ifdef CONFIG_TC3XX_GETH
+  tc375_ethernet_initialize();
 #endif
 
 #if defined(CONFIG_ARCH_BUTTONS) && defined(CONFIG_INPUT_BUTTONS_LOWER)
