@@ -833,6 +833,7 @@ enum
 /* 17.3.5, 17.4.6 */
 
 #define MTL_TXQi_QUANTUM_WEIGHT(i) (0x0d18 + 0x40 * (i))
+#define MTL_TXQi_QUANTUM_WEIGHT_ISCQW GENMASK(20, 0)
 
 /* 17.4.7 */
 

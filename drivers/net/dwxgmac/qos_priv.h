@@ -572,6 +572,14 @@ static inline void eth_dwmac_mtl_txq_init(const struct xgmac_driver_s *priv,
                                         qcfg->threshold)) |
                 MTL_TXQi_OPERATION_MODE_TXQEN,
                 priv->base + MTL_TXQi_OPERATION_MODE(queue));
+
+  /* queue fills up, the DMA channel stops after the first descriptor
+   * and every transmit fails with -ENOSPC. One credit per queue gives
+   * plain round robin.
+   */
+
+  xgmac_write(FIELD_PREP(MTL_TXQi_QUANTUM_WEIGHT_ISCQW, 1),
+                priv->base + MTL_TXQi_QUANTUM_WEIGHT(queue));
 }
 
 static inline void eth_dwmac_mtl_set_rxq_ctrl(const struct xgmac_driver_s *priv)
