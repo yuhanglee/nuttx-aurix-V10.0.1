@@ -183,6 +183,15 @@ config TC3X_WDT_FSPB
 		Source clock for the WDT divider chain.  TC375 runs fSPB at
 		100 MHz by default; adjust to match your clock-tree.
 
+# GPT12 — shared instance base address
+config TC3X_GPT120_BASE
+	hex "GPT120 module base address"
+	default 0xF0001800
+	depends on TC3X_GPT1_PWM || TC3X_GPT2_PWM || TC3X_GPT1_CAP || TC3X_GPT2_CAP
+	---help---
+		Base address of the GPT120 peripheral. Verify against the TC3xx
+		User Manual address map chapter before use.
+
 # GPT1 PWM
 menuconfig TC3X_GPT1_PWM
 	bool "TC3xx GPT1 PWM output (T2/T3/T4)"
@@ -200,13 +209,6 @@ menuconfig TC3X_GPT1_PWM
 		approximately 381 kHz.
 
 if TC3X_GPT1_PWM
-
-config TC3X_GPT120_BASE
-	hex "GPT120 module base address"
-	default 0xF0001800
-	---help---
-		Base address of the GPT120 peripheral. Verify against the TC3xx
-		User Manual address map chapter before use.
 
 config TC3X_GPT1_PWM_T3_SRN
 	int "GPT120 T3 overflow SRN (Service Request Node) index"
