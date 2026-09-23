@@ -63,7 +63,7 @@
 #define CONFIG_MCMCAN_NODE0_RX_FIFO1        32
 #define CONFIG_MCMCAN_NODE0_TX_EVENTS       16
 #define CONFIG_MCMCAN_NODE0_TX_SLOTS        16
-#define CONFIG_MCMCAN_NODE0_NPCR            0x2
+#define CONFIG_MCMCAN_NODE0_NPCR            0x4
 
 static struct can_dev_s g_node0_candev;
 
