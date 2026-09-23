@@ -333,7 +333,9 @@ static int tc3x_smu_irq_handler(int irq, void *context, void *arg)
 
 int tc3x_smu_initialize(void)
 {
+#ifdef CONFIG_TC3X_SMU_DISABLE_DOUBLE_RESET_GUARD
   irqstate_t flags;
+#endif
 
   /* On the second consecutive SMU-triggered Application Reset the
    * hardware enters permanent reset until a cold power cycle.
