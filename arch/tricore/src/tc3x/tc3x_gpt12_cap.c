@@ -287,6 +287,8 @@ static struct tc3x_gpt12_cap_s g_gpt12_cap0 =
 
 static bool g_gpt2_caprel_busy;
 
+#endif /* CONFIG_TC3X_GPT2_CAP */
+
 #ifdef CONFIG_TC3X_GPT1_CAP
 static int g_gpt1_t3_users;
 #endif
@@ -597,6 +599,8 @@ static int gpt12_cap_stop_hw(FAR struct tc3x_gpt12_cap_s *priv)
 /****************************************************************************
  * Public Functions
  ****************************************************************************/
+
+#ifdef CONFIG_TC3X_GPT2_CAP
 
 static void gpt12_gpt2_t5_init(FAR struct tc3x_gpt12_cap_s *priv)
 {
