@@ -45,7 +45,10 @@
  * boundary, where width is src/dst_width.
  */
 
-#define TRICORE_DMA_BURST(moves)   (moves)
+#define TRICORE_DMA_MOVES_MASK     0x00ffu
+#define TRICORE_DMA_BURST(moves)   ((moves) & TRICORE_DMA_MOVES_MASK)
+
+#define TRICORE_DMA_FIFO_PACED     0x0100u
 
 /****************************************************************************
  * Public Function Prototypes

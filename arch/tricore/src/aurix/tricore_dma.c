@@ -98,6 +98,11 @@
 #  define TRICORE_DMA_RP0            0
 #endif
 
+/* Internal per-channel state flags (dmach->flags) */
+
+#define TRICORE_DMACH_FIFO_PACED    (1u << 0)  /* FIFO-gated peripheral: RROAT */
+#define TRICORE_DMACH_BOOTSTRAP     (1u << 1)  /* Pending one-shot SCH kick    */
+
 /****************************************************************************
  * Private Types
  ****************************************************************************/
@@ -117,6 +122,7 @@ struct tricore_dmach_s
   int8_t               src_step;    /* >0 increment source, 0 hold fixed */
   int8_t               dst_step;    /* >0 increment dest, 0 hold fixed */
   bool                 cyclic;      /* Continuous double-buffer transfer */
+  uint8_t              flags;       /* TRICORE_DMACH_* channel state */
 
   /* Active transfer bookkeeping */
 
@@ -324,7 +330,8 @@ static int tricore_dma_config(FAR struct dma_chan_s *chan,
       return -EINVAL;
     }
 
-  moves = cfg->option ? cfg->option : 1;
+  moves = (cfg->option & TRICORE_DMA_MOVES_MASK) ?
+          (cfg->option & TRICORE_DMA_MOVES_MASK) : 1;
   blkm  = tricore_dma_moves2blkm(moves);
   if (blkm < 0)
     {
@@ -334,6 +341,14 @@ static int tricore_dma_config(FAR struct dma_chan_s *chan,
   dmach->width      = width;
   dmach->blkm_moves = (uint8_t)moves;
   dmach->blkm_enc   = (uint8_t)blkm;
+
+  dmach->flags = 0;
+  if ((cfg->option & TRICORE_DMA_FIFO_PACED) != 0 &&
+      cfg->direction != DMA_MEM_TO_MEM)
+    {
+      dmach->flags = TRICORE_DMACH_FIFO_PACED | TRICORE_DMACH_BOOTSTRAP;
+    }
+
   return OK;
 }
 
@@ -401,7 +416,8 @@ static int tricore_dma_start(FAR struct dma_chan_s *chan,
   chcfgr |= ((uint32_t)dmach->blkm_enc << DMA_CHCFGR_BLKM_SHIFT);
   chcfgr |= (trel << DMA_CHCFGR_TREL_SHIFT) & DMA_CHCFGR_TREL_MASK;
 
-  if (dmach->dir == DMA_MEM_TO_MEM)
+  if (dmach->dir == DMA_MEM_TO_MEM ||
+      (dmach->flags & TRICORE_DMACH_FIFO_PACED) != 0)
     {
       chcfgr |= DMA_CHCFGR_RROAT;
     }
@@ -421,6 +437,13 @@ static int tricore_dma_start(FAR struct dma_chan_s *chan,
 #ifdef TRICORE_DMA_HAVE_ERR_IRQ
       modreg32(DMA_TSR_ETRL, DMA_TSR_ETRL, TRICORE_DMA_TSR(channel));
 #endif
+
+      if ((dmach->flags & TRICORE_DMACH_BOOTSTRAP) != 0)
+        {
+          dmach->flags &= ~TRICORE_DMACH_BOOTSTRAP;
+          putreg32(DMA_CHCSR_SCH, TRICORE_DMA_CHCSR(channel));
+        }
+
       return OK;
     }
 
@@ -741,8 +764,12 @@ static int tricore_dma_stop(FAR struct dma_chan_s *chan)
 
   putreg32(DMA_CHCSR_CICH, TRICORE_DMA_CHCSR(channel));
 
-  dmach->callback = NULL;
-  dmach->cyclic   = false;
+  dmach->callback  = NULL;
+  dmach->cyclic    = false;
+  if ((dmach->flags & TRICORE_DMACH_FIFO_PACED) != 0)
+    {
+      dmach->flags |= TRICORE_DMACH_BOOTSTRAP;
+    }
 
   dmainfo("ch %u: stopped\n", channel);
 
@@ -865,6 +892,7 @@ static FAR struct dma_chan_s *tricore_dma_get_chan(FAR struct dma_dev_s *dev,
   dmach->arg        = NULL;
   dmach->dir        = DMA_MEM_TO_MEM;
   dmach->cyclic     = false;
+  dmach->flags      = 0;
   dmach->blkm_moves = 1;
   dmach->blkm_enc   = DMA_BLKM_1_MOVE;
   dmach->src_step   = 1;
