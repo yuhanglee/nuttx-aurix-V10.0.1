@@ -80,7 +80,7 @@ config TRICORE_ASCLINF_FREQUENCY
 	int "ASCLIN fASCLIN clock frequency (Hz)"
 	default 200000000 if ARCH_CHIP_FAMILY_TC4X
 	default 200000000 if ARCH_CHIP_FAMILY_TC3X
-	depends on TRICORE_UART0 || TRICORE_UART1
+	depends on TRICORE_UART0 || TRICORE_UART1 || TRICORE_LIN_SOCKET
 	---help---
 		ASCLIN baud generator source clock (fASCLIN), in Hz.
 
@@ -129,6 +129,62 @@ config TRICORE_ASCLIN_CLK_SRC
 		0 = NOCLK (clock off), 2 = FASCLINF (fast ASCLIN clock,
 		default for the on-board console), 4 = FASCLINS (slow ASCLIN
 		clock). Values 1 and 3 are reserved.
+
+menuconfig TRICORE_LIN_SOCKET
+	bool "ASCLIN native LIN SocketCAN"
+	default n
+	depends on NET_CAN
+	select NET_CAN_HAVE_ERRORS
+	---help---
+		Drive ASCLIN instances as SocketCAN native LIN master
+		(commander) interfaces.  Every enabled instance registers as
+		the next free "lin%d" network device, in ascending ASCLIN
+		order.  ASCLIN0, ASCLIN1 and ASCLIN4 are offered.  The service
+		request numbers follow from the instance index and the RX
+		input select (IOCR.ALTI) is returned by the board pin hook
+		board_aurix_setup_lin_pin().
+
+if TRICORE_LIN_SOCKET
+
+config TRICORE_LIN_PRESCALER
+	int "LIN bit timing prescaler (BITCON.PRESCALER + 1)"
+	default 4
+	range 1 4096
+
+config TRICORE_LIN_CLK_SRC
+	int "LIN ASCLIN clock source (CSR.CLKSEL)"
+	default 2
+	---help---
+		2 selects fASCLINF, 4 selects fASCLINS.
+
+config TRICORE_LIN0
+	bool "LIN on ASCLIN0"
+	default n
+
+config TRICORE_LIN0_BAUD
+	int "ASCLIN0 LIN bit rate (bps)"
+	depends on TRICORE_LIN0
+	default 19200
+
+config TRICORE_LIN1
+	bool "LIN on ASCLIN1"
+	default n
+
+config TRICORE_LIN1_BAUD
+	int "ASCLIN1 LIN bit rate (bps)"
+	depends on TRICORE_LIN1
+	default 19200
+
+config TRICORE_LIN4
+	bool "LIN on ASCLIN4"
+	default n
+
+config TRICORE_LIN4_BAUD
+	int "ASCLIN4 LIN bit rate (bps)"
+	depends on TRICORE_LIN4
+	default 19200
+
+endif # TRICORE_LIN_SOCKET
 
 config TC4X_GPIO_ACCESS_GROUP
 	int "TC4X port access group"

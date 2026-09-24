@@ -42,6 +42,12 @@
  ****************************************************************************/
 #define ASCLIN_REG(base, off)       ((base) + (off))
 
+#define TRICORE_ASCLIN_IRQ_STRIDE   3
+#define TRICORE_ASCLIN_TXIRQ(n)     (TRICORE_ASCLIN_IRQ_BASE + \
+                                     (n) * TRICORE_ASCLIN_IRQ_STRIDE)
+#define TRICORE_ASCLIN_RXIRQ(n)     (TRICORE_ASCLIN_TXIRQ(n) + 1)
+#define TRICORE_ASCLIN_ERIRQ(n)     (TRICORE_ASCLIN_TXIRQ(n) + 2)
+
 #define ASCLIN_CLC_DISR             BIT(0)
 #define ASCLIN_CLC_DISS             BIT(1)
 #define ASCLIN_CLC_EDIS             BIT(3)
@@ -131,7 +137,16 @@
 #define ASCLIN_DATCON_TRGSRC_SHIFT  8
 #define ASCLIN_DATCON_TRGSRC_MASK   GENMASK(9, 8)
 
+#define ASCLIN_DATCON_HO            BIT(13)
+#define ASCLIN_DATCON_RM            BIT(14)
+#define ASCLIN_DATCON_CSM           BIT(15)
+#define ASCLIN_DATCON_RESPONSE_SHIFT 16
+#define ASCLIN_DATCON_RESPONSE_MASK GENMASK(23, 16)
+
 #define ASCLIN_DATCON_DATLEN(n)     (((n) - 1) & 0xf)
+#define ASCLIN_DATCON_RESPONSE(n)   ((((uint32_t)(n)) << \
+                                     ASCLIN_DATCON_RESPONSE_SHIFT) & \
+                                     ASCLIN_DATCON_RESPONSE_MASK)
 
 #define ASCLIN_BRG_DENOMINATOR_SHIFT  0
 #define ASCLIN_BRG_DENOMINATOR_MASK   GENMASK(11, 0)
@@ -153,6 +168,9 @@
 #define ASCLIN_FLAGS_HT             BIT(19)
 #define ASCLIN_FLAGS_RT             BIT(20)
 #define ASCLIN_FLAGS_BD             BIT(21)
+#define ASCLIN_FLAGS_LP             BIT(22)
+#define ASCLIN_FLAGS_LA             BIT(23)
+#define ASCLIN_FLAGS_LC             BIT(24)
 #define ASCLIN_FLAGS_CE             BIT(25)
 #define ASCLIN_FLAGS_RFO            BIT(26)
 #define ASCLIN_FLAGS_RFU            BIT(27)
@@ -173,6 +191,9 @@
 #define ASCLIN_FLAGSCLEAR_HTC       BIT(19)
 #define ASCLIN_FLAGSCLEAR_RTC       BIT(20)
 #define ASCLIN_FLAGSCLEAR_BDC       BIT(21)
+#define ASCLIN_FLAGSCLEAR_LPC       BIT(22)
+#define ASCLIN_FLAGSCLEAR_LAC       BIT(23)
+#define ASCLIN_FLAGSCLEAR_LCC       BIT(24)
 #define ASCLIN_FLAGSCLEAR_CEC       BIT(25)
 #define ASCLIN_FLAGSCLEAR_RFOC      BIT(26)
 #define ASCLIN_FLAGSCLEAR_RFUC      BIT(27)
@@ -183,6 +204,9 @@
 #define ASCLIN_FLAGSCLEAR_ALL_ERRS  (ASCLIN_FLAGSCLEAR_PEC  | \
                                      ASCLIN_FLAGSCLEAR_FEC  | \
                                      ASCLIN_FLAGSCLEAR_BDC  | \
+                                     ASCLIN_FLAGSCLEAR_LPC  | \
+                                     ASCLIN_FLAGSCLEAR_LAC  | \
+                                     ASCLIN_FLAGSCLEAR_LCC  | \
                                      ASCLIN_FLAGSCLEAR_CEC  | \
                                      ASCLIN_FLAGSCLEAR_RFOC | \
                                      ASCLIN_FLAGSCLEAR_RFUC | \
@@ -201,6 +225,9 @@
                                      ASCLIN_FLAGSCLEAR_HTC  | \
                                      ASCLIN_FLAGSCLEAR_RTC  | \
                                      ASCLIN_FLAGSCLEAR_BDC  | \
+                                     ASCLIN_FLAGSCLEAR_LPC  | \
+                                     ASCLIN_FLAGSCLEAR_LAC  | \
+                                     ASCLIN_FLAGSCLEAR_LCC  | \
                                      ASCLIN_FLAGSCLEAR_CEC  | \
                                      ASCLIN_FLAGSCLEAR_RFOC | \
                                      ASCLIN_FLAGSCLEAR_RFUC | \
@@ -209,6 +236,10 @@
                                      ASCLIN_FLAGSCLEAR_TFLC)
 
 #define ASCLIN_FLAGSSET_THS         BIT(0)
+#define ASCLIN_FLAGSSET_SWTRGS      BIT(12)
+#define ASCLIN_FLAGSSET_TWRQS       BIT(13)
+#define ASCLIN_FLAGSSET_THRQS       BIT(14)
+#define ASCLIN_FLAGSSET_TRRQS       BIT(15)
 #define ASCLIN_FLAGSSET_TFLC        BIT(31)
 
 #define ASCLIN_FLAGSENABLE_THE      BIT(0)
@@ -221,13 +252,26 @@
 #define ASCLIN_FLAGSENABLE_PEE      BIT(16)
 #define ASCLIN_FLAGSENABLE_TCE      BIT(17)
 #define ASCLIN_FLAGSENABLE_FEE      BIT(18)
+#define ASCLIN_FLAGSENABLE_HTE      BIT(19)
+#define ASCLIN_FLAGSENABLE_RTE      BIT(20)
 #define ASCLIN_FLAGSENABLE_BDE      BIT(21)
+#define ASCLIN_FLAGSENABLE_LPE      BIT(22)
+#define ASCLIN_FLAGSENABLE_LAE      BIT(23)
+#define ASCLIN_FLAGSENABLE_LCE      BIT(24)
 #define ASCLIN_FLAGSENABLE_CEE      BIT(25)
 #define ASCLIN_FLAGSENABLE_RFOE     BIT(26)
 #define ASCLIN_FLAGSENABLE_RFUE     BIT(27)
 #define ASCLIN_FLAGSENABLE_RFLE     BIT(28)
 #define ASCLIN_FLAGSENABLE_TFOE     BIT(30)
 #define ASCLIN_FLAGSENABLE_TFLE     BIT(31)
+
+#define ASCLIN_LINCON_CSI           BIT(23)
+#define ASCLIN_LINCON_CSEN          BIT(25)
+#define ASCLIN_LINCON_MS            BIT(26)
+#define ASCLIN_LINCON_ABD           BIT(27)
+
+#define ASCLIN_LINBTIMER_BREAK_MASK GENMASK(5, 0)
+#define ASCLIN_LINHTIMER_HEADER_MASK GENMASK(7, 0)
 
 #define ASCLIN_CSR_CLKSEL_SHIFT     0
 #define ASCLIN_CSR_CLKSEL_MASK      GENMASK(4, 0)

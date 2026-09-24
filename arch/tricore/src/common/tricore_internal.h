@@ -182,6 +182,11 @@ void aurix_serialinit(void);
 
 void board_aurix_setup_serial_pin(int idx);
 
+#ifdef CONFIG_TRICORE_LIN_SOCKET
+int tricore_lin_sock_initialize(void);
+int board_aurix_setup_lin_pin(int idx);
+#endif
+
 #ifdef CONFIG_TRICORE_FLASH_MTD
 struct mtd_dev_s;
 struct mtd_dev_s *tricore_flash_initialize(void);

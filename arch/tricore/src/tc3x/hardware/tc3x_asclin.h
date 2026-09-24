@@ -32,6 +32,7 @@
 #define TRICORE_ASCLIN_STRIDE       0x100
 #define TRICORE_ASCLIN_BASE(n)      ((n) <= 9 ? (TRICORE_ASCLIN0_BASE + ((uint32_t)(n) * TRICORE_ASCLIN_STRIDE)) \
                                      : (0xf02c0a00 + (((uint32_t)(n) - 10) * TRICORE_ASCLIN_STRIDE)))
+#define TRICORE_ASCLIN_IRQ_BASE     20
 
 #define ASCLIN_CLC_OFFSET           0x00
 #define ASCLIN_IOCR_OFFSET          0x04
