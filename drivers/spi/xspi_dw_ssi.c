@@ -75,13 +75,6 @@ static inline void dw_ssi_write(FAR struct xspi_dw_ssi_s *priv,
   xspi_write(val, priv->cfg->base + offset);
 }
 
-static inline void dw_ssi_modify(FAR struct xspi_dw_ssi_s *priv,
-                                 unsigned int offset,
-                                 uint32_t clrbits, uint32_t setbits)
-{
-  xspi_modreg(setbits, clrbits | setbits, priv->cfg->base + offset);
-}
-
 static int dw_ssi_lock(FAR struct xspi_dev_s *dev, bool lock)
 {
   FAR struct xspi_dw_ssi_s *priv = (FAR struct xspi_dw_ssi_s *)dev;
