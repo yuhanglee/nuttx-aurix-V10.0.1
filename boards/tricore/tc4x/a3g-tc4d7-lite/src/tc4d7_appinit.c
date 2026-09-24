@@ -27,8 +27,10 @@
 #include <nuttx/config.h>
 #include <sys/types.h>
 #include <debug.h>
+#include <errno.h>
 
 #include "tricore_gpio.h"
+#include "tricore_asclin.h"
 
 #ifdef CONFIG_USERLED_LOWER
 #  include <debug.h>
@@ -58,6 +60,7 @@ int tc4d7_qspi_bringup(void);
 #ifdef CONFIG_CAN_MCAN
 #  include <debug.h>
 int mcmcan_board_initialize(void);
+
 #endif
 
 #ifdef CONFIG_TRICORE_FLASH_MTD
@@ -290,6 +293,10 @@ void board_aurix_setup_i2c_pin(int bus)
 }
 #endif
 
+#ifdef CONFIG_TRICORE_LIN_SOCKET
+int tricore_lin_sock_initialize(void);
+#endif
+
 void board_aurix_setup_serial_pin(int idx)
 {
   switch (idx)
@@ -308,6 +315,23 @@ void board_aurix_setup_serial_pin(int idx)
         break;
     }
 }
+
+#ifdef CONFIG_TRICORE_LIN_SOCKET
+
+int board_aurix_setup_lin_pin(int idx)
+{
+  if (idx != 1)
+    {
+      return -ENODEV;
+    }
+
+  aurix_config_gpio(AURIX_GPIO(15, 0, GPIO_PERIPH, GPIO_ALT2) |
+                    GPIO_OPEN_DRAIN);
+  aurix_config_gpio(AURIX_GPIO(15, 1, GPIO_INPUT, GPIO_PULL_UP));
+
+  return ASCLIN_IOCR_ALTI_A;
+}
+#endif
 
 int board_app_initialize(uintptr_t arg)
 {
@@ -380,6 +404,17 @@ void board_late_initialize(void)
     if (ret < 0)
       {
         _err("CAN init failed: %d\n", ret);
+      }
+  }
+#endif
+
+#ifdef CONFIG_TRICORE_LIN_SOCKET
+  {
+    int ret = tricore_lin_sock_initialize();
+
+    if (ret < 0)
+      {
+        _err("ERROR: tricore_lin_sock_initialize failed: %d\n", ret);
       }
   }
 #endif

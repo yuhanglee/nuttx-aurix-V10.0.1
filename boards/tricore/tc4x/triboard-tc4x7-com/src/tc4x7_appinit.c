@@ -26,6 +26,7 @@
 
 #include <sys/types.h>
 #include <debug.h>
+#include <errno.h>
 
 #include <nuttx/config.h>
 #include <nuttx/board.h>
@@ -36,6 +37,7 @@
 #endif
 
 #include "tricore_gpio.h"
+#include "tricore_asclin.h"
 
 #ifdef CONFIG_TC4X_WDT
 #include "hardware/tc4x_wdt.h"
@@ -92,6 +94,12 @@ void board_aurix_setup_i2c_pin(int bus)
   aurix_config_gpio(sdapin);
 }
 
+#ifdef CONFIG_TRICORE_LIN_SOCKET
+#define TC4X7_LIN_ASCLIN 4
+
+int tricore_lin_sock_initialize(void);
+#endif
+
 void board_aurix_setup_serial_pin(int idx)
 {
   if (idx != 0)
@@ -102,6 +110,26 @@ void board_aurix_setup_serial_pin(int idx)
   aurix_config_gpio(AURIX_GPIO(14, 0, GPIO_PERIPH, GPIO_ALT2));
   aurix_config_gpio(AURIX_GPIO(14, 1, GPIO_INPUT, GPIO_PULL_UP));
 }
+
+#ifdef CONFIG_TRICORE_LIN_SOCKET
+int board_aurix_setup_lin_pin(int idx)
+{
+  gpio_pinset_t enpin = AURIX_GPIO(0, 7, GPIO_OUTPUT, GPIO_ALT0);
+
+  if (idx != TC4X7_LIN_ASCLIN)
+    {
+      return -ENODEV;
+    }
+
+  aurix_config_gpio(enpin);
+  aurix_gpio_write(enpin, true);
+
+  aurix_config_gpio(AURIX_GPIO(0, 9, GPIO_PERIPH, GPIO_ALT5));
+  aurix_config_gpio(AURIX_GPIO(0, 12, GPIO_INPUT, GPIO_PULL_UP));
+
+  return ASCLIN_IOCR_ALTI_A;
+}
+#endif
 
 #if defined(CONFIG_TC4X7_PWM_ANY) || defined(CONFIG_TC4X7_ATOM_ANY)
 
@@ -355,6 +383,14 @@ void board_late_initialize(void)
 
 #ifdef CONFIG_CAN_MCAN
   mcmcan_board_initialize();
+#endif
+
+#ifdef CONFIG_TRICORE_LIN_SOCKET
+  ret = tricore_lin_sock_initialize();
+  if (ret < 0)
+    {
+      _err("ERROR: tricore_lin_sock_initialize failed: %d\n", ret);
+    }
 #endif
 
 #ifdef CONFIG_TC4X_QSPI
