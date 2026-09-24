@@ -148,14 +148,14 @@ SECTIONS
 		_ebss = ABSOLUTE(.);
 	} > BSS_MEM
 
-	.ustack . : ALIGN(8) FLAGS(aw)
+	.ustack : ALIGN(8) FLAGS(aw)
 	{
 		. +=  CONFIG_IDLETHREAD_STACKSIZE ;
 		__USTACK =  . ;
 	} > BSS_MEM
 
 #if defined(CONFIG_ARCH_INTERRUPTSTACK)
-	.istack . : ALIGN(8) FLAGS(aw)
+	.istack : ALIGN(8) FLAGS(aw)
 	{
 		. += CONFIG_ARCH_INTERRUPTSTACK;
 		__istack =  . ;
