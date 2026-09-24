@@ -611,3 +611,242 @@ config TC4X_GPT2_PWM_T6_SRN
 		GPT120=1413, GPT121=1419, GPT122=1425, GPT123=1431.
 
 endif # TC4X_GPT2_PWM
+
+menuconfig TC4X_I2S
+	bool "TC48x AUDIO TDM / I2S driver"
+	default n
+	depends on I2S && TC4X_CHIP_TC487
+	---help---
+		Enable the AURIX TC48x AUDIO TDM audio-serial (I2S) lower-half
+		driver.  The SoC is the I2S master (BCLK/WS/MCLK from the 98.304 MHz
+		Audio PLL).  AUDIO exists only on TC48x, hence the TC4X_CHIP_TC487
+		dependency.  Default data path is CPU FIFO fill/drain.
+
+if TC4X_I2S
+
+comment "Common I2S/TDM options (shared by all instances)"
+
+config TC4X_I2S_MAXINFLIGHT
+	int "Maximum in-flight audio buffers"
+	default 16
+	range 2 64
+	---help---
+		Preallocated buffer containers shared by the TX and RX queues:
+		the max number of audio buffers enqueued but not yet completed.
+		Shared by every enabled instance.
+
+# Per-instance options (TDM0..2, each opt-in like QSPI)
+
+config TC4X_I2S0
+	bool "Enable I2S/TDM instance 0"
+	default n
+	---help---
+		Enable AUDIO TDM instance 0.  Each TDM instance is opt-in; the board
+		selects and wires the instances it uses.
+
+if TC4X_I2S0
+
+config TC4X_I2S0_TX_IOMUX_SEL
+	int "I2S0 TX pad-group select (A/B/C/D = 0..3)"
+	default 0
+	range 0 3
+	---help---
+		TX_IOMUX_CTL pad-group for instance 0 (A/B/C/D = 0..3), selecting
+		which pad set carries the TX signals.
+
+config TC4X_I2S0_RX_IOMUX_SEL
+	int "I2S0 RX pad-group select (A/B/C/D = 0..3)"
+	default 3
+	range 0 3
+	---help---
+		RX_IOMUX_CTL pad-group for instance 0 that feeds
+		RX_SDI/SCK/FSYNC/MCK (A/B/C/D = 0..3).
+
+config TC4X_I2S0_MCK_DIV
+	int "I2S0 MCKO divider code (0=/1, 1=/2, 2=/4, 3=/8)"
+	default 2
+	range 0 3
+	---help---
+		Instance-0 TX/RX interface MCK_DIV field.  MCKO = clk_if / MCK_DIV
+		(clk_if = 98.304 MHz); code 2 gives MCKO = APLL/4 = 24.576 MHz.  The
+		codec must be configured for the same MCLK.  MCK_DIV is per-TDM.
+
+config TC4X_I2S0_TX_DMA
+	bool "I2S0 TX via System DMA (SDMA) offload"
+	default n
+	depends on TRICORE_DMA
+	---help---
+		Offload the instance-0 TX FIFO fill to the System DMA (SDMA0).
+		Uses RROAT + one-shot SCH bootstrap; 32-bit samples only (narrower
+		widths fall back to CPU fill).
+
+config TC4X_I2S0_TX_DMA_CHAN
+	int "I2S0 TX SDMA channel"
+	default 2
+	range 0 127
+	depends on TC4X_I2S0_TX_DMA
+	---help---
+		Free SDMA0 channel serving the instance-0 TX FIFO.
+
+config TC4X_I2S0_RX_DMA
+	bool "I2S0 RX via System DMA (SDMA) offload"
+	default n
+	depends on TRICORE_DMA
+	---help---
+		Offload the instance-0 RX FIFO drain to the System DMA (SDMA0).
+		32-bit samples only.
+
+config TC4X_I2S0_RX_DMA_CHAN
+	int "I2S0 RX SDMA channel"
+	default 3
+	range 0 127
+	depends on TC4X_I2S0_RX_DMA
+	---help---
+		Free SDMA0 channel serving the instance-0 RX FIFO (distinct from TX).
+
+config TC4X_I2S0_LOOPBACK
+	bool "I2S0 internal RX self-test loopback (TX_SDO -> RX_SDI)"
+	default n
+	---help---
+		Route TX_SDO straight back into RX_SDI via the TDM block's internal
+		loopback (RX_TEST_CTL) to validate the RX datapath with no external
+		pins, codec or mic.  Leave disabled for normal operation.
+
+config TC4X_I2S0_TX_SLAVE
+	bool "I2S0 TX is an external clock slave"
+	default n
+	---help---
+		Run instance-0 TX as a clock slave (TX_CTL.MS = 0): BCLK/FSYNC come
+		from the TX input pads instead of the SoC.  Default is master.
+
+config TC4X_I2S0_RX_SLAVE
+	bool "I2S0 RX is an external clock slave"
+	default n
+	---help---
+		Run instance-0 RX as a clock slave (RX_CTL.MS = 0): BCLK/FSYNC come
+		from the RX input pads (external master or looped-back TX clock).
+
+endif # TC4X_I2S0
+
+config TC4X_I2S1
+	bool "Enable I2S/TDM instance 1"
+	default n
+	---help---
+		Enable AUDIO TDM instance 1.  A board that uses it must wire and
+		supply this instance's pads.
+
+if TC4X_I2S1
+
+config TC4X_I2S1_TX_IOMUX_SEL
+	int "I2S1 TX pad-group select (A/B/C/D = 0..3)"
+	default 0
+	range 0 3
+
+config TC4X_I2S1_RX_IOMUX_SEL
+	int "I2S1 RX pad-group select (A/B/C/D = 0..3)"
+	default 3
+	range 0 3
+
+config TC4X_I2S1_MCK_DIV
+	int "I2S1 MCKO divider code (0=/1, 1=/2, 2=/4, 3=/8)"
+	default 2
+	range 0 3
+
+config TC4X_I2S1_TX_DMA
+	bool "I2S1 TX via System DMA (SDMA) offload"
+	default n
+	depends on TRICORE_DMA
+
+config TC4X_I2S1_TX_DMA_CHAN
+	int "I2S1 TX SDMA channel"
+	default 4
+	range 0 127
+	depends on TC4X_I2S1_TX_DMA
+
+config TC4X_I2S1_RX_DMA
+	bool "I2S1 RX via System DMA (SDMA) offload"
+	default n
+	depends on TRICORE_DMA
+
+config TC4X_I2S1_RX_DMA_CHAN
+	int "I2S1 RX SDMA channel"
+	default 5
+	range 0 127
+	depends on TC4X_I2S1_RX_DMA
+
+config TC4X_I2S1_LOOPBACK
+	bool "I2S1 internal RX self-test loopback (TX_SDO -> RX_SDI)"
+	default n
+
+config TC4X_I2S1_TX_SLAVE
+	bool "I2S1 TX is an external clock slave"
+	default n
+
+config TC4X_I2S1_RX_SLAVE
+	bool "I2S1 RX is an external clock slave"
+	default n
+
+endif # TC4X_I2S1
+
+config TC4X_I2S2
+	bool "Enable I2S/TDM instance 2"
+	default n
+	---help---
+		Enable AUDIO TDM instance 2.  A board that uses it must wire and
+		supply this instance's pads.
+
+if TC4X_I2S2
+
+config TC4X_I2S2_TX_IOMUX_SEL
+	int "I2S2 TX pad-group select (A/B/C/D = 0..3)"
+	default 0
+	range 0 3
+
+config TC4X_I2S2_RX_IOMUX_SEL
+	int "I2S2 RX pad-group select (A/B/C/D = 0..3)"
+	default 3
+	range 0 3
+
+config TC4X_I2S2_MCK_DIV
+	int "I2S2 MCKO divider code (0=/1, 1=/2, 2=/4, 3=/8)"
+	default 2
+	range 0 3
+
+config TC4X_I2S2_TX_DMA
+	bool "I2S2 TX via System DMA (SDMA) offload"
+	default n
+	depends on TRICORE_DMA
+
+config TC4X_I2S2_TX_DMA_CHAN
+	int "I2S2 TX SDMA channel"
+	default 6
+	range 0 127
+	depends on TC4X_I2S2_TX_DMA
+
+config TC4X_I2S2_RX_DMA
+	bool "I2S2 RX via System DMA (SDMA) offload"
+	default n
+	depends on TRICORE_DMA
+
+config TC4X_I2S2_RX_DMA_CHAN
+	int "I2S2 RX SDMA channel"
+	default 7
+	range 0 127
+	depends on TC4X_I2S2_RX_DMA
+
+config TC4X_I2S2_LOOPBACK
+	bool "I2S2 internal RX self-test loopback (TX_SDO -> RX_SDI)"
+	default n
+
+config TC4X_I2S2_TX_SLAVE
+	bool "I2S2 TX is an external clock slave"
+	default n
+
+config TC4X_I2S2_RX_SLAVE
+	bool "I2S2 RX is an external clock slave"
+	default n
+
+endif # TC4X_I2S2
+
+endif # TC4X_I2S
+

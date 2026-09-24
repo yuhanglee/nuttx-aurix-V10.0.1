@@ -57,4 +57,8 @@ if(CONFIG_TC4X_SMU)
   list(APPEND SRCS tc4x_smu.c)
 endif()
 
+if(CONFIG_TC4X_I2S)
+  list(APPEND SRCS tc4x_i2s.c)
+endif()
+
 target_sources(arch PRIVATE ${SRCS})

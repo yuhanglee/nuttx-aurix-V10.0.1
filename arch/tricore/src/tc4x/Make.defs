@@ -65,4 +65,9 @@ ifneq ($(filter y, $(CONFIG_TC4X_GPT1_PWM) $(CONFIG_TC4X_GPT2_PWM)),)
 CHIP_CSRCS += tc4x_gpt12_pwm.c
 endif
 
+# AUDIO TDM / I2S (TC48x only)
+ifeq ($(CONFIG_TC4X_I2S),y)
+CHIP_CSRCS += tc4x_i2s.c
+endif
+
 VPATH += tc4x

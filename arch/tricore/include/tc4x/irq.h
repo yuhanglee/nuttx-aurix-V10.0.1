@@ -55,6 +55,15 @@
 #define TC4X_IRQ_SMM0             1212
 #define TC4X_IRQ_SMM1             1213
 
+/* AUDIO TDM SRC nodes (TC48x): 4 contiguous per instance from 1480 (TXDMA,
+ * RXDMA, TXERR, RXERR); node = (SRC register addr - 0xF4432000) / 4.
+ */
+
+#define TC4X_IRQ_AUDIO_TDM_TXDMA(i)  (1480 + (i) * 4)  /* TX FIFO DMA req     */
+#define TC4X_IRQ_AUDIO_TDM_RXDMA(i)  (1481 + (i) * 4)  /* RX FIFO DMA req     */
+#define TC4X_IRQ_AUDIO_TDM_TXERR(i)  (1482 + (i) * 4)  /* TX err/trigger (CPU) */
+#define TC4X_IRQ_AUDIO_TDM_RXERR(i)  (1483 + (i) * 4)  /* RX err/trigger (CPU) */
+
 /****************************************************************************
  * Public Types
  ****************************************************************************/
