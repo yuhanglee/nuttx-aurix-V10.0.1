@@ -477,11 +477,26 @@ static void tc3x_syspll_k2_step(void)
 
 void up_clockconfig(void)
 {
-  /* WDT Application Reset does not reset the SCU/PLL domain.
-   * Skip re-init if PLLs are already locked to avoid UART corruption.
+  uint32_t kdiv = TC3X_PERPLLCON1_K2DIV_MASK | TC3X_PERPLLCON1_K3DIV_MASK;
+  uint32_t kval = FIELD_PREP(TC3X_PERPLLCON1_K2DIV_MASK,
+                             TC3X_PERPLLCON1_K2DIV_SHIFT,
+                             TC3X_PERPLL_K2DIV - 1u) |
+                  FIELD_PREP(TC3X_PERPLLCON1_K3DIV_MASK,
+                             TC3X_PERPLLCON1_K3DIV_SHIFT,
+                             TC3X_PERPLL_K3DIV - 1u);
+
+  /* An Application Reset keeps the clock tree, so skip re-init only if it
+   * is already ours. Some boards come out of PORST with both PLLs locked.
    */
 
-  if ((getreg32(REGADDR(TC3X_CLOCK_SYSPLLSTAT_OFFSET)) &
+  if ((getreg32(REGADDR(TC3X_CLOCK_CCUCON0_OFFSET)) &
+       TC3X_CCUCON0_CLKSEL_MASK) == TC3X_CCUCON0_CLKSEL_PLL &&
+      (getreg32(REGADDR(TC3X_CLOCK_SYSPLLCON1_OFFSET)) &
+       TC3X_SYSPLLCON1_K2DIV_MASK) ==
+      FIELD_PREP(TC3X_SYSPLLCON1_K2DIV_MASK, TC3X_SYSPLLCON1_K2DIV_SHIFT,
+                 TC3X_SYSPLL_K2DIV - 1u) &&
+      (getreg32(REGADDR(TC3X_CLOCK_PERPLLCON1_OFFSET)) & kdiv) == kval &&
+      (getreg32(REGADDR(TC3X_CLOCK_SYSPLLSTAT_OFFSET)) &
        TC3X_SYSPLLSTAT_LOCK) &&
       (getreg32(REGADDR(TC3X_CLOCK_PERPLLSTAT_OFFSET)) &
        TC3X_PERPLLSTAT_LOCK))
