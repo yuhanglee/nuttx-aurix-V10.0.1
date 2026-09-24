@@ -136,6 +136,60 @@ config CS43L22_CLKDEBUG
 
 endif # AUDIO_CS43L22
 
+config AUDIO_TLV320AIC26
+	bool "TLV320AIC26 audio codec"
+	default n
+	depends on AUDIO && SPI && I2S
+	---help---
+		Select to enable support for the TI TLV320AIC26 low-power stereo
+		audio codec.  Uses SPI for register control and I2S for audio data
+		(the SoC is the I2S master).
+
+if AUDIO_TLV320AIC26
+
+config AUDIO_TLV320AIC26_CAPTURE
+	bool "Enable the ADC/microphone (capture) path"
+	default n
+	---help---
+		Bring up the codec ADC (MICIN, preamp) alongside the DAC so the
+		RX/capture path is active during playback (full-duplex mic echo:
+		headset mic -> ADC -> I2S RX).  Also enables a standalone capture
+		stream via AUDIO_TYPE_INPUT (I2S_RECEIVE).
+
+config TLV320AIC26_MASTER
+	bool "TLV320AIC26 is the I2S master (drives BCLK/WS)"
+	default n
+	---help---
+		Make the codec the I2S master (SLVMS=1) instead of the
+		default controller-master wiring.  The I2S controller must
+		then be configured as a slave.
+
+config TLV320AIC26_INFLIGHT
+	int "TLV320AIC26 maximum in-flight audio buffers"
+	default 2
+
+config TLV320AIC26_SPI_FREQUENCY
+	int "TLV320AIC26 SPI control-port frequency (Hz)"
+	default 12000000
+
+config TLV320AIC26_MSG_PRIO
+	int "TLV320AIC26 message priority"
+	default 1
+
+config TLV320AIC26_WORKER_STACKSIZE
+	int "TLV320AIC26 worker thread stack size"
+	default 768
+
+config TLV320AIC26_BUFFER_SIZE
+	int "TLV320AIC26 preferred buffer size"
+	default 4096
+
+config TLV320AIC26_NUM_BUFFERS
+	int "TLV320AIC26 preferred number of buffers"
+	default 4
+
+endif # AUDIO_TLV320AIC26
+
 config AUDIO_CS4344
 	bool "CS4344 audio chip"
 	default n

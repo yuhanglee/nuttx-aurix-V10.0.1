@@ -39,6 +39,10 @@ if(CONFIG_DRIVERS_AUDIO)
     endif()
   endif()
 
+  if(CONFIG_AUDIO_TLV320AIC26)
+    list(APPEND SRCS tlv320aic26.c)
+  endif()
+
   if(CONFIG_AUDIO_CS4344)
     list(APPEND SRCS cs4344.c)
   endif()

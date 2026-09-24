@@ -39,6 +39,10 @@ endif
 endif
 endif
 
+ifeq ($(CONFIG_AUDIO_TLV320AIC26),y)
+CSRCS += tlv320aic26.c
+endif
+
 ifeq ($(CONFIG_AUDIO_CS4344),y)
 CSRCS += cs4344.c
 endif
