@@ -26,8 +26,10 @@
 
 #include <nuttx/config.h>
 #include <debug.h>
+#include <errno.h>
 
 #include "tricore_gpio.h"
+#include "tricore_asclin.h"
 
 #ifdef CONFIG_USERLED_LOWER
 #  include <debug.h>
@@ -71,6 +73,7 @@ int tc375_qspi_initialize(void);
 
 #ifdef CONFIG_CAN_MCAN
 int mcmcan_board_initialize(void);
+
 #endif
 
 #if defined(CONFIG_TC3X_GPT1_PWM) || defined(CONFIG_TC3X_GPT2_PWM)
@@ -85,6 +88,10 @@ int mcmcan_board_initialize(void);
  * Public Functions
  ****************************************************************************/
 
+#ifdef CONFIG_TRICORE_LIN_SOCKET
+int tricore_lin_sock_initialize(void);
+#endif
+
 void board_aurix_setup_serial_pin(int idx)
 {
   if (idx != 0)
@@ -95,6 +102,23 @@ void board_aurix_setup_serial_pin(int idx)
   aurix_config_gpio(AURIX_GPIO(14, 0, GPIO_PERIPH, GPIO_ALT2));
   aurix_config_gpio(AURIX_GPIO(14, 1, GPIO_INPUT, GPIO_PULL_UP));
 }
+
+#ifdef CONFIG_TRICORE_LIN_SOCKET
+
+int board_aurix_setup_lin_pin(int idx)
+{
+  if (idx != 1)
+    {
+      return -ENODEV;
+    }
+
+  aurix_config_gpio(AURIX_GPIO(15, 0, GPIO_PERIPH, GPIO_ALT2) |
+                    GPIO_OPEN_DRAIN);
+  aurix_config_gpio(AURIX_GPIO(15, 1, GPIO_INPUT, GPIO_PULL_UP));
+
+  return ASCLIN_IOCR_ALTI_A;
+}
+#endif
 
 #ifdef CONFIG_TC3X_I2C
 /* Lite Kit routes I2C0 (EEPROM 0x50, mikroBUS, Shield2Go) to P13.1 SCL /
@@ -198,6 +222,17 @@ void board_late_initialize(void)
 
 #ifdef CONFIG_CAN_MCAN
   mcmcan_board_initialize();
+#endif
+
+#ifdef CONFIG_TRICORE_LIN_SOCKET
+  {
+    int ret = tricore_lin_sock_initialize();
+
+    if (ret < 0)
+      {
+        _err("ERROR: tricore_lin_sock_initialize failed: %d\n", ret);
+      }
+  }
 #endif
 
 #if defined(CONFIG_ARCH_BUTTONS) && defined(CONFIG_INPUT_BUTTONS_LOWER)

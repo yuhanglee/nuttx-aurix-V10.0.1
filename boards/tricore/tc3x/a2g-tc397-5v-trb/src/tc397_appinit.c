@@ -25,6 +25,7 @@
 #include <debug.h>
 #include <errno.h>
 #include "tricore_gpio.h"
+#include "tricore_asclin.h"
 
 #ifdef CONFIG_TC3X_I2C
 #include "tc397_i2c.h"
@@ -38,6 +39,7 @@ struct mtd_dev_s *tricore_flash_initialize(void);
 
 #ifdef CONFIG_CAN_MCAN
 int mcmcan_board_initialize(void);
+
 #endif
 
 #ifdef CONFIG_TC3X_QSPI2
@@ -58,6 +60,10 @@ void board_aurix_setup_i2c_pin(int bus)
   aurix_config_gpio(sdapin);
 }
 
+#ifdef CONFIG_TRICORE_LIN_SOCKET
+int tricore_lin_sock_initialize(void);
+#endif
+
 void board_aurix_setup_serial_pin(int idx)
 {
   if (idx != 0)
@@ -68,6 +74,22 @@ void board_aurix_setup_serial_pin(int idx)
   aurix_config_gpio(AURIX_GPIO(14, 0, GPIO_PERIPH, GPIO_ALT2));
   aurix_config_gpio(AURIX_GPIO(14, 1, GPIO_INPUT, GPIO_PULL_UP));
 }
+
+#ifdef CONFIG_TRICORE_LIN_SOCKET
+
+int board_aurix_setup_lin_pin(int idx)
+{
+  if (idx != 1)
+    {
+      return -ENODEV;
+    }
+
+  aurix_config_gpio(AURIX_GPIO(15, 0, GPIO_PERIPH, GPIO_ALT2));
+  aurix_config_gpio(AURIX_GPIO(15, 1, GPIO_INPUT, GPIO_PULL_UP));
+
+  return ASCLIN_IOCR_ALTI_A;
+}
+#endif
 
 #ifdef CONFIG_BOARD_GPIO_TEST
 
@@ -103,6 +125,15 @@ void board_late_initialize(void)
       _err("CAN init failed: %d\n", ret);
     }
 #endif
+
+#ifdef CONFIG_TRICORE_LIN_SOCKET
+  ret = tricore_lin_sock_initialize();
+  if (ret < 0)
+    {
+      _err("ERROR: tricore_lin_sock_initialize failed: %d\n", ret);
+    }
+#endif
+
 
 #ifdef CONFIG_TC3X_QSPI2
   ret = tc397_qspi_initialize();
