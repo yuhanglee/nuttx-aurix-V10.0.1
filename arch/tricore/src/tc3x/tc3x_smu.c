@@ -149,11 +149,16 @@ int tc3x_smu_clear_alarm_bit(uint8_t group, uint8_t alarm)
       return -EINVAL;
     }
 
-  /* Clear AEX first so the alarm can re-latch after this clear. */
-
-  putreg32(BIT(alarm), TC3X_SMU_CORE_BASE + TC3X_SMU_AEXCLR_OFFSET);
-
   flags = enter_critical_section();
+
+  /* Clear AEX first so the alarm can re-latch after this clear.
+   * AEXCLR is Safety ENDINIT protected (UM access mode SE).
+   */
+
+  aurix_safety_endinit_enable(false);
+  putreg32(BIT(alarm), TC3X_SMU_CORE_BASE + TC3X_SMU_AEXCLR_OFFSET);
+  aurix_safety_endinit_enable(true);
+
   smu_write_cmd(SMU_CMD_ASCE, 0u);
   aurix_safety_endinit_enable(false);
   putreg32(BIT(alarm), TC3X_SMU_CORE_BASE + TC3X_SMU_AG_OFFSET(group));
@@ -261,7 +266,9 @@ static uint32_t tc3x_clear_get_status(uint8_t group, void *arg)
 static void tc3x_clear_write_aexclr(uint32_t mask, void *arg)
 {
   UNUSED(arg);
+  aurix_safety_endinit_enable(false);
   putreg32(mask, TC3X_SMU_CORE_BASE + TC3X_SMU_AEXCLR_OFFSET);
+  aurix_safety_endinit_enable(true);
 }
 
 static int tc3x_clear_write_cmd(uint8_t cmd, uint8_t cmdarg, void *arg)
@@ -280,7 +287,9 @@ static uint32_t tc3x_clear_read_sts(void *arg)
 static void tc3x_clear_write_status(uint32_t mask, uint8_t group, void *arg)
 {
   UNUSED(arg);
+  aurix_safety_endinit_enable(false);
   putreg32(mask, TC3X_SMU_CORE_BASE + TC3X_SMU_AG_OFFSET(group));
+  aurix_safety_endinit_enable(true);
 }
 
 /* Clear all latched alarm bits across all 12 groups. */
