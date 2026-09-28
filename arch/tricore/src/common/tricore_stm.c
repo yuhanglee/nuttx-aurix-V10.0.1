@@ -163,9 +163,16 @@ void up_timer_initialize(void)
   putreg32(val, TRICORE_STM_ICR(g_core_id, TRICORE_STM_DEFAULT));
 
 #ifdef CONFIG_DEBUG_FEATURES
-  /* Freeze STM on debug halt */
+  /* Freeze STM on debug halt.  OCS is writable only while OCDS is enabled
+   * (access mode OEN); otherwise the store raises an async bus error.
+   */
 
-  putreg32(TRICORE_STM_OCS_SUS_W, TRICORE_STM_OCS(g_core_id));
+#ifdef TRICORE_CBS_OSTATE
+  if ((getreg32(TRICORE_CBS_OSTATE) & TRICORE_CBS_OSTATE_OEN) != 0)
+#endif
+    {
+      putreg32(TRICORE_STM_OCS_SUS_W, TRICORE_STM_OCS(g_core_id));
+    }
 #endif
 
   /* Attach and enable the timer interrupt */

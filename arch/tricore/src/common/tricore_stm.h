@@ -82,6 +82,9 @@
 #define TRICORE_STM_CLC(core)           (TRICORE_STM_BASE(core) + 0x00)
 #define TRICORE_STM_OCS(core)           (TRICORE_STM_BASE(core) + 0xe8)
 
+#define TRICORE_CBS_OSTATE              0xf0000480
+#define TRICORE_CBS_OSTATE_OEN          BIT(0)
+
 #define TRICORE_STM_CMP0(core, stm)      (TRICORE_STM_BASE(core) + 0x30)
 #define TRICORE_STM_CMP1(core, stm)      (TRICORE_STM_BASE(core) + 0x34)
 #define TRICORE_STM_CMCON(core, stm)     (TRICORE_STM_BASE(core) + 0x38)
