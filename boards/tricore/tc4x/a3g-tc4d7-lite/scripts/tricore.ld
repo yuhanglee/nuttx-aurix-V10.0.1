@@ -5,7 +5,7 @@ OUTPUT_ARCH("tricore")
 ENTRY(__start)
 EXTERN(__start)
 
-__HEAP_SIZE = (512 * 1024);
+__HEAP_SIZE = (240 * 1024);
 CONFIG_TRICORE_CSA_COUNT = 512;
 CONFIG_TRICORE_INITIAL_STACK_SIZE = 512;
 CONFIG_TRICORE_INITIAL_STACK_OFFSET = 0xEB00;
@@ -16,7 +16,15 @@ MEMORY
 	dsram (w!xp): ORIGIN = 0x70000000, LENGTH = 240K
 	psram (w!xp): ORIGIN = 0x70100000, LENGTH = 64K
 	lmu (wr!xp): ORIGIN = 0x90400000, LENGTH = 512K
-	dlmu (wr!xp): ORIGIN = 0x90000000, LENGTH = 512K
+	lmu_nc (wr!xp): ORIGIN = 0xB0400000, LENGTH = 512K
+
+	/* The heap takes the lower half of the DLMU and bus masters the upper
+	 * half, addressed through its non-cached 0xB alias so that they and the
+	 * CPU see the same data without cache maintenance.
+	 */
+
+	dlmu (wr!xp): ORIGIN = 0x90000000, LENGTH = 256K
+	dlmu_nc (wr!xp): ORIGIN = 0xB0040000, LENGTH = 256K
 	pflash (rx!p): ORIGIN = 0x80000000, LENGTH = 4M
 #endif
 	pflash0 (rx!p): ORIGIN = 0xA0000000, LENGTH = 4M
@@ -74,6 +82,11 @@ REGION_ALIAS("BSS_MEM", dsram)
 REGION_ALIAS("CSA_MEM", dsram)
 REGION_ALIAS("HEAP_MEM", dlmu)
 REGION_ALIAS("PSRAM_MEM", psram)
+#if CPU == 0
+REGION_ALIAS("DMA_MEM", dlmu_nc)
+#else
+REGION_ALIAS("DMA_MEM", lmu)
+#endif
 
 pflash0_base = ORIGIN(pflash0);
 pflash1_base = ORIGIN(pflash1);
@@ -147,6 +160,14 @@ SECTIONS
 		. = ALIGN(4);
 		_ebss = ABSOLUTE(.);
 	} > BSS_MEM
+
+	.dma_data (NOLOAD) : ALIGN(64)
+	{
+		_sdma_data = ABSOLUTE(.);
+		*(.dma_data .dma_data.*)
+		. = ALIGN(4);
+		_edma_data = ABSOLUTE(.);
+	} > DMA_MEM
 
 	.ustack : ALIGN(8) FLAGS(aw)
 	{

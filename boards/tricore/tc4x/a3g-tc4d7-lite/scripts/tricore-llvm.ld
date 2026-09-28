@@ -5,7 +5,7 @@ OUTPUT_ARCH("tricore")
 ENTRY(__start)
 EXTERN(__start)
 
-__HEAP_SIZE = (512 * 1024);
+__HEAP_SIZE = (240 * 1024);
 CONFIG_TRICORE_CSA_COUNT = 512;
 CONFIG_TRICORE_INITIAL_STACK_SIZE = 512;
 CONFIG_TRICORE_INITIAL_STACK_OFFSET = 0xEB00;
@@ -17,7 +17,14 @@ MEMORY
   psram  (rwx): ORIGIN = 0x70100000, LENGTH = 64K
   lmu    (rw): ORIGIN = 0x90400000, LENGTH = 512K
   lmu_nc (rw): ORIGIN = 0xB0400000, LENGTH = 512K
-  dlmu   (rw): ORIGIN = 0x90000000, LENGTH = 512K
+
+  /* The heap takes the lower half of the DLMU and bus masters the upper
+   * half, addressed through its non-cached 0xB alias so that they and the
+   * CPU see the same data without cache maintenance.
+   */
+
+  dlmu    (rw): ORIGIN = 0x90000000, LENGTH = 256K
+  dlmu_nc (rw): ORIGIN = 0xB0040000, LENGTH = 256K
   pflash (rx): ORIGIN = 0x80000000, LENGTH = 4M
 #endif
   pflash0 (rx): ORIGIN = 0xA0000000, LENGTH = 4M
@@ -75,7 +82,7 @@ REGION_ALIAS("CSA_MEM", dsram)
 REGION_ALIAS("HEAP_MEM", dlmu)
 REGION_ALIAS("PSRAM_MEM", psram)
 #if CPU == 0
-REGION_ALIAS("DMA_MEM", lmu_nc)
+REGION_ALIAS("DMA_MEM", dlmu_nc)
 #else
 REGION_ALIAS("DMA_MEM", lmu)
 #endif
