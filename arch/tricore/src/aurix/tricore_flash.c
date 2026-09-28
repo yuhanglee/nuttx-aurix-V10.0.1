@@ -143,12 +143,13 @@ static int dmu_wait_done(void)
   uint32_t status;
   uint32_t err;
   unsigned int retries = TRICORE_FLASH_POLL_LIMIT;
+  bool started = false;
 
   do
     {
       status = getreg32(DMU_STATUS_REG);
 
-      if ((status & DMU_BUSY_DF_MASK) == 0u)
+      if (started && (status & DMU_BUSY_DF_MASK) == 0u)
         {
 
           err = getreg32(DMU_ERR_REG);
@@ -175,6 +176,12 @@ static int dmu_wait_done(void)
           csi_reset_to_read();
           return -EIO;
         }
+
+      /* BUSY rises some time after the last command cycle, so only trust
+       * BUSY == 0 once the operation latch has been seen set.
+       */
+
+      started = (getreg32(DMU_OP_LATCH_REG) & DMU_OP_LATCH_MASK) != 0u;
     }
   while (--retries != 0u);
 
@@ -293,6 +300,13 @@ static int tricore_dflash_write_page(uint32_t page_offset,
     *cmd5554 = 0xFAu;            /* Clear Status    */
     *cmd5554 = 0x5Du;            /* Enter Page Mode (DFLASH) */
     *cmdLP64 = page64;           /* Load Page 64-bit */
+#ifdef CONFIG_ARCH_CHIP_FAMILY_TC4X
+    /* Clear Status just before Write Page (TC4x UM 6.3.10.2) so REQDONE
+     * reflects this page only.
+     */
+
+    *cmd5554 = 0xFAu;            /* Clear Status    */
+#endif
     *addr1   = pa;               /* Write Page cycle 1 */
     *addr2   = 0x00u;            /* Write Page cycle 2 */
     *addr3   = 0xA0u;            /* Write Page cycle 3 */

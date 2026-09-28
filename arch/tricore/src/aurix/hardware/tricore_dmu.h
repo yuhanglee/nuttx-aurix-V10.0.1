@@ -138,6 +138,7 @@
 #  define DMU_HF_CLRE_OFFSET           0x0038u
 
 #  define DMU_HF_STATUS                (DMU_BASE + DMU_HF_STATUS_OFFSET)
+#  define DMU_HF_OPERATION             (DMU_BASE + DMU_HF_OPERATION_OFFSET)
 #  define DMU_HF_ERRSR                 (DMU_BASE + DMU_HF_ERRSR_OFFSET)
 #  define DMU_HF_CLRE                  (DMU_BASE + DMU_HF_CLRE_OFFSET)
 
@@ -145,6 +146,11 @@
 
 #  define DMU_HF_STATUS_D0BUSY         BIT(0)
 #  define DMU_HF_STATUS_D1BUSY         BIT(1)
+
+/* HF_OPERATION: set by the last command cycle, cleared by Clear Status. */
+
+#  define DMU_HF_OPERATION_PROG        BIT(0)
+#  define DMU_HF_OPERATION_ERASE       BIT(1)
 
 /* HF_ERRSR bit fields (TC3xx). */
 
@@ -171,6 +177,10 @@
 #  define DMU_CLRE_REG                 DMU_HF_CLRE
 
 #  define DMU_BUSY_DF_MASK             DMU_HF_STATUS_D0BUSY
+
+#  define DMU_OP_LATCH_REG             DMU_HF_OPERATION
+#  define DMU_OP_LATCH_MASK            (DMU_HF_OPERATION_PROG | \
+                                        DMU_HF_OPERATION_ERASE)
 
 #  define DMU_ERR_FATAL_MASK           (DMU_HF_ERRSR_OPER  | \
                                         DMU_HF_ERRSR_SQER  | \
@@ -255,6 +265,11 @@
 #  define DMU_CLRE_REG                 DMU_HCI_CLRERR
 
 #  define DMU_BUSY_DF_MASK             DMU_HCI_STATUS_BUSYHOSTDF
+
+/* REQDONE marks the true end of a sequence; BUSY can fall before it. */
+
+#  define DMU_OP_LATCH_REG             DMU_HCI_STATUS
+#  define DMU_OP_LATCH_MASK            DMU_HCI_STATUS_REQDONE
 
 #  define DMU_ERR_FATAL_MASK           (DMU_HCI_ERR_ADER  | \
                                         DMU_HCI_ERR_SQER  | \
