@@ -177,6 +177,36 @@
 #define TC4X_PLLSTAT_PLLLOCK_SHIFT     1
 #define TC4X_PLLSTAT_PLLLOCK      BIT(1)
 
+#define TC4X_CLOCK_APLLCON0_OFFSET    0x070Cu
+#define TC4X_CLOCK_APLLCON1_OFFSET    0x0710u
+#define TC4X_CLOCK_APLLCON2_OFFSET    0x0714u
+#define TC4X_CLOCK_APLLSTAT_OFFSET    0x071Cu
+
+#define TC4X_CLOCK_APLLCON0    TC4X_REG32(TC4X_CLOCK_APLLCON0_OFFSET)
+#define TC4X_CLOCK_APLLCON1    TC4X_REG32(TC4X_CLOCK_APLLCON1_OFFSET)
+#define TC4X_CLOCK_APLLCON2    TC4X_REG32(TC4X_CLOCK_APLLCON2_OFFSET)
+#define TC4X_CLOCK_APLLSTAT    TC4X_REG32(TC4X_CLOCK_APLLSTAT_OFFSET)
+
+/* APLLCON0 fields (P divider = PDIV + 1) */
+#define TC4X_APLLCON0_PLLPWR      BIT(0)
+#define TC4X_APLLCON0_RESLD       BIT(1)
+#define TC4X_APLLCON0_PDIV_SHIFT  16
+#define TC4X_APLLCON0_PDIV_MASK   GENMASK(18, 16)
+
+/* APLLCON1 fields (K divider = KDIV + 1) */
+#define TC4X_APLLCON1_KDIV_SHIFT  0
+#define TC4X_APLLCON1_KDIV_MASK   GENMASK(3, 0)
+
+/* APLLCON2: NDIV feedback divider, Q7.12 (integer [18:12], fraction [11:0]);
+ * the integer field holds N-1.
+ */
+#define TC4X_APLLCON2_NDIV_MASK   GENMASK(18, 0)
+
+/* APLLSTAT fields */
+#define TC4X_APLLSTAT_PWRSTAT     BIT(0)
+#define TC4X_APLLSTAT_PLLLOCK     BIT(1)
+#define TC4X_APLLSTAT_LCK         BIT(31)
+
 /* CCUCON fields */
 
 #define TC4X_CCUCON_CLKSELS_SHIFT 0
@@ -294,11 +324,18 @@ enum tc4x_rootclk_domain
 #define TC4X_FBACK_HZ           100000000u   /* 100 MHz backup clock */
 #define TC4X_FOSC_HZ            25000000u    /* 25 MHz external crystal */
 
-/* SYSPLL:  fVCO = 25 MHz * 20 / 1 = 500 MHz, K2=1 => 500 MHz core */
-
-#define TC4X_SYSPLL_PDIV        1u
-#define TC4X_SYSPLL_NDIV        20u
-#define TC4X_SYSPLL_K2DIV       1u
+/* SYSPLL (fOSC = 25 MHz): TC487 = 25*32/1 = 800 MHz DCO, K2=2 -> 400 MHz core;
+ * others = 25*20/1 = 500 MHz DCO, K2=1 -> 500 MHz core.
+ */
+#if defined(CONFIG_TC4X_CHIP_TC487)
+#  define TC4X_SYSPLL_PDIV      1u
+#  define TC4X_SYSPLL_NDIV      32u
+#  define TC4X_SYSPLL_K2DIV     2u
+#else
+#  define TC4X_SYSPLL_PDIV      1u
+#  define TC4X_SYSPLL_NDIV      20u
+#  define TC4X_SYSPLL_K2DIV     1u
+#endif
 #define TC4X_SYSPLL_K2PREDIV    1u
 #define TC4X_SYSPLL_K3DIV       1u
 #define TC4X_SYSPLL_K3PREDIV    1u

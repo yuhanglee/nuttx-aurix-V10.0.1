@@ -568,14 +568,22 @@ static void tc4x_set_syspll_divider(void)
   val = 0;
   val |= FIELD_PREP(TC4X_SYSPLLCON1_K2DIV_MASK,
                     TC4X_SYSPLLCON1_K2DIV_SHIFT,
-                    0);
+                    TC4X_SYSPLL_K2DIV - 1u);
   val |= FIELD_PREP(TC4X_SYSPLLCON1_K3DIV_MASK,
                     TC4X_SYSPLLCON1_K3DIV_SHIFT,
                     0);
 
+  /* K2PREDIV must be 00B (/1.0) for normal operation; SYSPLLCON1 reset is
+   * undefined, so program it explicitly (else it may be /2.0 = half clock).
+   */
+
+  val |= FIELD_PREP(TC4X_SYSPLLCON1_K2PREDIV_MASK,
+                    TC4X_SYSPLLCON1_K2PREDIV_SHIFT,
+                    0u);
+
   tc4x_ccu_wait_unlocked();
-  modreg32(val,
-           (TC4X_SYSPLLCON1_K2DIV_MASK | TC4X_SYSPLLCON1_K3DIV_MASK), con1);
+  modreg32(val, (TC4X_SYSPLLCON1_K2DIV_MASK | TC4X_SYSPLLCON1_K3DIV_MASK |
+                 TC4X_SYSPLLCON1_K2PREDIV_MASK), con1);
 }
 
 static void tc4x_set_perpll_divider(void)
