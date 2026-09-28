@@ -194,10 +194,16 @@ void tricore_trap_handler(uint32_t tclass, uint32_t tin)
       return;
     }
 
+  /* PCXI here is the upper CSA of the call into this handler; its link is
+   * the stub's svlcx lower CSA, whose A11 holds the trapped PC.
+   */
+
   TRICORE_MFCR(TRICORE_CPU_PCXI, pcxi);
   regs = tricore_csa2addr(pcxi);
+  regs = tricore_csa2addr(regs[REG_UPCXI]);
 
-  lowsyslog("TriCore Trap: Class %" PRIu32 " TIN %" PRIu32 " (%s)\n",
-            tclass, tin, tricore_trap_cause_str(tclass, tin));
+  lowsyslog("TriCore Trap: Class %" PRIu32 " TIN %" PRIu32 " (%s) "
+            "at %08lx\n", tclass, tin, tricore_trap_cause_str(tclass, tin),
+            (unsigned long)regs[REG_LPC]);
   up_dump_register(regs);
 }
