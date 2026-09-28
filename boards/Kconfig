@@ -2489,6 +2489,15 @@ config ARCH_BOARD_A3G_TC4D7_LITE
 		Infineon AURIX Lite Kit evaluation board (KIT_A3G_TC4D7_LITE)
 		with the TC4D7 SoC.
 
+config ARCH_BOARD_A3G_TC487_LITE
+	bool "Infineon AURIX Lite Kit (TC487)"
+	depends on TC4X_CHIP_TC487
+	select ARCH_HAVE_LEDS
+	---help---
+		This option selects support for NuttX on the Infineon
+		KIT_A3G_TC487_LITE board featuring the TC487 (4 Main + 1 CS)
+		Core CPU.
+
 config ARCH_BOARD_TRIBOARD_TC4X7_COM
 	bool "Infineon AURIX TriBoard (TC4X7 COM)"
 	depends on TC4X_CHIP_TC4D7
@@ -3932,6 +3941,7 @@ config ARCH_BOARD
 	default "a2g-tc397-5v-trb"             if ARCH_BOARD_A2G_TC397_5V_TRB
 	default "a2g-tc397xa-3v3-tft"          if ARCH_BOARD_A2G_TC397XA_3V3_TFT
 	default "a3g-tc4d7-lite"               if ARCH_BOARD_A3G_TC4D7_LITE
+	default "a3g-tc487-lite"               if ARCH_BOARD_A3G_TC487_LITE
 	default "triboard-tc4x7-com"           if ARCH_BOARD_TRIBOARD_TC4X7_COM
 	default "qemu-armv7a"                  if ARCH_BOARD_QEMU_ARMV7A
 	default "qemu-armv7r"                  if ARCH_BOARD_QEMU_ARMV7R
@@ -4166,6 +4176,9 @@ source "boards/tricore/tc3x/a2g-tc397xa-3v3-tft/Kconfig"
 endif
 if ARCH_BOARD_A3G_TC4D7_LITE
 source "boards/tricore/tc4x/a3g-tc4d7-lite/Kconfig"
+endif
+if ARCH_BOARD_A3G_TC487_LITE
+source "boards/tricore/tc4x/a3g-tc487-lite/Kconfig"
 endif
 if ARCH_BOARD_TRIBOARD_TC4X7_COM
 source "boards/tricore/tc4x/triboard-tc4x7-com/Kconfig"

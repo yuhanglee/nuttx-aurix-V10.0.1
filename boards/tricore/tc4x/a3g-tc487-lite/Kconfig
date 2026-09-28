@@ -1,0 +1,31 @@
+#
+# For a description of the syntax of this configuration file,
+# see the file kconfig-language.txt in the NuttX tools repository.
+#
+
+if ARCH_BOARD_A3G_TC487_LITE
+
+config BOARD_GPIO_TEST
+	bool "Register Port-22 GPIO pins for gpio_test"
+	default n
+	depends on DEV_GPIO
+	---help---
+		Registers /dev/gpio0 (P22.0 output, init high), /dev/gpio1
+		(P22.2 input pull-up), /dev/gpio2 (P22.3 input pull-down) on
+		boot via aurix_gpio_lower_register().  Wire P22.0 to P22.2
+		(or P22.3) externally to verify loopback with the gpio_test
+		userspace app.
+
+config BOARD_USER_LED_GPIO
+	bool "Register on-board user LED1 (P03.9) as /dev/gpio0"
+	default n
+	depends on DEV_GPIO
+	depends on !BOARD_GPIO_TEST
+	---help---
+		Registers TC487-Lite Kit user LED1 (P03.9) as /dev/gpio0
+		via aurix_gpio_lower_register().  The pin is configured as
+		push-pull output with init level HIGH so the LED is off at
+		boot (the kit drives LED1 active-low).  Run the led_blink
+		smoke test from tricore-apps to toggle it at 1 Hz.
+
+endif
