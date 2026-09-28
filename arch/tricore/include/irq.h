@@ -318,6 +318,24 @@ static inline_function uintptr_t up_getusrsp(void *regs)
 {
   uintptr_t *csa = regs;
 
+  /* A PCXI value has bits 31:30 clear (PCPN is 29:22); anything else is a
+   * saved-register buffer laid out by up_saveusercontext().
+   */
+
+  if (((uintptr_t)regs & 0xc0000000) != 0)
+    {
+      if ((csa[REG_LPCXI] & PCXI_UL) != 0)
+        {
+          csa = tricore_csa2addr(csa[REG_LPCXI]);
+        }
+      else
+        {
+          csa += TC_CONTEXT_REGS;
+        }
+
+      return csa[REG_SP];
+    }
+
   while (((uintptr_t)csa & PCXI_UL) == 0)
     {
       csa = tricore_csa2addr((uintptr_t)csa);
