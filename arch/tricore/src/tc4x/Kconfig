@@ -14,6 +14,11 @@ config TC4X_CHIP_TC4D7
 	---help---
 		Infineon AURIX TC4D7.
 
+config TC4X_CHIP_TC487
+	bool "TC487 SoC"
+	---help---
+		TC487 SoC
+
 config TC4X_CHIP_TC499
 	bool "TC499 SoC"
 	---help---
@@ -29,11 +34,12 @@ config ARCH_TRICORE_CPU_COUNT
 
 config TC4X_PERI_MMAP_OFFSET
 	hex "Tricore base address"
-	default 0x4400000 if TC4X_CHIP_TC4D7
+	default 0x4400000 if TC4X_CHIP_TC4D7 || TC4X_CHIP_TC487
 	default 0 if TC4X_CHIP_TC499
 
 config TRICORE_STM_FREQUENCY
 	int "STM clock frequency (Hz)"
+	default 400000000 if TC4X_CHIP_TC487
 	default 500000000
 	---help---
 		Frequency of the clock feeding the System Timer.  The tick
