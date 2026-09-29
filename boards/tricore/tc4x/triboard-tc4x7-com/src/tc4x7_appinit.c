@@ -356,6 +356,10 @@ static int tc4x7_atom_bringup(void)
 }
 #endif
 
+#ifdef CONFIG_TC4X_GETH
+int tc4x7_ethernet_initialize(void);
+#endif
+
 int board_app_initialize(uintptr_t arg)
 {
   return OK;
@@ -465,4 +469,8 @@ void board_late_initialize(void)
     }
 #endif
   UNUSED(ret);
+
+#ifdef CONFIG_TC4X_GETH
+  tc4x7_ethernet_initialize();
+#endif
 }

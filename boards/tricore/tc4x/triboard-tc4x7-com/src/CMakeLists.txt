@@ -59,4 +59,8 @@ if(CONFIG_TC4X_QSPI)
   list(APPEND SRCS tc4x7_qspi.c)
 endif()
 
+if(CONFIG_TC4X_GETH)
+  list(APPEND SRCS tc4x7_ethernet.c)
+endif()
+
 target_sources(board PRIVATE ${SRCS})

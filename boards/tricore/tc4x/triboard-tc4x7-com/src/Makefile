@@ -51,4 +51,8 @@ ifeq ($(CONFIG_TC4X_QSPI),y)
 CSRCS += tc4x7_qspi.c
 endif
 
+ifeq ($(CONFIG_TC4X_GETH),y)
+CSRCS += tc4x7_ethernet.c
+endif
+
 include $(TOPDIR)/boards/Board.mk
