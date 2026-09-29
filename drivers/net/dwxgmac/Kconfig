@@ -66,6 +66,16 @@ config DWXGMAC_DMA_IRQ
     int "XGMAC DMA interrupt number"
     default 0
 
+config DWXGMAC_TX_FIFO_SIZE
+    int "Transmit FIFO size in bytes"
+    default 0
+    ---help---
+        Size of the transmit FIFO the MTL queues are carved out of.  Leave
+        at 0 to take it from MAC_HW_FEATURE1.  Set it where that register
+        reports more than the block really has: a queue programmed past the
+        end of the FIFO transmits a few kilobytes and then wedges, with the
+        DMA waiting for a transmit status that never arrives.
+
 config NET_DWXGMAC_MDIO
 	bool "XGMAC MDIO driver"
 	default n

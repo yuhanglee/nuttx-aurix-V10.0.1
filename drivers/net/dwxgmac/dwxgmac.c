@@ -283,6 +283,14 @@ static void xgmac_check_caps(FAR struct xgmac_driver_s *priv)
     nerr("TX channels/queues %u/%u exceed hardware %" PRIu32 "/%" PRIu32 "\n",
          cfg->dma_tx_channel, cfg->mtl_tx_queues, txch, txq);
 
+#if CONFIG_DWXGMAC_TX_FIFO_SIZE > 0
+  /* The reported size is wrong on some parts, so the board can say what the
+   * block really has.
+   */
+
+  txfifo = CONFIG_DWXGMAC_TX_FIFO_SIZE;
+#endif
+
   /* Share the synthesized FIFO out over the active queues rather than
    * guessing a budget at build time.
    */
