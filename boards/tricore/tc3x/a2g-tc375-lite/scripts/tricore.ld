@@ -1,5 +1,5 @@
 /****************************************************************************
- * arch/tricore/src/common/tricore.ld
+ * boards/tricore/tc3x/a2g-tc375-lite/scripts/tricore.ld
  *
  * SPDX-License-Identifier: Apache-2.0
  *
@@ -32,21 +32,13 @@ CONFIG_TRICORE_CSA_COUNT = 512;
 CONFIG_TRICORE_INITIAL_STACK_OFFSET = 0xEB00;
 CONFIG_TRICORE_INITIAL_STACK_SIZE = 512;
 
-#if defined(CONFIG_ARCH_CHIP_FAMILY_TC4X)
-__HEAP_SIZE = 512K;
-#else
 __HEAP_SIZE = 64K;
-#endif
 
 MEMORY
 {
 	dsram0 (w!xp): ORIGIN = 0x70000000, LENGTH = 240K
 	psram0 (wx!p): ORIGIN = 0x70100000, LENGTH = 64K
-#if defined(CONFIG_ARCH_CHIP_FAMILY_TC4X)
-	dlmu   (wr!xp): ORIGIN = 0x90000000, LENGTH = 512K
-#else
 	dlmu   (wr!xp): ORIGIN = 0x90000000, LENGTH = 96K
-#endif
 	pflash0 (rx!p): ORIGIN = 0x80000000, LENGTH = 4M
 }
 

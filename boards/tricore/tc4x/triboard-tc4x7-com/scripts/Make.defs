@@ -26,9 +26,9 @@ include $(TOPDIR)/tools/Config.mk
 include $(TOPDIR)/arch/tricore/src/tc4x/Toolchain.defs
 
 ifeq ($(CONFIG_TRICORE_TOOLCHAIN_LLVM),y)
-ARCHSCRIPT += $(TOPDIR)$(DELIM)arch$(DELIM)tricore$(DELIM)src$(DELIM)common$(DELIM)tricore-llvm.ld
+ARCHSCRIPT += $(BOARD_DIR)$(DELIM)scripts$(DELIM)tricore-llvm.ld
 else
-ARCHSCRIPT += $(TOPDIR)$(DELIM)arch$(DELIM)tricore$(DELIM)src$(DELIM)common$(DELIM)tricore.ld
+ARCHSCRIPT += $(BOARD_DIR)$(DELIM)scripts$(DELIM)tricore.ld
 endif
 
 CFLAGS := $(ARCHCFLAGS) $(ARCHOPTIMIZATION) $(ARCHCPUFLAGS) $(ARCHINCLUDES) $(ARCHDEFINES) $(EXTRAFLAGS)

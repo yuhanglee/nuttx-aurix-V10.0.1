@@ -23,10 +23,10 @@
 if(CONFIG_TRICORE_TOOLCHAIN_LLVM)
   set_property(
     GLOBAL PROPERTY LD_SCRIPT
-                    "${NUTTX_DIR}/arch/tricore/src/common/tricore-llvm.ld")
+                    "${NUTTX_BOARD_DIR}/scripts/tricore-llvm.ld")
 else()
   set_property(
-    GLOBAL PROPERTY LD_SCRIPT "${NUTTX_DIR}/arch/tricore/src/common/tricore.ld")
+    GLOBAL PROPERTY LD_SCRIPT "${NUTTX_BOARD_DIR}/scripts/tricore.ld")
 endif()
 
 target_sources(board PRIVATE tc4d7_appinit.c tc4d7_amp_secondary.c)

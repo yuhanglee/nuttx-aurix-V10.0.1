@@ -1,5 +1,5 @@
 /****************************************************************************
- * arch/tricore/src/common/tricore-llvm.ld
+ * boards/tricore/tc4x/triboard-tc4x7-com/scripts/tricore-llvm.ld
  *
  * SPDX-License-Identifier: Apache-2.0
  *
@@ -31,17 +31,12 @@ CONFIG_TRICORE_CSA_COUNT = 512;
 CONFIG_TRICORE_INITIAL_STACK_SIZE = 512;
 CONFIG_TRICORE_INITIAL_STACK_OFFSET = 0xEB00;
 
-#if defined(CONFIG_ARCH_CHIP_FAMILY_TC4X)
 __HEAP_SIZE = (256 * 1024);   /* dlmu less the 256K DMA window */
-#else
-__HEAP_SIZE = (64 * 1024);
-#endif
 
 MEMORY
 {
   dsram  (rw): ORIGIN = 0x70000000, LENGTH = 240K
   psram  (rwx): ORIGIN = 0x70100000, LENGTH = 64K
-#if defined(CONFIG_ARCH_CHIP_FAMILY_TC4X)
   /* CPU0 DLMU, split between the heap and a DMA window.  dma_nc is the
    * non-cached 0xB alias of the same RAM, so bus masters and the CPU
    * stay coherent without cache maintenance.
@@ -49,9 +44,6 @@ MEMORY
 
   dlmu   (rw): ORIGIN = 0x90000000, LENGTH = 256K
   dma_nc (rw): ORIGIN = 0xB0040000, LENGTH = 256K
-#else
-  dlmu   (rw): ORIGIN = 0x90000000, LENGTH = 96K
-#endif
   pflash (rx): ORIGIN = 0x80000000, LENGTH = 4M
 }
 
@@ -61,9 +53,7 @@ REGION_ALIAS("BSS_MEM", dsram)
 REGION_ALIAS("CSA_MEM", dsram)
 REGION_ALIAS("HEAP_MEM", dlmu)
 REGION_ALIAS("PSRAM_MEM", psram)
-#if defined(CONFIG_ARCH_CHIP_FAMILY_TC4X)
 REGION_ALIAS("DMA_MEM", dma_nc)
-#endif
 
 SECTIONS
 {
@@ -138,7 +128,6 @@ SECTIONS
   } > BSS_MEM
 #endif
 
-#if defined(CONFIG_ARCH_CHIP_FAMILY_TC4X)
   .dma_data (NOLOAD) : ALIGN(64)
   {
     _sdma_data = ABSOLUTE(.);
@@ -146,7 +135,6 @@ SECTIONS
     . = ALIGN(4);
     _edma_data = ABSOLUTE(.);
   } > DMA_MEM
-#endif
 
   .csa (NOLOAD) : ALIGN(64)
   {
